@@ -4,12 +4,11 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - .:/project
-      - ${DATA_DIR}:/data
-    
+      - .:/project/src
     environment:
-      DATA_DIR: /data
-    
+      REPO_ROOT: /project/src
+      DATA_DIR: /project/data
+      PYTHONPATH: /project/src
     shm_size: '16gb'
     # At least one of stdin_open or tty is required to make devcontainer work
     stdin_open: true

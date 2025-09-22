@@ -138,8 +138,3 @@ venv.bak/
 
 # data files
 *.avro
-
-
-# data directory
-data/
-
