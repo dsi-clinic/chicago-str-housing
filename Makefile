@@ -35,7 +35,7 @@ run-notebooks: build-only
 	docker compose run --rm -p 8888:8888 -t $(mount_data) $(project_name) uv run jupyter lab --port=8888 --ip='*' --NotebookApp.token='' --NotebookApp.password='' --no-browser --allow-root
 
 test-pipeline: build-only
-	docker compose run --rm -t $(mount_data) $(project_name) uv run python src/utils/pipeline_example.py
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/utils/pipeline_example.py
 
 clean:
 	docker compose down --rmi all --volumes --remove-orphans
