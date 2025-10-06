@@ -67,17 +67,43 @@ cp .env.example .env
 # Example: DATA_DIR=/Users/yourname/project/data
 ```
 
-### 2. Install Pre-commit Hooks
+### 2. Choose Your Development Workflow
+
+#### Option A: Development Container (Recommended)
+**Best for**: Interactive development, notebooks, and full IDE integration
+
 ```bash
+# Build the devcontainer
+make devcontainer
+
+# Open in VS Code or Cursor
+# When prompted, click "Reopen in Container"
+```
+
+**Benefits**:
+- Run notebooks directly in the editor
+- Full IDE integration with code completion
+- Pre-configured Python environment
+- All extensions and tools ready to use
+
+#### Option B: Command Line with Make
+**Best for**: Scripts, testing, and automated workflows
+
+```bash
+# Install pre-commit hooks
 make run-interactive
 # Inside container:
-cd src
 pre-commit install
 exit
+
+# Test your setup
+make test-pipeline
 ```
 
 ### 3. Test Your Setup
 ```bash
+# If using devcontainer: Open a notebook and run cells
+# If using make: Run the pipeline test
 make test-pipeline
 ```
 
@@ -106,13 +132,13 @@ We use [uv](https://docs.astral.sh/uv/) for Python environment and package manag
 
 ```bash
 # Example: Running the pipeline
-uv run python src/utils/pipeline_example.py
-
-# Example: Running a notebook
-uv run jupyter lab
+uv run python src/housing/scripts/pipeline_example.py
 
 # Example: Running tests
-uv run pytest
+uv run pytest tests/
+
+# Example: Running a notebook (in devcontainer)
+# Just open the notebook file and run cells directly
 ```
 
 ### Container Volume Structure
@@ -120,7 +146,12 @@ uv run pytest
 ```
 Container: /project/
 ├── src/           # Your source code (mounted from host repo)
+│   └── housing/   # Python package with your code
+│       ├── scripts/  # Executable scripts
+│       └── *.py      # Importable modules
 ├── data/          # Data directory (mounted from HOST_DATA_DIR)
+├── notebooks/     # Jupyter notebooks
+├── tests/         # Test files
 ├── .venv/         # Python virtual environment (created in container)
 ├── pyproject.toml # Project configuration
 └── ...
@@ -129,20 +160,58 @@ Container: /project/
 
 ## Usage & Testing
 
+### Working with the Housing Package
+
+The project uses a Python package called `housing` located in `src/housing/`. The package is organized as follows:
+
+```
+src/housing/
+├── __init__.py                    # Package initialization
+├── preprocess_util_lib_example.py # Importable utility functions
+└── scripts/                       # Executable scripts
+    ├── __init__.py
+    └── pipeline_example.py        # Example pipeline script
+```
+
+**Importable Code**: Use functions and classes from the main package:
+```python
+# In notebooks or Python scripts
+from housing.preprocess_util_lib_example import generate_random_dataframe
+
+# Use the function
+df = generate_random_dataframe(rows=100)
+```
+
+**Executable Scripts**: Run scripts from the scripts directory:
+```bash
+# Run pipeline scripts
+uv run python src/housing/scripts/pipeline_example.py
+```
+
+### Data Management
+
 - Set `DATA_DIR` in your `.env` file to specify where data lives on your host
 - This directory is mounted to `/project/data` inside the container
 - Keep data separate from code to avoid repository bloat and enable easy data sharing
 
+### Testing Your Setup
+
 Run the command `make test-pipeline`. If your setup is working you should see a file `sample_output.csv` appear in your data directory. 
 
 
-### Docker & Make
+### Docker & Make Commands
 
-We use `docker` and `make` to run our code. There are three built-in `make` commands:
+We use `docker` and `make` to run our code. Available `make` commands:
 
-* `make build-only`: This will build the image only. It is useful for testing and making changes to the Dockerfile.
-* `make run-notebooks`: This will run a Jupyter server, which also mounts the current directory into `/program`.
-* `make run-interactive`: This will create a container (with the current directory mounted as `/program`) and load an interactive session. 
+* `make help`: Show all available commands and descriptions
+* `make build-only`: Build the Docker image only (useful for testing Dockerfile changes)
+* `make devcontainer`: Build and prepare devcontainer for VS Code/Cursor
+* `make run-interactive`: Create a container and load an interactive bash session
+* `make test`: Run all tests with pytest
+* `make test-pipeline`: Run the pipeline example script
+* `make clean`: Clean up Docker images and containers
+
+**Note**: For notebook development, use the devcontainer workflow instead of command-line tools for the best experience.
 
 The file `Makefile` contains details about the specific commands that are run when calling each `make` target.
 

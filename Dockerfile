@@ -12,7 +12,7 @@ COPY pyproject.toml .
 RUN /usr/local/bin/uv venv
 ENV VIRTUAL_ENV=/project/.venv
 ENV PATH="/project/.venv/bin:$PATH"
-ENV PYTHONPATH=/project/src
+ENV PYTHONPATH=/project
 RUN uv sync
 
 CMD ["/bin/bash"]

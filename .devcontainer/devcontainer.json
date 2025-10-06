@@ -1,0 +1,53 @@
+{
+  "name": "Housing Project",
+  "dockerComposeFile": "../docker-compose.yaml",
+  "service": "2025-autumn-city-of-chicago-housing",
+  "workspaceFolder": "/project",
+  
+  // Configure tool-specific properties
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.pylint",
+        "ms-python.black-formatter",
+        "ms-toolsai.jupyter",
+        "ms-toolsai.jupyter-keymap",
+        "ms-toolsai.jupyter-renderers",
+        "ms-python.debugpy",
+        "charliermarsh.ruff",
+        "ms-python.isort"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/project/.venv/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "python.linting.enabled": true,
+        "python.linting.ruffEnabled": true,
+        "python.formatting.provider": "black",
+        "python.sortImports.args": ["--profile", "black"],
+        "jupyter.askForKernelRestart": false,
+        "jupyter.interactiveWindow.creationMode": "perFile",
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/*.pyc": true,
+          ".pytest_cache": true,
+          ".venv": false
+        }
+      }
+    }
+  },
+
+  // Use 'forwardPorts' to make a list of ports inside the container available locally
+  "forwardPorts": [8888],
+
+  // Use 'postCreateCommand' to run commands after the container is created
+  "postCreateCommand": "echo 'Dev container ready! You can now run notebooks and use the housing package.'",
+
+  // Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root
+  "remoteUser": "root",
+
+  // Mount the data directory if it exists
+  "mounts": [
+    "source=${localWorkspaceFolder}/data,target=/project/data,type=bind,consistency=cached"
+  ]
+}

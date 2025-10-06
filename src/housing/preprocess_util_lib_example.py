@@ -1,11 +1,7 @@
 """Utilities example"""
 
-import os
-
 import numpy as np
 import pandas as pd
-
-REPO_ROOT = os.environ["REPO_ROOT"]
 
 
 def generate_random_dataframe(no_rows: int = 10) -> pd.DataFrame:
