@@ -167,7 +167,6 @@ The project uses a Python package called `housing` located in `src/housing/`. Th
 ```
 src/housing/
 ├── __init__.py                    # Package initialization
-├── preprocess_util_lib_example.py # Importable utility functions
 └── scripts/                       # Executable scripts
     ├── __init__.py
     └── pipeline_example.py        # Example pipeline script
@@ -176,10 +175,10 @@ src/housing/
 **Importable Code**: Use functions and classes from the main package:
 ```python
 # In notebooks or Python scripts
-from src.housing.preprocess_util_lib_example import generate_random_dataframe
+from src.housing import some_function
 
 # Use the function
-df = generate_random_dataframe(rows=100)
+result = some_function()
 ```
 
 **Executable Scripts**: Run scripts from the scripts directory:

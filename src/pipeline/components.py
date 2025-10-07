@@ -1,7 +1,10 @@
-"""Concrete pipeline components for Chicago housing analysis.
+"""Core pipeline components for spatial data analysis demo.
 
-This module contains specific implementations of pipeline components
-for data loading, processing, analysis, and visualization.
+This module demonstrates the key concepts students need to learn:
+1. Loading different data formats (CSV, GeoJSON)
+2. Spatial joins and geometry transformations
+3. Merging datasets with different geometries
+4. Analysis on merged spatial data
 """
 
 import warnings
@@ -34,13 +37,20 @@ CORRELATION_WEAK_THRESHOLD = 0.3
 CORRELATION_MODERATE_THRESHOLD = 0.5
 CORRELATION_STRONG_THRESHOLD = 0.7
 
+# Statistical thresholds for correlation strength classification
+STRONG_CORRELATION_THRESHOLD = 0.7
+MODERATE_CORRELATION_THRESHOLD = 0.5
+
 # ============================================================================
 # DATA LOADERS
 # ============================================================================
 
 
 class RentalDataLoader(DataLoader):
-    """Load rental price data from ZORI dataset."""
+    """Load rental price data from ZORI dataset.
+
+    This demonstrates loading CSV data with geographic identifiers (zip codes).
+    """
 
     def __init__(
         self, file_path: str = "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv"
@@ -49,152 +59,110 @@ class RentalDataLoader(DataLoader):
             "rental_data", file_path, "Load rental price data from ZORI dataset"
         )
 
-    def execute(self, context: dict[str, Any]) -> pd.DataFrame:
-        """Load and process rental data."""
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Load and clean rental data."""
         print(f"Loading rental data from: {self.file_path}")
 
-        # Load the data
-        rental_data = pd.read_csv(self.file_path)
+        # Load the CSV data
+        rental_df = pd.read_csv(self.file_path)
 
-        # Identify date columns (they start with 20)
-        date_columns = [col for col in rental_data.columns if col.startswith("20")]
-        print(f"Found {len(date_columns)} date columns")
+        # Clean and prepare the data
+        rental_df = rental_df.rename(columns={"RegionName": "zip_code"})
+        rental_df["zip_code"] = rental_df["zip_code"].astype(str).str.zfill(5)
 
-        # Get the most recent data (last 12 months)
-        recent_columns = date_columns[-12:]
-        print(f"Using last 12 months: {recent_columns[0]} to {recent_columns[-1]}")
+        # Get the most recent month's data
+        date_columns = [col for col in rental_df.columns if col.startswith("20")]
+        if date_columns:
+            latest_month = sorted(date_columns)[-1]
+            rental_df = rental_df[["zip_code", latest_month]].copy()
+            rental_df = rental_df.rename(columns={latest_month: "rental_price"})
+            rental_df = rental_df.dropna()
 
-        # Calculate average rental price for each ZIP code over the last 12 months
-        rental_data["avg_rental_price"] = rental_data[recent_columns].mean(axis=1)
+        print(f"Loaded {len(rental_df)} zip codes with rental data")
+        print(
+            f"Rental price range: ${rental_df['rental_price'].min():.0f} - ${rental_df['rental_price'].max():.0f}"
+        )
 
-        # Create a clean dataset with ZIP codes and average rental prices
-        zip_rental_prices = rental_data[["RegionName", "avg_rental_price"]].copy()
-        zip_rental_prices.columns = ["zip_code", "avg_rental_price"]
-        zip_rental_prices = zip_rental_prices.dropna()
-
-        print(f"Processed {len(zip_rental_prices)} ZIP codes with rental data")
-
-        return zip_rental_prices
+        return {"rental_data": rental_df}
 
 
 class ZipBoundariesLoader(DataLoader):
-    """Load ZIP code boundaries."""
+    """Load zip code boundary data.
+
+    This demonstrates loading GeoJSON data with polygon geometries.
+    """
 
     def __init__(
         self, file_path: str = "/project/data/Boundaries_ZIP_Codes.csv"
     ) -> None:
-        super().__init__("zip_boundaries", file_path, "Load ZIP code boundaries")
+        super().__init__("zip_boundaries", file_path, "Load zip code boundary data")
 
-    def execute(self, context: dict[str, Any]) -> gpd.GeoDataFrame:
-        """Load and process ZIP boundaries."""
-        print(f"Loading ZIP boundaries from: {self.file_path}")
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Load zip code boundaries."""
+        print(f"Loading zip boundaries from: {self.file_path}")
 
-        # Load the data
-        zip_boundaries = gpd.read_file(self.file_path)
+        # Load CSV with polygon coordinates
+        zip_df = pd.read_csv(self.file_path)
 
-        # Set CRS if not already set
-        if zip_boundaries.crs is None:
-            zip_boundaries = zip_boundaries.set_crs("EPSG:4326")
+        # Convert to GeoDataFrame
+        # This is a key concept: transforming coordinate data to geometries
+        from shapely import wkt
 
-        # Check if we need to convert geometry from WKT strings
-        if zip_boundaries.geometry.isna().all():
-            print("ZIP boundaries geometry is empty. Checking for WKT column...")
-            geom_cols = [
-                col
-                for col in zip_boundaries.columns
-                if "geom" in col.lower() or "wkt" in col.lower()
-            ]
-            print(f"Potential geometry columns: {geom_cols}")
+        zip_df["geometry"] = zip_df["the_geom"].apply(wkt.loads)
+        gdf = gpd.GeoDataFrame(zip_df, geometry="geometry")
 
-            if geom_cols:
-                from shapely import wkt
+        # Set CRS
+        gdf = gdf.set_crs("EPSG:4326")
 
-                zip_boundaries["geometry"] = zip_boundaries[geom_cols[0]].apply(
-                    wkt.loads
-                )
-                print("Converted WKT to geometry for ZIP boundaries")
+        # Clean zip code column
+        if "ZIP" in gdf.columns:
+            gdf = gdf.rename(columns={"ZIP": "zip_code"})
+        gdf["zip_code"] = gdf["zip_code"].astype(str).str.zfill(5)
 
-        print(f"Loaded {len(zip_boundaries)} ZIP boundaries")
-        print(
-            f"Valid geometries: {zip_boundaries.geometry.is_valid.sum()}/{len(zip_boundaries)}"
-        )
+        print(f"Loaded {len(gdf)} zip code boundaries")
+        print(f"CRS: {gdf.crs}")
 
-        return zip_boundaries
+        return {"zip_boundaries": gdf}
 
 
 class CommunityBoundariesLoader(DataLoader):
-    """Load community area boundaries."""
+    """Load community area boundary data.
+
+    This demonstrates loading CSV data with polygon coordinates that need
+    to be converted to GeoDataFrame.
+    """
 
     def __init__(
         self, file_path: str = "/project/data/Boundaries_Community_Areas.csv"
     ) -> None:
         super().__init__(
-            "community_boundaries", file_path, "Load community area boundaries"
+            "community_boundaries", file_path, "Load community area boundary data"
         )
 
-    def execute(self, context: dict[str, Any]) -> gpd.GeoDataFrame:
-        """Load and process community boundaries."""
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Load community area boundaries."""
         print(f"Loading community boundaries from: {self.file_path}")
 
-        # Load the data
-        community_boundaries = gpd.read_file(self.file_path)
+        # Load CSV with polygon coordinates
+        community_df = pd.read_csv(self.file_path)
 
-        # Set CRS if not already set
-        if community_boundaries.crs is None:
-            community_boundaries = community_boundaries.set_crs("EPSG:4326")
+        # Convert to GeoDataFrame
+        # This is a key concept: transforming coordinate data to geometries
+        from shapely import wkt
 
-        # Check if we need to convert geometry from WKT strings
-        if community_boundaries.geometry.isna().all():
-            print("Community boundaries geometry is empty. Checking for WKT column...")
-            geom_cols = [
-                col
-                for col in community_boundaries.columns
-                if "geom" in col.lower() or "wkt" in col.lower()
-            ]
-            print(f"Potential geometry columns: {geom_cols}")
+        community_df["geometry"] = community_df["the_geom"].apply(wkt.loads)
+        gdf = gpd.GeoDataFrame(community_df, geometry="geometry")
 
-            if geom_cols:
-                from shapely import wkt
+        # Set CRS
+        gdf = gdf.set_crs("EPSG:4326")
 
-                community_boundaries["geometry"] = community_boundaries[
-                    geom_cols[0]
-                ].apply(wkt.loads)
-                print("Converted WKT to geometry for community boundaries")
+        # Clean column names
+        gdf = gdf.rename(columns={"COMMUNITY": "community_name"})
 
-        print(f"Loaded {len(community_boundaries)} community boundaries")
-        print(
-            f"Valid geometries: {community_boundaries.geometry.is_valid.sum()}/{len(community_boundaries)}"
-        )
+        print(f"Loaded {len(gdf)} community area boundaries")
+        print(f"CRS: {gdf.crs}")
 
-        return community_boundaries
-
-
-class HouseShareDataLoader(DataLoader):
-    """Load house share prohibition data."""
-
-    def __init__(
-        self,
-        file_path: str = "/project/data/aggregated_house_share_buildings_by_community.csv",
-    ) -> None:
-        super().__init__(
-            "house_share_data", file_path, "Load house share prohibition data"
-        )
-
-    def execute(self, context: dict[str, Any]) -> pd.DataFrame:
-        """Load and process house share data."""
-        print(f"Loading house share data from: {self.file_path}")
-
-        # Load the data
-        house_share_data = pd.read_csv(self.file_path)
-
-        # Clean up community names for merging
-        house_share_data["community_area"] = (
-            house_share_data["COMMUNITY"].str.upper().str.strip()
-        )
-
-        print(f"Loaded house share data for {len(house_share_data)} community areas")
-
-        return house_share_data
+        return {"community_boundaries": gdf}
 
 
 # ============================================================================
@@ -203,180 +171,97 @@ class HouseShareDataLoader(DataLoader):
 
 
 class SpatialJoinProcessor(DataProcessor):
-    """Create ZIP code to community area mapping using spatial joins."""
+    """Perform spatial join to transform data from zip codes to community areas.
+
+    This is the CORE CONCEPT students need to understand:
+    - How to join data with different geometries
+    - How to aggregate data when geometries don't align perfectly
+    - How to handle overlapping boundaries
+    """
 
     def __init__(self) -> None:
-        super().__init__("spatial_join", "Create ZIP code to community area mapping")
-        self.dependencies = ["zip_boundaries", "community_boundaries"]
-        self.required_data = ["zip_boundaries", "community_boundaries"]
-        self.output_data = ["zip_community_mapping"]
+        super().__init__(
+            "spatial_join", "Transform rental data from zip codes to community areas"
+        )
 
-    def execute(self, context: dict[str, Any]) -> pd.DataFrame:
-        """Perform spatial join to map ZIP codes to community areas."""
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Perform spatial join and aggregation."""
+        print("Performing spatial join: zip codes -> community areas")
+
+        # Get the data from context
+        rental_data = context["rental_data"]
         zip_boundaries = context["zip_boundaries"]
         community_boundaries = context["community_boundaries"]
 
-        print("Performing spatial join to map ZIP codes to community areas...")
+        # Step 1: Join rental data with zip boundaries
+        print("Step 1: Joining rental data with zip boundaries...")
+        zip_rental = zip_boundaries.merge(rental_data, on="zip_code", how="inner")
+        print(f"Joined {len(zip_rental)} zip codes with rental data")
 
-        # Ensure both GeoDataFrames have the same CRS
-        if zip_boundaries.crs != community_boundaries.crs:
-            community_boundaries = community_boundaries.to_crs(zip_boundaries.crs)
+        # Step 2: Spatial join - zip codes to community areas
+        print("Step 2: Performing spatial join (zip codes -> community areas)...")
 
-        # Perform spatial join to map ZIP codes to community areas
-        zip_to_community_all = gpd.sjoin(
-            zip_boundaries, community_boundaries, how="inner", predicate="intersects"
+        # Ensure same CRS for spatial operations
+        if zip_rental.crs != community_boundaries.crs:
+            community_boundaries = community_boundaries.to_crs(zip_rental.crs)
+
+        # Perform spatial join
+        # This is the key concept: how to handle overlapping geometries
+        spatial_join = gpd.sjoin(
+            zip_rental, community_boundaries, how="inner", predicate="intersects"
         )
 
-        print(
-            f"Initial spatial join results: {len(zip_to_community_all)} ZIP-Community mappings"
+        print(f"Spatial join resulted in {len(spatial_join)} zip-community pairs")
+
+        # Step 3: Aggregate rental prices by community area
+        print("Step 3: Aggregating rental prices by community area...")
+
+        # Calculate area-weighted average rental price
+        # This is another key concept: how to properly aggregate spatial data
+        spatial_join["zip_area"] = spatial_join.geometry.area
+        spatial_join["weighted_rent"] = (
+            spatial_join["rental_price"] * spatial_join["zip_area"]
         )
 
-        # Check for duplicate ZIP codes (multiple community area matches)
-        duplicate_zips = zip_to_community_all["ZIP"].value_counts()
-        duplicate_zips = duplicate_zips[duplicate_zips > 1]
-        print(f"ZIP codes with multiple community area matches: {len(duplicate_zips)}")
-
-        # For each ZIP code, find the community area with the largest intersection
-        zip_to_community_fixed = []
-
-        for zip_code in zip_to_community_all["ZIP"].unique():
-            zip_matches = zip_to_community_all[zip_to_community_all["ZIP"] == zip_code]
-
-            if len(zip_matches) == 1:
-                # Only one match, use it
-                zip_to_community_fixed.append(zip_matches.iloc[0])
-            else:
-                # Multiple matches, find the one with largest intersection
-                zip_geom = zip_boundaries[
-                    zip_boundaries["ZIP"] == zip_code
-                ].geometry.iloc[0]
-                best_match = None
-                max_intersection = 0
-
-                for _, row in zip_matches.iterrows():
-                    community_geom = community_boundaries[
-                        community_boundaries["COMMUNITY"] == row["COMMUNITY"]
-                    ].geometry.iloc[0]
-                    intersection_area = zip_geom.intersection(community_geom).area
-                    if intersection_area > max_intersection:
-                        max_intersection = intersection_area
-                        best_match = row
-
-                if best_match is not None:
-                    zip_to_community_fixed.append(best_match)
-
-        # Convert back to DataFrame
-        zip_to_community = pd.DataFrame(zip_to_community_fixed)
-
-        print(
-            f"After resolving duplicates: {len(zip_to_community)} unique ZIP-Community mappings"
-        )
-
-        # Clean up the mapping
-        zip_community_mapping = zip_to_community[["ZIP", "COMMUNITY"]].copy()
-        zip_community_mapping.columns = ["zip_code", "community_area"]
-
-        # Convert ZIP codes to string for consistent matching
-        zip_community_mapping["zip_code"] = zip_community_mapping["zip_code"].astype(
-            str
-        )
-
-        # Verify no duplicate ZIP codes
-        duplicate_check = zip_community_mapping["zip_code"].value_counts()
-        duplicates = duplicate_check[duplicate_check > 1]
-        if len(duplicates) > 0:
-            print(f"WARNING: Still have {len(duplicates)} duplicate ZIP codes!")
-        else:
-            print(
-                f"✓ All {len(zip_community_mapping)} ZIP codes have unique community area assignments"
+        community_rental = (
+            spatial_join.groupby("community_name")
+            .agg(
+                {
+                    "weighted_rent": "sum",
+                    "zip_area": "sum",
+                    "rental_price": ["mean", "min", "max", "count"],
+                }
             )
-
-        return zip_community_mapping
-
-
-class CommunityRentalProcessor(DataProcessor):
-    """Calculate average rental prices by community area."""
-
-    def __init__(self) -> None:
-        super().__init__(
-            "community_rental_processor",
-            "Calculate average rental prices by community area",
-        )
-        self.dependencies = ["rental_data", "spatial_join"]
-        self.required_data = ["rental_data", "spatial_join"]
-        self.output_data = ["community_avg_rentals"]
-
-    def execute(self, context: dict[str, Any]) -> pd.DataFrame:
-        """Calculate average rental prices by community area."""
-        zip_rental_prices = context["rental_data"]
-        zip_community_mapping = context["spatial_join"]
-
-        print("Calculating average rental prices by community area...")
-
-        # Convert ZIP codes to string for consistent matching
-        zip_rental_prices["zip_code"] = zip_rental_prices["zip_code"].astype(str)
-
-        # Merge rental prices with ZIP-community mapping
-        merged_data = zip_rental_prices.merge(
-            zip_community_mapping, on="zip_code", how="inner"
-        )
-
-        print(f"Merged {len(merged_data)} ZIP codes with community areas")
-
-        # Calculate average rental price by community area
-        community_avg_rentals = (
-            merged_data.groupby("community_area")
-            .agg({"avg_rental_price": ["mean", "count", "std"]})
-            .round(2)
+            .reset_index()
         )
 
         # Flatten column names
-        community_avg_rentals.columns = ["avg_rental_price", "zip_count", "price_std"]
-        community_avg_rentals = community_avg_rentals.reset_index()
+        community_rental.columns = [
+            "community_name",
+            "total_weighted_rent",
+            "total_area",
+            "avg_rental_price",
+            "min_rental_price",
+            "max_rental_price",
+            "zip_count",
+        ]
 
+        # Calculate area-weighted average
+        community_rental["area_weighted_avg_rent"] = (
+            community_rental["total_weighted_rent"] / community_rental["total_area"]
+        )
+
+        # Step 4: Join back with community boundaries for final result
+        final_result = community_boundaries.merge(
+            community_rental, on="community_name", how="left"
+        )
+
+        print(f"Final result: {len(final_result)} community areas")
         print(
-            f"Calculated average rental prices for {len(community_avg_rentals)} community areas"
+            f"Areas with rental data: {final_result['avg_rental_price'].notna().sum()}"
         )
 
-        return community_avg_rentals
-
-
-class HouseShareMerger(DataProcessor):
-    """Merge rental prices with house share prohibition data."""
-
-    def __init__(self) -> None:
-        super().__init__(
-            "house_share_merger",
-            "Merge rental prices with house share prohibition data",
-        )
-        self.dependencies = ["community_rental_processor", "house_share_data"]
-        self.required_data = ["community_rental_processor", "house_share_data"]
-        self.output_data = ["merged_analysis_data"]
-
-    def execute(self, context: dict[str, Any]) -> pd.DataFrame:
-        """Merge rental prices with house share prohibition data."""
-        community_avg_rentals = context["community_rental_processor"]
-        house_share_data = context["house_share_data"]
-
-        print("Merging rental prices with house share prohibition data...")
-
-        # Clean up community names for merging
-        community_avg_rentals["community_area"] = (
-            community_avg_rentals["community_area"].str.upper().str.strip()
-        )
-
-        # Merge rental prices with house share prohibition data
-        merged_data = community_avg_rentals.merge(
-            house_share_data[
-                ["community_area", "building_count", "total_units", "avg_units"]
-            ],
-            on="community_area",
-            how="inner",
-        )
-
-        print(f"Successfully merged {len(merged_data)} community areas")
-
-        return merged_data
+        return {"community_rental_data": final_result}
 
 
 # ============================================================================
@@ -385,97 +270,88 @@ class HouseShareMerger(DataProcessor):
 
 
 class CorrelationAnalyzer(Analyzer):
-    """Analyze correlation between rental prices and house share prohibitions."""
+    """Analyze correlations in the merged spatial dataset.
 
-    def __init__(self) -> None:  # noqa: ANN204
+    This demonstrates how to perform statistical analysis on merged spatial data.
+    """
+
+    def __init__(self) -> None:
         super().__init__(
-            "correlation_analyzer",
-            "Analyze correlation between rental prices and house share prohibitions",
+            "correlation_analysis", "Analyze correlations in community rental data"
         )
-        self.dependencies = ["house_share_merger"]
-        self.required_data = ["house_share_merger"]
-        self.output_data = ["correlation_results"]
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Perform correlation analysis."""
-        merged_data = context["house_share_merger"]
+        print("Performing correlation analysis on community rental data...")
 
-        print("Performing correlation analysis...")
+        data = context["community_rental_data"]
 
-        # Calculate correlation coefficients
-        correlation_buildings = merged_data["avg_rental_price"].corr(
-            merged_data["building_count"]
-        )
-        correlation_units = merged_data["avg_rental_price"].corr(
-            merged_data["total_units"]
-        )
-        correlation_avg_units = merged_data["avg_rental_price"].corr(
-            merged_data["avg_units"]
-        )
+        # Calculate area statistics
+        data["area_km2"] = data.geometry.area / 1_000_000  # Convert to km²
 
-        # Determine correlation strength
-        def get_correlation_strength(corr: float) -> str:
-            abs_corr = abs(corr)
-            if abs_corr < CORRELATION_NEGLIGIBLE_THRESHOLD:
-                return "negligible"
-            elif abs_corr < CORRELATION_WEAK_THRESHOLD:
-                return "weak"
-            elif abs_corr < CORRELATION_MODERATE_THRESHOLD:
-                return "moderate"
-            elif abs_corr < CORRELATION_STRONG_THRESHOLD:
-                return "strong"
-            else:
-                return "very strong"
+        # Prepare numeric columns for analysis
+        numeric_cols = [
+            "area_weighted_avg_rent",
+            "avg_rental_price",
+            "min_rental_price",
+            "max_rental_price",
+            "zip_count",
+            "area_km2",
+        ]
 
-        # Statistical significance (rough approximation)
-        n = len(merged_data)
-        t_stat = correlation_buildings * np.sqrt(
-            (n - 2) / (1 - correlation_buildings**2)
-        )
+        # Remove rows with missing data
+        analysis_data = data[numeric_cols].dropna()
 
-        # Summary statistics
-        areas_with_prohibitions = len(merged_data[merged_data["building_count"] > 0])
-        areas_without_prohibitions = len(
-            merged_data[merged_data["building_count"] == 0]
-        )
-        avg_price_with_prohibitions = merged_data[merged_data["building_count"] > 0][
-            "avg_rental_price"
-        ].mean()
-        avg_price_without_prohibitions = merged_data[
-            merged_data["building_count"] == 0
-        ]["avg_rental_price"].mean()
+        print(f"Analyzing {len(analysis_data)} community areas with complete data")
 
-        results = {
-            "correlations": {
-                "buildings": correlation_buildings,
-                "total_units": correlation_units,
-                "avg_units": correlation_avg_units,
-            },
-            "correlation_strength": {
-                "buildings": get_correlation_strength(correlation_buildings),
-                "total_units": get_correlation_strength(correlation_units),
-                "avg_units": get_correlation_strength(correlation_avg_units),
-            },
-            "statistical_test": {"t_statistic": t_stat, "sample_size": n},
-            "summary_stats": {
-                "areas_with_prohibitions": areas_with_prohibitions,
-                "areas_without_prohibitions": areas_without_prohibitions,
-                "avg_price_with_prohibitions": avg_price_with_prohibitions,
-                "avg_price_without_prohibitions": avg_price_without_prohibitions,
-            },
-            "top_prohibitions": merged_data.nlargest(10, "building_count")[
-                ["community_area", "avg_rental_price", "building_count", "total_units"]
-            ].to_dict("records"),
+        # Calculate correlation matrix
+        correlation_matrix = analysis_data.corr()
+
+        # Key correlations to highlight
+        key_correlations = {
+            "Area vs Average Rent": correlation_matrix.loc[
+                "area_km2", "avg_rental_price"
+            ],
+            "Area vs Zip Count": correlation_matrix.loc["area_km2", "zip_count"],
+            "Min vs Max Rent": correlation_matrix.loc[
+                "min_rental_price", "max_rental_price"
+            ],
+            "Average vs Area-Weighted Rent": correlation_matrix.loc[
+                "avg_rental_price", "area_weighted_avg_rent"
+            ],
         }
 
-        print("Correlation analysis completed:")
-        print(
-            f"- Rental Price vs Prohibited Buildings: {correlation_buildings:.3f} ({get_correlation_strength(correlation_buildings)})"
-        )
-        print(f"- Areas with prohibitions: {areas_with_prohibitions}")
-        print(f"- Areas without prohibitions: {areas_without_prohibitions}")
+        # Statistical summary
+        summary_stats = {
+            "total_communities": len(data),
+            "communities_with_data": len(analysis_data),
+            "avg_rental_price": analysis_data["avg_rental_price"].mean(),
+            "rental_price_std": analysis_data["avg_rental_price"].std(),
+            "avg_area_km2": analysis_data["area_km2"].mean(),
+            "key_correlations": key_correlations,
+        }
 
-        return results
+        print("Key Correlations Found:")
+        for name, corr in key_correlations.items():
+            strength = self._get_correlation_strength(abs(corr))
+            print(f"  {name}: {corr:.3f} ({strength})")
+
+        return {
+            "correlation_matrix": correlation_matrix,
+            "analysis_data": analysis_data,
+            "summary_stats": summary_stats,
+        }
+
+    def _get_correlation_strength(self, abs_corr: float) -> str:
+        """Classify correlation strength."""
+        if abs_corr >= CORRELATION_STRONG_THRESHOLD:
+            return "Strong"
+        elif abs_corr >= CORRELATION_MODERATE_THRESHOLD:
+            return "Moderate"
+        elif abs_corr >= CORRELATION_WEAK_THRESHOLD:
+            return "Weak"
+        else:
+            return "Negligible"
 
 
 # ============================================================================
@@ -484,178 +360,159 @@ class CorrelationAnalyzer(Analyzer):
 
 
 class CorrelationVisualizer(Visualizer):
-    """Create visualizations for correlation analysis."""
+    """Create visualizations for the correlation analysis.
 
-    def __init__(self) -> None:
+    This demonstrates how to create meaningful visualizations from merged spatial data.
+    """
+
+    def __init__(self, output_dir: str = "/project/output") -> None:
         super().__init__(
-            "correlation_visualizer", "Create visualizations for correlation analysis"
+            "correlation_visualization",
+            "Create visualizations for correlation analysis",
         )
-        self.dependencies: list[str] = ["correlation_analyzer", "house_share_merger"]
-        self.required_data: list[str] = ["correlation_analyzer", "house_share_merger"]
-        self.output_data: list[str] = ["correlation_plots"]
+        self.output_dir = output_dir
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Create correlation visualizations."""
-        merged_data: pd.DataFrame = context["house_share_merger"]
-        correlation_results: dict[str, Any] = context["correlation_analyzer"]
-
         print("Creating correlation visualizations...")
 
-        # Set up the plot style
-        plt.style.use("default")
-        sns.set_palette("husl")
+        correlation_matrix = context["correlation_matrix"]
+        analysis_data = context["analysis_data"]
+        summary_stats = context["summary_stats"]
 
         # Create figure with subplots
-        fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
         fig.suptitle(
-            "Rental Prices vs House Share Prohibitions Analysis",
+            "Spatial Data Analysis: Community Area Rental Prices",
             fontsize=16,
             fontweight="bold",
         )
 
-        correlations = correlation_results["correlations"]
+        # 1. Correlation heatmap
+        sns.heatmap(
+            correlation_matrix,
+            annot=True,
+            cmap="RdBu_r",
+            center=0,
+            square=True,
+            ax=axes[0, 0],
+        )
+        axes[0, 0].set_title("Correlation Matrix")
 
-        # 1. Scatter plot: Rental Price vs Number of Prohibited Buildings
-        axes[0, 0].scatter(
-            merged_data["building_count"],
-            merged_data["avg_rental_price"],
-            alpha=0.7,
-            s=60,
-        )
-        axes[0, 0].set_xlabel("Number of Prohibited Buildings")
-        axes[0, 0].set_ylabel("Average Rental Price ($)")
-        axes[0, 0].set_title(
-            f'Rental Price vs Prohibited Buildings\n(Correlation: {correlations["buildings"]:.3f})'
-        )
-        axes[0, 0].grid(True, alpha=0.3)
-
-        # Add trend line
-        z = np.polyfit(
-            merged_data["building_count"], merged_data["avg_rental_price"], 1
-        )
-        p = np.poly1d(z)
-        axes[0, 0].plot(
-            merged_data["building_count"],
-            p(merged_data["building_count"]),
-            "r--",
-            alpha=0.8,
-        )
-
-        # 2. Scatter plot: Rental Price vs Total Prohibited Units
+        # 2. Area vs Average Rental Price
         axes[0, 1].scatter(
-            merged_data["total_units"],
-            merged_data["avg_rental_price"],
+            analysis_data["area_km2"],
+            analysis_data["avg_rental_price"],
             alpha=0.7,
             s=60,
-            color="orange",
         )
-        axes[0, 1].set_xlabel("Total Prohibited Units")
+        axes[0, 1].set_xlabel("Area (km²)")
         axes[0, 1].set_ylabel("Average Rental Price ($)")
-        axes[0, 1].set_title(
-            f'Rental Price vs Total Prohibited Units\n(Correlation: {correlations["total_units"]:.3f})'
-        )
+        axes[0, 1].set_title("Area vs Average Rental Price")
         axes[0, 1].grid(True, alpha=0.3)
 
         # Add trend line
-        z = np.polyfit(merged_data["total_units"], merged_data["avg_rental_price"], 1)
+        z = np.polyfit(analysis_data["area_km2"], analysis_data["avg_rental_price"], 1)
         p = np.poly1d(z)
-        axes[0, 1].plot(
-            merged_data["total_units"], p(merged_data["total_units"]), "r--", alpha=0.8
+        x_trend = np.linspace(
+            analysis_data["area_km2"].min(), analysis_data["area_km2"].max(), 100
         )
+        axes[0, 1].plot(x_trend, p(x_trend), "r--", alpha=0.8)
 
-        # 3. Box plot: Rental prices by prohibition status
-        prohibition_status = merged_data["building_count"].apply(
-            lambda x: "With Prohibitions" if x > 0 else "Without Prohibitions"
-        )
-        box_data = [
-            merged_data[prohibition_status == "With Prohibitions"]["avg_rental_price"],
-            merged_data[prohibition_status == "Without Prohibitions"][
-                "avg_rental_price"
-            ],
-        ]
-
-        axes[1, 0].boxplot(
-            box_data, labels=["With Prohibitions", "Without Prohibitions"]
-        )
-        axes[1, 0].set_ylabel("Average Rental Price ($)")
-        axes[1, 0].set_title("Rental Price Distribution by Prohibition Status")
-        axes[1, 0].grid(True, alpha=0.3)
-
-        # 4. Histogram: Distribution of prohibited buildings
-        axes[1, 1].hist(
-            merged_data["building_count"],
+        # 3. Distribution of rental prices
+        axes[1, 0].hist(
+            analysis_data["avg_rental_price"],
             bins=20,
             alpha=0.7,
-            color="green",
+            color="skyblue",
             edgecolor="black",
         )
-        axes[1, 1].set_xlabel("Number of Prohibited Buildings")
-        axes[1, 1].set_ylabel("Number of Community Areas")
-        axes[1, 1].set_title("Distribution of House Share Prohibitions")
-        axes[1, 1].grid(True, alpha=0.3)
+        axes[1, 0].set_xlabel("Average Rental Price ($)")
+        axes[1, 0].set_ylabel("Number of Communities")
+        axes[1, 0].set_title("Distribution of Average Rental Prices")
+        axes[1, 0].grid(True, alpha=0.3)
+
+        # 4. Statistical summary
+        axes[1, 1].axis("off")
+        stats_text = f"""
+        Statistical Summary
+
+        Total Communities: {summary_stats['total_communities']}
+        Communities with Data: {summary_stats['communities_with_data']}
+
+        Average Rental Price: ${summary_stats['avg_rental_price']:,.0f}
+        Standard Deviation: ${summary_stats['rental_price_std']:,.0f}
+        Average Area: {summary_stats['avg_area_km2']:.1f} km²
+
+        Key Correlations:
+        • Area vs Avg Rent: {summary_stats['key_correlations']['Area vs Average Rent']:.3f}
+        • Area vs Zip Count: {summary_stats['key_correlations']['Area vs Zip Count']:.3f}
+        • Min vs Max Rent: {summary_stats['key_correlations']['Min vs Max Rent']:.3f}
+        """
+
+        axes[1, 1].text(
+            0.05,
+            0.95,
+            stats_text,
+            transform=axes[1, 1].transAxes,
+            fontsize=10,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox={"boxstyle": "round,pad=0.5", "facecolor": "lightgray", "alpha": 0.8},
+        )
 
         plt.tight_layout()
 
         # Save the plot
-        output_path = Path("/project/output/correlation_analysis.png")
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path = Path(self.output_dir) / "correlation_analysis.png"
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
+        print(f"Saved visualization to: {output_path}")
+
         plt.show()
 
-        print(f"Correlation visualizations saved to: {output_path}")
-
-        return {"plot_path": str(output_path), "figure": fig}
+        return {"visualization_path": str(output_path)}
 
 
 # ============================================================================
-# DECORATOR-BASED COMPONENTS (Alternative approach)
+# UTILITY FUNCTIONS
 # ============================================================================
 
 
 @pipeline_component(
-    name="summary_reporter",
-    description="Generate summary report of analysis results",
-    dependencies=["correlation_analyzer"],
-    required_data=["correlation_analyzer"],
+    name="summary_reporter", description="Generate a summary report of the analysis"
 )
 def summary_reporter(context: dict[str, Any]) -> dict[str, Any]:
-    """Generate a summary report of the analysis."""
-    correlation_results = context["correlation_analyzer"]
+    """Generate a summary report of the analysis.
 
+    This demonstrates how to create summary reports from pipeline results.
+    """
+    print("\n" + "=" * 60)
+    print("SPATIAL DATA ANALYSIS SUMMARY REPORT")
     print("=" * 60)
-    print("CHICAGO HOUSING ANALYSIS SUMMARY REPORT")
-    print("=" * 60)
 
-    correlations = correlation_results["correlations"]
-    summary_stats = correlation_results["summary_stats"]
+    # Get summary stats
+    summary_stats = context.get("summary_stats", {})
 
-    print("\nCorrelation Analysis Results:")
-    print(f"- Rental Price vs Prohibited Buildings: {correlations['buildings']:.3f}")
+    print("\nDataset Overview:")
+    print(f"  • Total Community Areas: {summary_stats.get('total_communities', 'N/A')}")
     print(
-        f"- Rental Price vs Total Prohibited Units: {correlations['total_units']:.3f}"
-    )
-    print(
-        f"- Rental Price vs Average Units per Building: {correlations['avg_units']:.3f}"
+        f"  • Areas with Rental Data: {summary_stats.get('communities_with_data', 'N/A')}"
     )
 
-    print("\nSummary Statistics:")
-    print(
-        f"- Community areas with house share prohibitions: {summary_stats['areas_with_prohibitions']}"
-    )
-    print(
-        f"- Community areas without house share prohibitions: {summary_stats['areas_without_prohibitions']}"
-    )
-    print(
-        f"- Average rental price in areas with prohibitions: ${summary_stats['avg_price_with_prohibitions']:.2f}"
-    )
-    print(
-        f"- Average rental price in areas without prohibitions: ${summary_stats['avg_price_without_prohibitions']:.2f}"
-    )
+    print("\nRental Price Statistics:")
+    print(f"  • Average: ${summary_stats.get('avg_rental_price', 0):,.0f}")
+    print(f"  • Standard Deviation: ${summary_stats.get('rental_price_std', 0):,.0f}")
 
-    print("\nTop 5 Areas with Most House Share Prohibitions:")
-    for i, area in enumerate(correlation_results["top_prohibitions"][:5], 1):
-        print(
-            f"{i}. {area['community_area']}: {area['building_count']} buildings, ${area['avg_rental_price']:.2f} avg rent"
+    print("\nKey Insights:")
+    correlations = summary_stats.get("key_correlations", {})
+    for name, corr in correlations.items():
+        strength = (
+            "Strong"
+            if abs(corr) >= STRONG_CORRELATION_THRESHOLD
+            else "Moderate"
+            if abs(corr) >= MODERATE_CORRELATION_THRESHOLD
+            else "Weak"
         )
+        print(f"  • {name}: {corr:.3f} ({strength})")
 
-    return {"report_generated": True, "timestamp": pd.Timestamp.now().isoformat()}
+    return {"report_generated": True}

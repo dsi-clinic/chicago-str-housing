@@ -1,7 +1,4 @@
-"""Chicago Housing Analysis Pipeline
-
-A flexible pipeline system for registering and executing different analysis components.
-"""
+"""Spatial Data Analysis Pipeline"""
 
 from pipeline.base import (
     Analyzer,
@@ -15,11 +12,8 @@ from pipeline.base import (
 )
 from pipeline.components import (
     CommunityBoundariesLoader,
-    CommunityRentalProcessor,
     CorrelationAnalyzer,
     CorrelationVisualizer,
-    HouseShareDataLoader,
-    HouseShareMerger,
     RentalDataLoader,
     SpatialJoinProcessor,
     ZipBoundariesLoader,
@@ -36,14 +30,11 @@ __all__ = [
     "Visualizer",
     "PipelineResult",
     "pipeline_component",
-    # Concrete components
+    # Core educational components
     "RentalDataLoader",
     "ZipBoundariesLoader",
     "CommunityBoundariesLoader",
-    "HouseShareDataLoader",
     "SpatialJoinProcessor",
-    "CommunityRentalProcessor",
-    "HouseShareMerger",
     "CorrelationAnalyzer",
     "CorrelationVisualizer",
     "summary_reporter",

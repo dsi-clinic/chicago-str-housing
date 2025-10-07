@@ -1,195 +1,162 @@
-"""Example usage of the Chicago Housing Analysis Pipeline.
+"""Example usage of the Spatial Data Analysis Pipeline.
 
-This script demonstrates how to:
-1. Create a pipeline
-2. Register components
-3. Execute the pipeline
-4. View results
+This script demonstrates the core spatial data analysis concepts:
+1. Loading data from different formats (CSV, GeoJSON)
+2. Spatial joins and geometry transformations
+3. Aggregating data across spatial boundaries
+4. Statistical analysis on merged datasets
+
+This is designed for educational use to teach students the most challenging
+aspects of spatial data analysis.
 """
 
 from typing import Any
 
-from src.pipeline import (
+from pipeline import (
     CommunityBoundariesLoader,
-    CommunityRentalProcessor,
     CorrelationAnalyzer,
     CorrelationVisualizer,
-    HouseShareDataLoader,
-    HouseShareMerger,
     Pipeline,
     PipelineResult,
     RentalDataLoader,
     SpatialJoinProcessor,
     ZipBoundariesLoader,
+    pipeline_component,
     summary_reporter,
 )
 
 
-def create_housing_analysis_pipeline() -> Pipeline:
-    """Create and configure the housing analysis pipeline."""
-    # Create the main pipeline
-    pipeline = Pipeline(
-        name="Chicago Housing Analysis",
-        description="Analyze rental prices and house share prohibitions in Chicago",
-    )
+def create_spatial_analysis_pipeline() -> Pipeline:
+    """Create a pipeline that demonstrates core spatial data analysis concepts."""
+    pipeline = Pipeline("Spatial Data Analysis Demo")
 
-    # Register all components
-    components = [
-        # Data loaders
-        RentalDataLoader(),
-        ZipBoundariesLoader(),
-        CommunityBoundariesLoader(),
-        HouseShareDataLoader(),
-        # Data processors
-        SpatialJoinProcessor(),
-        CommunityRentalProcessor(),
-        HouseShareMerger(),
-        # Analyzers
-        CorrelationAnalyzer(),
-        # Visualizers
-        CorrelationVisualizer(),
-        # Reporters
-        summary_reporter,
-    ]
+    # Step 1: Load data from different sources
+    pipeline.register_component(RentalDataLoader())
+    pipeline.register_component(ZipBoundariesLoader())
+    pipeline.register_component(CommunityBoundariesLoader())
 
-    pipeline.register_components(components)
+    # Step 2: Perform spatial join (the hard part!)
+    pipeline.register_component(SpatialJoinProcessor())
 
-    # Set execution order (optional - pipeline can auto-determine based on dependencies)
-    execution_order = [
-        "rental_data",
-        "zip_boundaries",
-        "community_boundaries",
-        "house_share_data",
-        "spatial_join",
-        "community_rental_processor",
-        "house_share_merger",
-        "correlation_analyzer",
-        "correlation_visualizer",
-        "summary_reporter",
-    ]
-
-    pipeline.set_execution_order(execution_order)
+    # Step 3: Analyze the merged dataset
+    pipeline.register_component(CorrelationAnalyzer())
+    pipeline.register_component(CorrelationVisualizer())
+    pipeline.register_component(summary_reporter)
 
     return pipeline
 
 
 def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
-    """Run the complete housing analysis pipeline."""
-    print("=" * 60)
-    print("CHICAGO HOUSING ANALYSIS PIPELINE")
-    print("=" * 60)
+    """Run the complete spatial analysis pipeline."""
+    print("Starting Spatial Data Analysis Pipeline")
+    print("=" * 50)
 
-    # Create the pipeline
-    pipeline = create_housing_analysis_pipeline()
-
-    # Set any configuration
-    config = {"output_dir": "/project/output", "save_intermediate_results": True}
-    pipeline.set_config(config)
-
-    # Execute the pipeline
+    pipeline = create_spatial_analysis_pipeline()
     results = pipeline.execute()
 
-    # Print summary
-    summary = pipeline.get_results_summary()
-    print("\nPipeline Execution Summary:")
-    print(f"- Total components: {summary['total_components']}")
-    print(f"- Successful: {summary['successful_components']}")
-    print(f"- Failed: {summary['failed_components']}")
-    print(f"- Success rate: {summary['success_rate']:.1%}")
-    print(f"- Total execution time: {summary['total_execution_time']:.2f} seconds")
-
-    # Save results
-    pipeline.save_results("/project/output/pipeline_results.json")
+    print("\nPipeline execution completed!")
+    print(f"Generated {len(results)} results:")
+    for result in results:
+        status = "SUCCESS" if result.success else "FAILED"
+        print(f"  • {result.component_name}: {status}")
 
     return pipeline, results
 
 
 def run_partial_analysis() -> tuple[Pipeline, list[PipelineResult]]:
-    """Run only specific components of the pipeline."""
-    print("=" * 60)
-    print("PARTIAL PIPELINE EXECUTION EXAMPLE")
-    print("=" * 60)
+    """Run only the data loading and spatial join parts."""
+    print("Running Partial Analysis (Data Loading + Spatial Join)")
+    print("=" * 55)
 
-    # Create the pipeline
-    pipeline = create_housing_analysis_pipeline()
+    pipeline = Pipeline("Partial Spatial Analysis")
 
-    # Run only data loading and basic processing
-    partial_components = [
-        "rental_data",
-        "zip_boundaries",
-        "community_boundaries",
-        "spatial_join",
-    ]
+    # Only load data and perform spatial join
+    pipeline.register_component(RentalDataLoader())
+    pipeline.register_component(ZipBoundariesLoader())
+    pipeline.register_component(CommunityBoundariesLoader())
+    pipeline.register_component(SpatialJoinProcessor())
 
-    results = pipeline.execute(components=partial_components)
+    results = pipeline.execute()
 
-    print("\nPartial execution completed:")
-    for result in results:
-        status = "✓" if result.success else "✗"
-        print(f"{status} {result.component_name}: {result.execution_time:.2f}s")
+    print("\nPartial analysis completed!")
+    print("This demonstrates the core spatial join concept.")
 
     return pipeline, results
 
 
 def run_custom_analysis() -> tuple[Pipeline, list[PipelineResult]]:
-    """Example of running a custom analysis with additional components."""
-    print("=" * 60)
-    print("CUSTOM ANALYSIS EXAMPLE")
-    print("=" * 60)
+    """Run a custom analysis with additional components."""
+    print("Running Custom Analysis")
+    print("=" * 30)
 
-    # Create the pipeline
-    pipeline = create_housing_analysis_pipeline()
+    pipeline = Pipeline("Custom Spatial Analysis")
 
-    # Add custom component using decorator
-    from src.pipeline.base import pipeline_component
+    # Add all components
+    pipeline.register_component(RentalDataLoader())
+    pipeline.register_component(ZipBoundariesLoader())
+    pipeline.register_component(CommunityBoundariesLoader())
+    pipeline.register_component(SpatialJoinProcessor())
+    pipeline.register_component(CorrelationAnalyzer())
+    pipeline.register_component(CorrelationVisualizer())
+    pipeline.register_component(summary_reporter)
 
-    @pipeline_component(
-        name="custom_statistics",
-        description="Calculate custom statistics",
-        dependencies=["correlation_analyzer"],
-        required_data=["correlation_results"],
-    )
-    def custom_statistics(context: dict[str, Any]) -> dict[str, Any]:
-        """Calculate custom statistics."""
-        correlation_results = context["correlation_results"]
-
-        # Calculate some custom metrics
-        correlations = correlation_results["correlations"]
-
-        # Find the strongest correlation
-        strongest_corr = max(correlations.items(), key=lambda x: abs(x[1]))
-
-        print(f"Strongest correlation: {strongest_corr[0]} = {strongest_corr[1]:.3f}")
-
-        return {
-            "strongest_correlation": {
-                "metric": strongest_corr[0],
-                "value": strongest_corr[1],
-            }
-        }
-
-    # Register the custom component
+    # Add custom analysis
     pipeline.register_component(custom_statistics)
 
-    # Run the analysis including the custom component
     results = pipeline.execute()
 
     return pipeline, results
 
 
+@pipeline_component(
+    name="custom_statistics", description="Custom statistical analysis component"
+)
+def custom_statistics(context: dict[str, Any]) -> dict[str, Any]:
+    """Custom statistical analysis component."""
+    print("Running Custom Statistical Analysis...")
+
+    if "community_rental_data" in context:
+        data = context["community_rental_data"]
+
+        # Calculate additional statistics
+        stats = {
+            "total_communities": len(data),
+            "communities_with_data": data["avg_rental_price"].notna().sum(),
+            "rental_price_range": {
+                "min": data["avg_rental_price"].min(),
+                "max": data["avg_rental_price"].max(),
+                "median": data["avg_rental_price"].median(),
+            },
+            "top_5_expensive": data.nlargest(5, "avg_rental_price")[
+                ["community_name", "avg_rental_price"]
+            ].to_dict("records"),
+            "top_5_cheapest": data.nsmallest(5, "avg_rental_price")[
+                ["community_name", "avg_rental_price"]
+            ].to_dict("records"),
+        }
+
+        print(f"  • Total communities: {stats['total_communities']}")
+        print(f"  • Communities with data: {stats['communities_with_data']}")
+        print(
+            f"  • Rental price range: ${stats['rental_price_range']['min']:,.0f} - ${stats['rental_price_range']['max']:,.0f}"
+        )
+
+        return {"custom_stats": stats}
+
+    return {}
+
+
 if __name__ == "__main__":
-    # Example 1: Run full analysis
-    print("Example 1: Full Analysis")
+    print("Spatial Data Analysis Pipeline Examples")
+    print("=" * 45)
+
+    print("\n1. Running Full Analysis...")
     pipeline1, results1 = run_full_analysis()
 
-    print("\n" + "=" * 60 + "\n")
-
-    # Example 2: Run partial analysis
-    print("Example 2: Partial Analysis")
+    print("\n" + "=" * 50)
+    print("\n2. Running Partial Analysis...")
     pipeline2, results2 = run_partial_analysis()
 
-    print("\n" + "=" * 60 + "\n")
-
-    # Example 3: Run custom analysis
-    print("Example 3: Custom Analysis")
+    print("\n" + "=" * 50)
+    print("\n3. Running Custom Analysis...")
     pipeline3, results3 = run_custom_analysis()

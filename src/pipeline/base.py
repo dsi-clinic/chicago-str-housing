@@ -193,7 +193,10 @@ class Pipeline:
 
             # Add result data to context if successful
             if result.success and result.data is not None:
-                self.context[component_name] = result.data
+                if isinstance(result.data, dict):
+                    self.context.update(result.data)
+                else:
+                    self.context[component_name] = result.data
 
         self.results = results
         logger.info(f"Pipeline execution completed: {self.name}")

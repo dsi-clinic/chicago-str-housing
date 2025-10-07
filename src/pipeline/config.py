@@ -31,10 +31,6 @@ class DataConfig(BaseModel):
         default=Path("/project/data/Boundaries_Community_Areas.csv"),
         description="Path to community area boundaries file",
     )
-    house_share_data_path: Path = Field(
-        default=Path("/project/data/aggregated_house_share_buildings_by_community.csv"),
-        description="Path to house share prohibition data file",
-    )
 
     @validator("*", pre=True)
     def validate_paths(cls: type["DataConfig"], v: str | Path) -> Path:  # noqa: N805
@@ -182,7 +178,6 @@ class ConfigManager:
             ("rental_data", self.config.data.rental_data_path),
             ("zip_boundaries", self.config.data.zip_boundaries_path),
             ("community_boundaries", self.config.data.community_boundaries_path),
-            ("house_share_data", self.config.data.house_share_data_path),
         ]
 
         for name, path in data_paths:
