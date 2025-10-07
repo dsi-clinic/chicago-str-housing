@@ -1,0 +1,21 @@
+analysis:
+  correlation_threshold: 0.1
+  min_zip_codes_per_community: 1
+  recent_months: 12
+  spatial_join_predicate: intersects
+components: []
+data:
+  community_boundaries_path: /project/data/Boundaries_Community_Areas.csv
+  rental_data_path: /project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv
+  zip_boundaries_path: /project/data/Boundaries_ZIP_Codes.csv
+description: Analyze rental prices and house share prohibitions in Chicago
+execution_order: []
+metadata: {}
+name: Chicago Housing Analysis
+output:
+  output_dir: /project/output
+  plot_dpi: 300
+  plot_format: png
+  results_format: json
+  save_intermediate_results: true
+  save_plots: true

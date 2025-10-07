@@ -14,6 +14,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from pipeline.config import ConfigManager, PipelineConfig
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -51,7 +53,9 @@ class PipelineComponent(ABC):
         """Validate that all dependencies are available in context."""
         for dep in self.dependencies:
             if dep not in context:
-                logger.error(f"Missing dependency '{dep}' for component '{self.name}'")
+                logger.error(
+                    "Missing dependency '%s' for component '%s'", dep, self.name
+                )
                 return False
         return True
 
@@ -60,7 +64,7 @@ class PipelineComponent(ABC):
         for data_key in self.required_data:
             if data_key not in context:
                 logger.error(
-                    f"Missing required data '{data_key}' for component '{self.name}'"
+                    "Missing required data '%s' for component '%s'", data_key, self.name
                 )
                 return False
         return True
@@ -78,28 +82,21 @@ class DataLoader(PipelineComponent):
 class DataProcessor(PipelineComponent):
     """Base class for data processing components."""
 
-    def __init__(self, name: str, description: str = "") -> None:
-        super().__init__(name, description)
-
 
 class Analyzer(PipelineComponent):
     """Base class for analysis components."""
-
-    def __init__(self, name: str, description: str = "") -> None:
-        super().__init__(name, description)
 
 
 class Visualizer(PipelineComponent):
     """Base class for visualization components."""
 
-    def __init__(self, name: str, description: str = "") -> None:
-        super().__init__(name, description)
-
 
 class Pipeline:
     """Main pipeline orchestrator."""
 
-    def __init__(self, name: str, description: str = "") -> None:
+    def __init__(
+        self, name: str, description: str = "", config: PipelineConfig | None = None
+    ) -> None:
         self.name = name
         self.description = description
         self.components: dict[str, PipelineComponent] = {}
@@ -107,11 +104,12 @@ class Pipeline:
         self.context: dict[str, Any] = {}
         self.results: list[PipelineResult] = []
         self.config: dict[str, Any] = {}
+        self.pipeline_config: PipelineConfig | None = config
 
     def register_component(self, component: PipelineComponent) -> None:
         """Register a component with the pipeline."""
         self.components[component.name] = component
-        logger.info(f"Registered component: {component.name}")
+        logger.info("Registered component: %s", component.name)
 
     def register_components(self, components: list[PipelineComponent]) -> None:
         """Register multiple components at once."""
@@ -125,7 +123,7 @@ class Pipeline:
             if component_name not in self.components:
                 raise ValueError(f"Component '{component_name}' not registered")
         self.execution_order = order
-        logger.info(f"Set execution order: {order}")
+        logger.info("Set execution order: %s", order)
 
     def auto_determine_order(self) -> list[str]:
         """Automatically determine execution order based on dependencies."""
@@ -166,6 +164,30 @@ class Pipeline:
         self.config = config
         self.context.update(config)
 
+    def load_config(self, config_path: str | None = None) -> None:
+        """Load pipeline configuration from file or use defaults."""
+        config_manager = ConfigManager(config_path)
+        self.pipeline_config = config_manager.load_config()
+
+        if self.pipeline_config:
+            # Update context with configuration data
+            self.context.update(
+                {
+                    "config": self.pipeline_config.dict(),
+                    "data_paths": {
+                        "rental_data": str(self.pipeline_config.data.rental_data_path),
+                        "zip_boundaries": str(
+                            self.pipeline_config.data.zip_boundaries_path
+                        ),
+                        "community_boundaries": str(
+                            self.pipeline_config.data.community_boundaries_path
+                        ),
+                    },
+                    "output_dir": str(self.pipeline_config.output.output_dir),
+                }
+            )
+            logger.info("Loaded pipeline configuration")
+
     def add_to_context(self, key: str, value: Any) -> None:  # noqa: ANN401
         """Add data to the pipeline context."""
         self.context[key] = value
@@ -177,14 +199,14 @@ class Pipeline:
                 self.execution_order = self.auto_determine_order()
             components = self.execution_order
 
-        logger.info(f"Starting pipeline execution: {self.name}")
-        logger.info(f"Components to execute: {components}")
+        logger.info("Starting pipeline execution: %s", self.name)
+        logger.info("Components to execute: %s", components)
 
         results = []
 
         for component_name in components:
             if component_name not in self.components:
-                logger.error(f"Component '{component_name}' not found")
+                logger.error("Component '%s' not found", component_name)
                 continue
 
             component = self.components[component_name]
@@ -199,7 +221,7 @@ class Pipeline:
                     self.context[component_name] = result.data
 
         self.results = results
-        logger.info(f"Pipeline execution completed: {self.name}")
+        logger.info("Pipeline execution completed: %s", self.name)
         return results
 
     def _execute_component(self, component: PipelineComponent) -> PipelineResult:
@@ -225,7 +247,7 @@ class Pipeline:
                 )
 
             # Execute the component
-            logger.info(f"Executing component: {component.name}")
+            logger.info("Executing component: %s", component.name)
             data = component.execute(self.context)
             execution_time = time.time() - start_time
 
@@ -239,7 +261,7 @@ class Pipeline:
 
         except Exception as e:
             execution_time = time.time() - start_time
-            logger.error(f"Error executing component '{component.name}': {str(e)}")
+            logger.error("Error executing component '%s': %s", component.name, str(e))
 
             return PipelineResult(
                 component_name=component.name,
@@ -279,10 +301,10 @@ class Pipeline:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with output_path.open("w") as f:
+        with output_path.open("w", encoding="utf-8") as f:
             json.dump(self.get_results_summary(), f, indent=2, default=str)
 
-        logger.info(f"Results saved to: {output_path}")
+        logger.info("Results saved to: %s", output_path)
 
 
 # Decorator for easy component registration

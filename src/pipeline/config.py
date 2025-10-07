@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from typing import Any, Literal
 
+import yaml
 from pydantic import BaseModel, Field, validator
 
 logger = logging.getLogger(__name__)
@@ -150,9 +151,16 @@ class ConfigManager:
 
         try:
             if self.config_path and Path(self.config_path).exists():
-                # Pydantic handles file loading automatically!
-                self.config = PipelineConfig.parse_file(self.config_path)
-                logger.info(f"Loaded configuration from: {self.config_path}")
+                # Handle different file formats
+                config_path = Path(self.config_path)
+                if config_path.suffix.lower() in [".yaml", ".yml"]:
+                    with config_path.open("r", encoding="utf-8") as f:
+                        config_data = yaml.safe_load(f)
+                    self.config = PipelineConfig(**config_data)
+                else:
+                    # Default to JSON
+                    self.config = PipelineConfig.parse_file(self.config_path)
+                logger.info("Loaded configuration from: %s", self.config_path)
             else:
                 # Use defaults with environment variable support
                 self.config = PipelineConfig()
@@ -164,7 +172,7 @@ class ConfigManager:
             return self.config
 
         except Exception as e:
-            logger.error(f"Error loading configuration: {e}")
+            logger.error("Error loading configuration: %s", e)
             logger.info("Falling back to default configuration")
             self.config = PipelineConfig()
             return self.config
@@ -182,7 +190,7 @@ class ConfigManager:
 
         for name, path in data_paths:
             if not path.exists():
-                logger.warning(f"Data file not found: {name} at {path}")
+                logger.warning("Data file not found: %s at %s", name, path)
 
     def save_config(self, output_path: str) -> None:
         """Save current configuration to file."""
@@ -195,15 +203,28 @@ class ConfigManager:
 
         # Pydantic handles serialization automatically!
         if output_path.suffix.lower() in [".yaml", ".yml"]:
-            with Path(output_path).open("w") as f:
-                f.write(self.config.yaml(indent=2))
+            # Convert Path objects to strings for YAML serialization
+            config_dict = self.config.dict()
+
+            def convert_paths(obj: Any) -> Any:  # noqa: ANN001, ANN401
+                if isinstance(obj, dict):
+                    return {k: convert_paths(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_paths(item) for item in obj]
+                elif hasattr(obj, "__fspath__"):  # Path objects
+                    return str(obj)
+                return obj
+
+            config_dict = convert_paths(config_dict)
+            with Path(output_path).open("w", encoding="utf-8") as f:
+                yaml.dump(config_dict, f, indent=2, default_flow_style=False)
         elif output_path.suffix.lower() == ".json":
-            with Path(output_path).open("w") as f:
+            with Path(output_path).open("w", encoding="utf-8") as f:
                 f.write(self.config.json(indent=2))
         else:
             raise ValueError(f"Unsupported output format: {output_path.suffix}")
 
-        logger.info(f"Configuration saved to: {output_path}")
+        logger.info("Configuration saved to: %s", output_path)
 
     def get_config_dict(self) -> dict[str, Any]:
         """Get configuration as dictionary."""
@@ -216,9 +237,9 @@ class ConfigManager:
 def create_default_config(output_path: str) -> None:
     """Create a default configuration file."""
     config_manager = ConfigManager()
-    # config = config_manager.load_config()  # This will use defaults
+    config_manager.load_config()  # This will use defaults
     config_manager.save_config(output_path)
-    logger.info(f"Default configuration created at: {output_path}")
+    logger.info("Default configuration created at: %s", output_path)
 
 
 def load_pipeline_config(config_path: str | None = None) -> PipelineConfig:

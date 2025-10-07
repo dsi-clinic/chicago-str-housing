@@ -35,7 +35,7 @@ run-interactive: build-only ## Run interactive bash session in container
 	docker compose run -it --rm $(mount_data) $(project_name) /bin/bash
 
 test-pipeline: build-only ## Run the pipeline example
-	docker compose run --rm $(mount_data) $(project_name) uv run python examples/pipeline_usage.py
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/pipeline/scripts/pipeline_usage.py
 
 test: build-only ## Run all tests with pytest
 	docker compose run --rm $(mount_data) $(project_name) uv run python -m pytest -v

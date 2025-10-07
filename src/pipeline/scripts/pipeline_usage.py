@@ -10,6 +10,7 @@ This is designed for educational use to teach students the most challenging
 aspects of spatial data analysis.
 """
 
+import logging
 from typing import Any
 
 from pipeline import (
@@ -24,13 +25,19 @@ from pipeline import (
     pipeline_component,
     summary_reporter,
 )
+from pipeline.config import PipelineConfig
+
+logger = logging.getLogger(__name__)
 
 
 def create_spatial_analysis_pipeline() -> Pipeline:
     """Create a pipeline that demonstrates core spatial data analysis concepts."""
-    pipeline = Pipeline("Spatial Data Analysis Demo")
+    # Load configuration
+    config = PipelineConfig()
+    pipeline = Pipeline("Spatial Data Analysis Demo", config=config)
+    pipeline.load_config()
 
-    # Step 1: Load data from different sources
+    # Step 1: Load data from different sources (using config paths)
     pipeline.register_component(RentalDataLoader())
     pipeline.register_component(ZipBoundariesLoader())
     pipeline.register_component(CommunityBoundariesLoader())
@@ -48,27 +55,30 @@ def create_spatial_analysis_pipeline() -> Pipeline:
 
 def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     """Run the complete spatial analysis pipeline."""
-    print("Starting Spatial Data Analysis Pipeline")
-    print("=" * 50)
+    logger.info("Starting Spatial Data Analysis Pipeline")
+    logger.info("=" * 50)
 
     pipeline = create_spatial_analysis_pipeline()
     results = pipeline.execute()
 
-    print("\nPipeline execution completed!")
-    print(f"Generated {len(results)} results:")
+    logger.info("Pipeline execution completed!")
+    logger.info("Generated %d results:", len(results))
     for result in results:
         status = "SUCCESS" if result.success else "FAILED"
-        print(f"  • {result.component_name}: {status}")
+        logger.info("  • %s: %s", result.component_name, status)
 
     return pipeline, results
 
 
 def run_partial_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     """Run only the data loading and spatial join parts."""
-    print("Running Partial Analysis (Data Loading + Spatial Join)")
-    print("=" * 55)
+    logger.info("Running Partial Analysis (Data Loading + Spatial Join)")
+    logger.info("=" * 55)
 
-    pipeline = Pipeline("Partial Spatial Analysis")
+    # Load configuration
+    config = PipelineConfig()
+    pipeline = Pipeline("Partial Spatial Analysis", config=config)
+    pipeline.load_config()
 
     # Only load data and perform spatial join
     pipeline.register_component(RentalDataLoader())
@@ -78,18 +88,21 @@ def run_partial_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     results = pipeline.execute()
 
-    print("\nPartial analysis completed!")
-    print("This demonstrates the core spatial join concept.")
+    logger.info("Partial analysis completed!")
+    logger.info("This demonstrates the core spatial join concept.")
 
     return pipeline, results
 
 
 def run_custom_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     """Run a custom analysis with additional components."""
-    print("Running Custom Analysis")
-    print("=" * 30)
+    logger.info("Running Custom Analysis")
+    logger.info("=" * 30)
 
-    pipeline = Pipeline("Custom Spatial Analysis")
+    # Load configuration
+    config = PipelineConfig()
+    pipeline = Pipeline("Custom Spatial Analysis", config=config)
+    pipeline.load_config()
 
     # Add all components
     pipeline.register_component(RentalDataLoader())
@@ -113,7 +126,7 @@ def run_custom_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 )
 def custom_statistics(context: dict[str, Any]) -> dict[str, Any]:
     """Custom statistical analysis component."""
-    print("Running Custom Statistical Analysis...")
+    logger.info("Running Custom Statistical Analysis...")
 
     if "community_rental_data" in context:
         data = context["community_rental_data"]
@@ -135,10 +148,12 @@ def custom_statistics(context: dict[str, Any]) -> dict[str, Any]:
             ].to_dict("records"),
         }
 
-        print(f"  • Total communities: {stats['total_communities']}")
-        print(f"  • Communities with data: {stats['communities_with_data']}")
-        print(
-            f"  • Rental price range: ${stats['rental_price_range']['min']:,.0f} - ${stats['rental_price_range']['max']:,.0f}"
+        logger.info("  • Total communities: %d", stats["total_communities"])
+        logger.info("  • Communities with data: %d", stats["communities_with_data"])
+        logger.info(
+            "  • Rental price range: $%.0f - $%.0f",
+            stats["rental_price_range"]["min"],
+            stats["rental_price_range"]["max"],
         )
 
         return {"custom_stats": stats}
@@ -147,16 +162,16 @@ def custom_statistics(context: dict[str, Any]) -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    print("Spatial Data Analysis Pipeline Examples")
-    print("=" * 45)
+    logger.info("Spatial Data Analysis Pipeline Examples")
+    logger.info("=" * 45)
 
-    print("\n1. Running Full Analysis...")
+    logger.info("1. Running Full Analysis...")
     pipeline1, results1 = run_full_analysis()
 
-    print("\n" + "=" * 50)
-    print("\n2. Running Partial Analysis...")
+    logger.info("=" * 50)
+    logger.info("2. Running Partial Analysis...")
     pipeline2, results2 = run_partial_analysis()
 
-    print("\n" + "=" * 50)
-    print("\n3. Running Custom Analysis...")
+    logger.info("=" * 50)
+    logger.info("3. Running Custom Analysis...")
     pipeline3, results3 = run_custom_analysis()

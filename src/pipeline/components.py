@@ -7,6 +7,7 @@ This module demonstrates the key concepts students need to learn:
 4. Analysis on merged spatial data
 """
 
+import logging
 import warnings
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from shapely import wkt
 
 from pipeline.base import (
     Analyzer,
@@ -25,6 +27,7 @@ from pipeline.base import (
     pipeline_component,
 )
 
+logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore")
 
 # ============================================================================
@@ -52,16 +55,16 @@ class RentalDataLoader(DataLoader):
     This demonstrates loading CSV data with geographic identifiers (zip codes).
     """
 
-    def __init__(
-        self, file_path: str = "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv"
-    ) -> None:
+    def __init__(self, file_path: str | None = None) -> None:
         super().__init__(
-            "rental_data", file_path, "Load rental price data from ZORI dataset"
+            "rental_data",
+            file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv",
+            "Load rental price data from ZORI dataset",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Load and clean rental data."""
-        print(f"Loading rental data from: {self.file_path}")
+        logger.info("Loading rental data from: %s", self.file_path)
 
         # Load the CSV data
         rental_df = pd.read_csv(self.file_path)
@@ -78,9 +81,11 @@ class RentalDataLoader(DataLoader):
             rental_df = rental_df.rename(columns={latest_month: "rental_price"})
             rental_df = rental_df.dropna()
 
-        print(f"Loaded {len(rental_df)} zip codes with rental data")
-        print(
-            f"Rental price range: ${rental_df['rental_price'].min():.0f} - ${rental_df['rental_price'].max():.0f}"
+        logger.info("Loaded %d zip codes with rental data", len(rental_df))
+        logger.info(
+            "Rental price range: $%.0f - $%.0f",
+            rental_df["rental_price"].min(),
+            rental_df["rental_price"].max(),
         )
 
         return {"rental_data": rental_df}
@@ -92,22 +97,21 @@ class ZipBoundariesLoader(DataLoader):
     This demonstrates loading GeoJSON data with polygon geometries.
     """
 
-    def __init__(
-        self, file_path: str = "/project/data/Boundaries_ZIP_Codes.csv"
-    ) -> None:
-        super().__init__("zip_boundaries", file_path, "Load zip code boundary data")
+    def __init__(self, file_path: str | None = None) -> None:
+        super().__init__(
+            "zip_boundaries",
+            file_path or "/project/data/Boundaries_ZIP_Codes.csv",
+            "Load zip code boundary data",
+        )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Load zip code boundaries."""
-        print(f"Loading zip boundaries from: {self.file_path}")
+        logger.info("Loading zip boundaries from: %s", self.file_path)
 
         # Load CSV with polygon coordinates
         zip_df = pd.read_csv(self.file_path)
 
         # Convert to GeoDataFrame
-        # This is a key concept: transforming coordinate data to geometries
-        from shapely import wkt
-
         zip_df["geometry"] = zip_df["the_geom"].apply(wkt.loads)
         gdf = gpd.GeoDataFrame(zip_df, geometry="geometry")
 
@@ -119,8 +123,8 @@ class ZipBoundariesLoader(DataLoader):
             gdf = gdf.rename(columns={"ZIP": "zip_code"})
         gdf["zip_code"] = gdf["zip_code"].astype(str).str.zfill(5)
 
-        print(f"Loaded {len(gdf)} zip code boundaries")
-        print(f"CRS: {gdf.crs}")
+        logger.info("Loaded %d zip code boundaries", len(gdf))
+        logger.info("CRS: %s", gdf.crs)
 
         return {"zip_boundaries": gdf}
 
@@ -132,24 +136,21 @@ class CommunityBoundariesLoader(DataLoader):
     to be converted to GeoDataFrame.
     """
 
-    def __init__(
-        self, file_path: str = "/project/data/Boundaries_Community_Areas.csv"
-    ) -> None:
+    def __init__(self, file_path: str | None = None) -> None:
         super().__init__(
-            "community_boundaries", file_path, "Load community area boundary data"
+            "community_boundaries",
+            file_path or "/project/data/Boundaries_Community_Areas.csv",
+            "Load community area boundary data",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Load community area boundaries."""
-        print(f"Loading community boundaries from: {self.file_path}")
+        logger.info("Loading community boundaries from: %s", self.file_path)
 
         # Load CSV with polygon coordinates
         community_df = pd.read_csv(self.file_path)
 
         # Convert to GeoDataFrame
-        # This is a key concept: transforming coordinate data to geometries
-        from shapely import wkt
-
         community_df["geometry"] = community_df["the_geom"].apply(wkt.loads)
         gdf = gpd.GeoDataFrame(community_df, geometry="geometry")
 
@@ -159,8 +160,8 @@ class CommunityBoundariesLoader(DataLoader):
         # Clean column names
         gdf = gdf.rename(columns={"COMMUNITY": "community_name"})
 
-        print(f"Loaded {len(gdf)} community area boundaries")
-        print(f"CRS: {gdf.crs}")
+        logger.info("Loaded %d community area boundaries", len(gdf))
+        logger.info("CRS: %s", gdf.crs)
 
         return {"community_boundaries": gdf}
 
@@ -186,7 +187,7 @@ class SpatialJoinProcessor(DataProcessor):
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Perform spatial join and aggregation."""
-        print("Performing spatial join: zip codes -> community areas")
+        logger.info("Performing spatial join: zip codes -> community areas")
 
         # Get the data from context
         rental_data = context["rental_data"]
@@ -194,12 +195,12 @@ class SpatialJoinProcessor(DataProcessor):
         community_boundaries = context["community_boundaries"]
 
         # Step 1: Join rental data with zip boundaries
-        print("Step 1: Joining rental data with zip boundaries...")
+        logger.info("Step 1: Joining rental data with zip boundaries...")
         zip_rental = zip_boundaries.merge(rental_data, on="zip_code", how="inner")
-        print(f"Joined {len(zip_rental)} zip codes with rental data")
+        logger.info("Joined %d zip codes with rental data", len(zip_rental))
 
         # Step 2: Spatial join - zip codes to community areas
-        print("Step 2: Performing spatial join (zip codes -> community areas)...")
+        logger.info("Step 2: Performing spatial join (zip codes -> community areas)...")
 
         # Ensure same CRS for spatial operations
         if zip_rental.crs != community_boundaries.crs:
@@ -211,10 +212,12 @@ class SpatialJoinProcessor(DataProcessor):
             zip_rental, community_boundaries, how="inner", predicate="intersects"
         )
 
-        print(f"Spatial join resulted in {len(spatial_join)} zip-community pairs")
+        logger.info(
+            "Spatial join resulted in %d zip-community pairs", len(spatial_join)
+        )
 
         # Step 3: Aggregate rental prices by community area
-        print("Step 3: Aggregating rental prices by community area...")
+        logger.info("Step 3: Aggregating rental prices by community area...")
 
         # Calculate area-weighted average rental price
         # This is another key concept: how to properly aggregate spatial data
@@ -256,9 +259,9 @@ class SpatialJoinProcessor(DataProcessor):
             community_rental, on="community_name", how="left"
         )
 
-        print(f"Final result: {len(final_result)} community areas")
-        print(
-            f"Areas with rental data: {final_result['avg_rental_price'].notna().sum()}"
+        logger.info("Final result: %d community areas", len(final_result))
+        logger.info(
+            "Areas with rental data: %d", final_result["avg_rental_price"].notna().sum()
         )
 
         return {"community_rental_data": final_result}
@@ -282,7 +285,7 @@ class CorrelationAnalyzer(Analyzer):
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Perform correlation analysis."""
-        print("Performing correlation analysis on community rental data...")
+        logger.info("Performing correlation analysis on community rental data...")
 
         data = context["community_rental_data"]
 
@@ -302,7 +305,9 @@ class CorrelationAnalyzer(Analyzer):
         # Remove rows with missing data
         analysis_data = data[numeric_cols].dropna()
 
-        print(f"Analyzing {len(analysis_data)} community areas with complete data")
+        logger.info(
+            "Analyzing %d community areas with complete data", len(analysis_data)
+        )
 
         # Calculate correlation matrix
         correlation_matrix = analysis_data.corr()
@@ -331,10 +336,10 @@ class CorrelationAnalyzer(Analyzer):
             "key_correlations": key_correlations,
         }
 
-        print("Key Correlations Found:")
+        logger.info("Key Correlations Found:")
         for name, corr in key_correlations.items():
             strength = self._get_correlation_strength(abs(corr))
-            print(f"  {name}: {corr:.3f} ({strength})")
+            logger.info("  %s: %.3f (%s)", name, corr, strength)
 
         return {
             "correlation_matrix": correlation_matrix,
@@ -365,16 +370,16 @@ class CorrelationVisualizer(Visualizer):
     This demonstrates how to create meaningful visualizations from merged spatial data.
     """
 
-    def __init__(self, output_dir: str = "/project/output") -> None:
+    def __init__(self, output_dir: str | None = None) -> None:
         super().__init__(
             "correlation_visualization",
             "Create visualizations for correlation analysis",
         )
-        self.output_dir = output_dir
+        self.output_dir = output_dir or "/project/output"
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Create correlation visualizations."""
-        print("Creating correlation visualizations...")
+        logger.info("Creating correlation visualizations...")
 
         correlation_matrix = context["correlation_matrix"]
         analysis_data = context["analysis_data"]
@@ -437,17 +442,17 @@ class CorrelationVisualizer(Visualizer):
         stats_text = f"""
         Statistical Summary
 
-        Total Communities: {summary_stats['total_communities']}
-        Communities with Data: {summary_stats['communities_with_data']}
+        Total Communities: {summary_stats["total_communities"]}
+        Communities with Data: {summary_stats["communities_with_data"]}
 
-        Average Rental Price: ${summary_stats['avg_rental_price']:,.0f}
-        Standard Deviation: ${summary_stats['rental_price_std']:,.0f}
-        Average Area: {summary_stats['avg_area_km2']:.1f} km²
+        Average Rental Price: ${summary_stats["avg_rental_price"]:,.0f}
+        Standard Deviation: ${summary_stats["rental_price_std"]:,.0f}
+        Average Area: {summary_stats["avg_area_km2"]:.1f} km²
 
         Key Correlations:
-        • Area vs Avg Rent: {summary_stats['key_correlations']['Area vs Average Rent']:.3f}
-        • Area vs Zip Count: {summary_stats['key_correlations']['Area vs Zip Count']:.3f}
-        • Min vs Max Rent: {summary_stats['key_correlations']['Min vs Max Rent']:.3f}
+        • Area vs Avg Rent: {summary_stats["key_correlations"]["Area vs Average Rent"]:.3f}
+        • Area vs Zip Count: {summary_stats["key_correlations"]["Area vs Zip Count"]:.3f}
+        • Min vs Max Rent: {summary_stats["key_correlations"]["Min vs Max Rent"]:.3f}
         """
 
         axes[1, 1].text(
@@ -466,7 +471,7 @@ class CorrelationVisualizer(Visualizer):
         # Save the plot
         output_path = Path(self.output_dir) / "correlation_analysis.png"
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
-        print(f"Saved visualization to: {output_path}")
+        logger.info("Saved visualization to: %s", output_path)
 
         plt.show()
 
@@ -486,6 +491,7 @@ def summary_reporter(context: dict[str, Any]) -> dict[str, Any]:
 
     This demonstrates how to create summary reports from pipeline results.
     """
+    logger.info("Generating summary report...")
     print("\n" + "=" * 60)
     print("SPATIAL DATA ANALYSIS SUMMARY REPORT")
     print("=" * 60)

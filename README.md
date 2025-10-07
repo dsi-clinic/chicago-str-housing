@@ -1,4 +1,4 @@
-# 2025-autumn-city-of-chicago-housing
+# Spatial Data Analysis Pipeline - Educational Demo
 
 ## Project Background
 The Department of Technology and Innovation (DTI) is the City of Chicago’s central IT
@@ -39,14 +39,6 @@ Key questions include:
     - Present visualizations that highlight key results.
     - Provide evidence-based insights for anticipating and addressing housing challenges.
 
-
-## First Week
-- Download and map the Affordable Housing Developments, House Share Prohibited, Foreclosed Rental Properties, and ZORI datasets
-- Download tract-level population and socioeconomic indicators for Cook County
-- Develop a strategy to aggregate the tract-level data to the community area level and merge it with the City of Chicago data 
-- Complete the quick start below, making sure that you can find the file `sample_output.csv`.
-
-
 ## Data
 - [Chicago’s Affordable Rental Housing Developments](https://data.cityofchicago.org/Community-Economic-Development/Affordable-Rental-Housing-Developments/s6ha-ppgi/about_data): Thousands of affordable units that are supported by City of Chicago programs to maintain affordability in local neighborhoods. Includes location data, management companies, and number of units
 - [House Share Prohibited Buildings List](https://data.cityofchicago.org/Buildings/House-Share-Prohibited-Buildings-List/7bzs-jsyj/about_data): A list of buildings excluded from short-term rental activity under the Shared Housing Ordinance. Includes location data, number of units, and dates.
@@ -56,10 +48,39 @@ Key questions include:
 - [American Community Survey Data](https://www.census.gov/programs-surveys/acs/data.html)
 
 
+## The Pipeline
+The pipeline works with Chicago housing data to demonstrate spatial analysis concepts:
+
+- **Rental Data**: CSV with zip codes and rental prices (ZORI dataset)
+- **Zip Boundaries**: CSV with WKT polygon strings for zip code boundaries  
+- **Community Boundaries**: CSV with WKT polygon strings for community area boundaries
+
+## Pipeline Architecture
+The system uses a modular pipeline architecture with configurable components:
+
+### Core Components
+- **DataLoaders**: Load and clean data from different sources
+- **DataProcessors**: Transform and merge datasets
+- **Analyzers**: Perform statistical analysis on merged data
+- **Visualizers**: Create meaningful visualizations
+- **Configuration System**: Manage data paths and analysis parameters
+
+### Key Features
+- **Flexible Configuration**: YAML/JSON config files with environment variable support
+- **Professional Logging**: Structured logging throughout the pipeline
+- **Modular Design**: Easy to extend with new components
+- **Error Handling**: Robust error handling and validation
+- **Educational Focus**: Clear examples and documentation
+
+
 ## Quick Start
 
 ### 1. Setup Environment
 ```bash
+# Clone the repository
+git clone <repository-url> spatial-data-analysis-pipeline
+cd spatial-data-analysis-pipeline
+
 # Copy the example environment file
 cp .env.example .env
 
@@ -100,35 +121,28 @@ exit
 make test-pipeline
 ```
 
-### 3. Test Your Setup
+### 3. Run the Pipeline Demo
 ```bash
-# If using devcontainer: Open a notebook and run cells
-# If using make: Run the pipeline test
+# Run the complete pipeline demonstration
 make test-pipeline
 ```
 
-If successful, you should see `sample_output.csv` appear in your data directory.
+This will execute the spatial data analysis pipeline and generate:
+- Processed data with spatial joins
+- Correlation analysis results
+- Visualization plots
+- Summary reports
+
+### 4. Explore the Notebook
+Open `notebooks/spatial_analysis_demo.ipynb` to see the complete workflow step-by-step.
 
 ## Technical Expectations
-
-### Pre requisites:
-
-We use Docker, Make and uv as part of our curriculum. If you are unfamiliar with them, it is strongly recommended you read over the following:
-- [An introduction to Docker](https://docker-curriculum.com/)
-- [An introduction to uv](https://realpython.com/python-uv/)
 
 ### Container-Based Development
 
 **All code must be run inside the Docker container.** This ensures consistent environments across different machines and eliminates "works on my machine" issues.
 
-### Environment Management with uv
-
-We use [uv](https://docs.astral.sh/uv/) for Python environment and package management _inside the container_. uv handles:
-- Virtual environment creation and management (replaces venv/pyenv)
-- Package installation and dependency resolution (replaces pip)
-- Project dependency management via `pyproject.toml`
-
-**Important**: When running Python code, prefix commands with `uv run` to maintain the proper environment:
+**Important**: When running Python code inside the container, prefix commands with `uv run` to maintain the proper environment:
 
 ```bash
 # Example: Running the pipeline
@@ -136,9 +150,6 @@ uv run python src/housing/scripts/pipeline_example.py
 
 # Example: Running tests
 uv run pytest tests/
-
-# Example: Running a notebook (in devcontainer)
-# Just open the notebook file and run cells directly
 ```
 
 ### Container Volume Structure
@@ -158,33 +169,71 @@ Container: /project/
 ```
 
 
-## Usage & Testing
+## Usage & Examples
 
-### Working with the Housing Package
+### Working with the Pipeline System
 
-The project uses a Python package called `housing` located in `src/housing/`. The package is organized as follows:
+The project uses a modular pipeline system located in `src/pipeline/`. The system is organized as follows:
 
 ```
-src/housing/
+src/pipeline/
 ├── __init__.py                    # Package initialization
+├── base.py                        # Base classes and pipeline orchestrator
+├── components.py                  # Concrete pipeline components
+├── config.py                      # Configuration management
 └── scripts/                       # Executable scripts
-    ├── __init__.py
-    └── pipeline_example.py        # Example pipeline script
+    └── pipeline_usage.py          # Example pipeline usage
 ```
 
-**Importable Code**: Use functions and classes from the main package:
+### Basic Pipeline Usage
+
+**Import and Use Components**:
 ```python
 # In notebooks or Python scripts
-from src.housing import some_function
+from pipeline import (
+    Pipeline, RentalDataLoader, ZipBoundariesLoader,
+    CommunityBoundariesLoader, SpatialJoinProcessor,
+    CorrelationAnalyzer, CorrelationVisualizer, summary_reporter
+)
+from pipeline.config import PipelineConfig
 
-# Use the function
-result = some_function()
+# Create pipeline with configuration
+config = PipelineConfig()
+pipeline = Pipeline("My Analysis", config=config)
+pipeline.load_config()
+
+# Register components
+pipeline.register_component(RentalDataLoader())
+pipeline.register_component(ZipBoundariesLoader())
+pipeline.register_component(CommunityBoundariesLoader())
+pipeline.register_component(SpatialJoinProcessor())
+
+# Execute pipeline
+results = pipeline.execute()
 ```
 
-**Executable Scripts**: Run scripts from the scripts directory:
+**Run Example Scripts**:
 ```bash
-# Run pipeline scripts
-uv run python src/housing/scripts/pipeline_example.py
+# Run the complete pipeline demonstration
+uv run python src/pipeline/scripts/pipeline_usage.py
+```
+
+### Configuration Management
+
+The pipeline uses a flexible configuration system:
+
+```python
+# Use default configuration
+config = PipelineConfig()
+
+# Load from YAML file
+from pipeline.config import ConfigManager
+config_manager = ConfigManager("config/pipeline_config.yaml")
+config = config_manager.load_config()
+
+# Create custom configuration
+config = PipelineConfig()
+config.data.rental_data_path = Path("/custom/path/data.csv")
 ```
 
 ### Data Management
@@ -192,10 +241,7 @@ uv run python src/housing/scripts/pipeline_example.py
 - Set `DATA_DIR` in your `.env` file to specify where data lives on your host
 - This directory is mounted to `/project/data` inside the container
 - Keep data separate from code to avoid repository bloat and enable easy data sharing
-
-### Testing Your Setup
-
-Run the command `make test-pipeline`. If your setup is working you should see a file `sample_output.csv` appear in your data directory. 
+- The pipeline automatically validates data file existence 
 
 
 ### Docker & Make Commands
@@ -207,14 +253,12 @@ We use `docker` and `make` to run our code. Available `make` commands:
 * `make devcontainer`: Build and prepare devcontainer for VS Code/Cursor
 * `make run-interactive`: Create a container and load an interactive bash session
 * `make test`: Run all tests with pytest
-* `make test-pipeline`: Run the pipeline example script
+* `make test-pipeline`: Run the spatial data analysis pipeline demonstration
 * `make clean`: Clean up Docker images and containers
 
 **Note**: For notebook development, use the devcontainer workflow instead of command-line tools for the best experience.
 
 The file `Makefile` contains details about the specific commands that are run when calling each `make` target.
-
-
 
 
 ## Style

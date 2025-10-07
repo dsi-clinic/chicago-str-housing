@@ -60,7 +60,8 @@ ignore = [
   "ANN002", # missing type on *args
   "ANN003", # missing type on **kwargs
   "B905",   # won't work on python <3.10
-  "N805"    # First argument of a method should be named `self` - false positive for class methods
+  "N805",   # First argument of a method should be named `self` - false positive for class methods
+  "S101"    # Use of `assert`
 ]
 
 [tool.ruff.lint.pydocstyle]
