@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from housing.preprocess_util_lib_example import generate_random_dataframe
+from src.housing.preprocess_util_lib_example import generate_random_dataframe
 
 
 def test_generate_random_dataframe() -> None:

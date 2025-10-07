@@ -176,7 +176,7 @@ src/housing/
 **Importable Code**: Use functions and classes from the main package:
 ```python
 # In notebooks or Python scripts
-from housing.preprocess_util_lib_example import generate_random_dataframe
+from src.housing.preprocess_util_lib_example import generate_random_dataframe
 
 # Use the function
 df = generate_random_dataframe(rows=100)

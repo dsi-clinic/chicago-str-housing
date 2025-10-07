@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from housing.preprocess_util_lib_example import generate_random_dataframe
+from src.housing.preprocess_util_lib_example import generate_random_dataframe
 
 if __name__ == "__main__":
     # This is an example of running the code as a pipeline

@@ -14,6 +14,7 @@ dependencies = [
   "ipykernel~=6.16",
   "ruff==0.7.2",
   "numpy~=1.2",
+  "scipy~=1.11",
   "geopandas~=0.14",
   "shapely~=2.0",
   "matplotlib~=3.8",
@@ -22,11 +23,13 @@ dependencies = [
   "plotly~=5.17",
   "pre-commit>=4.3.0",
   "pytest>=7.0.0",
-  "ipykernel>=6.16"
+  "ipykernel>=6.16",
+  "pydantic>=2.0.0",
+  "pyyaml>=6.0"
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/housing"]
+packages = ["src/housing", "src/pipeline"]
 
 [tool.ruff.lint]
 extend-select = [
@@ -52,9 +55,12 @@ extend-select = [
 
 ignore = [
   "D415",   # allow first line of doctstrings to end without punctuation
+  "D107",   # Missing docstring in `__init__`
+  "ANN101", # Missing type annotation for `self` in method 
   "ANN002", # missing type on *args
   "ANN003", # missing type on **kwargs
-  "B905"    # won't work on python <3.10
+  "B905",   # won't work on python <3.10
+  "N805"    # First argument of a method should be named `self` - false positive for class methods
 ]
 
 [tool.ruff.lint.pydocstyle]
