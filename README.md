@@ -70,7 +70,6 @@ The system uses a modular pipeline architecture with configurable components:
 - **Professional Logging**: Structured logging throughout the pipeline
 - **Modular Design**: Easy to extend with new components
 - **Error Handling**: Robust error handling and validation
-- **Educational Focus**: Clear examples and documentation
 
 
 ## Quick Start
@@ -146,28 +145,11 @@ Open `notebooks/spatial_analysis_demo.ipynb` to see the complete workflow step-b
 
 ```bash
 # Example: Running the pipeline
-uv run python src/housing/scripts/pipeline_example.py
+uv run python src/housing/scripts/pipeline_usage.py
 
 # Example: Running tests
 uv run pytest tests/
 ```
-
-### Container Volume Structure
-
-```
-Container: /project/
-├── src/           # Your source code (mounted from host repo)
-│   └── housing/   # Python package with your code
-│       ├── scripts/  # Executable scripts
-│       └── *.py      # Importable modules
-├── data/          # Data directory (mounted from HOST_DATA_DIR)
-├── notebooks/     # Jupyter notebooks
-├── tests/         # Test files
-├── .venv/         # Python virtual environment (created in container)
-├── pyproject.toml # Project configuration
-└── ...
-```
-
 
 ## Usage & Examples
 
