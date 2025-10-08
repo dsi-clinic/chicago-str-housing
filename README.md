@@ -48,12 +48,28 @@ Key questions include:
 - [American Community Survey Data](https://www.census.gov/programs-surveys/acs/data.html)
 
 
-## The Pipeline
-The pipeline works with Chicago housing data to demonstrate spatial analysis concepts:
+## The Pipeline: Census Tract-Level Analysis
 
+This pipeline demonstrates spatial analysis at the **census tract level** for fine-grained neighborhood analysis:
+
+### Data Sources
 - **Rental Data**: CSV with zip codes and rental prices (ZORI dataset)
 - **Zip Boundaries**: CSV with WKT polygon strings for zip code boundaries  
-- **Community Boundaries**: CSV with WKT polygon strings for community area boundaries
+- **Census Tract Boundaries**: CSV with WKT polygon strings for tract boundaries
+
+### Key Capabilities
+- **Zip-to-Tract Mapping**: Handles many-to-many relationships with area-weighted aggregation
+- **Tract-to-Community Aggregation**: Clean hierarchical aggregation from tracts to neighborhoods
+- **Spatial Joins**: Transforms data from zip codes (postal) to census tracts (statistical)
+- **Crosswalk Creation**: Generates reusable zip-to-tract mapping with intersection weights
+- **Multi-Level Analysis**: Analyze at tract level (800+ areas) OR aggregate to community level (77 areas)
+
+### Why Census Tracts as the Base Unit?
+- **Standardized**: Consistent boundaries across the entire US
+- **Census-aligned**: Easy to join with ACS demographic data
+- **Fine-grained**: ~4,000 residents per tract vs ~35,000 per community area
+- **Equity analysis**: Detect block-level disparities that larger geographies mask
+- **Hierarchical**: Designed to aggregate up to counties, communities, etc.
 
 ## Pipeline Architecture
 The system uses a modular pipeline architecture with configurable components:
@@ -122,8 +138,11 @@ make test-pipeline
 
 ### 3. Run the Pipeline Demo
 ```bash
-# Run the complete pipeline demonstration
+# Outside the container
 make test-pipeline
+
+# Inside the container 
+uv run python src/pipeline/scripts/pipeline_usage.py
 ```
 
 This will execute the spatial data analysis pipeline and generate:
@@ -133,7 +152,14 @@ This will execute the spatial data analysis pipeline and generate:
 - Summary reports
 
 ### 4. Explore the Notebook
-Open `notebooks/spatial_analysis_demo.ipynb` to see the complete workflow step-by-step.
+
+Open `notebooks/tract_analysis_demo.ipynb` to see the complete tract-level analysis workflow:
+- Zip code to census tract spatial joins
+- Area-weighted aggregation
+- Crosswalk creation
+- Tract-level statistical analysis
+
+**For detailed instructions on obtaining tract data**, see `CENSUS_TRACT_GUIDE.md`
 
 ## Technical Expectations
 

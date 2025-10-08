@@ -16,7 +16,11 @@ from pipeline.components import (
     CorrelationVisualizer,
     RentalDataLoader,
     SpatialJoinProcessor,
+    TractAnalyzer,
+    TractBoundariesLoader,
+    TractToCommunityProcessor,
     ZipBoundariesLoader,
+    ZipToTractProcessor,
     summary_reporter,
 )
 
@@ -30,12 +34,16 @@ __all__ = [
     "Visualizer",
     "PipelineResult",
     "pipeline_component",
-    # Core educational components
+    # Components
     "RentalDataLoader",
     "ZipBoundariesLoader",
     "CommunityBoundariesLoader",
+    "TractBoundariesLoader",
     "SpatialJoinProcessor",
+    "ZipToTractProcessor",
+    "TractToCommunityProcessor",
     "CorrelationAnalyzer",
+    "TractAnalyzer",
     "CorrelationVisualizer",
     "summary_reporter",
 ]
