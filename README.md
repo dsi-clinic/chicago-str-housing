@@ -1,4 +1,4 @@
-# Spatial Data Analysis Pipeline - Educational Demo
+# 2025-autumn-city-of-chicago-housing
 
 ## Project Background
 The Department of Technology and Innovation (DTI) is the City of Chicago’s central IT

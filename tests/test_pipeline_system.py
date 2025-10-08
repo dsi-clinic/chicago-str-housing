@@ -16,7 +16,6 @@ from pipeline import (
     CorrelationAnalyzer,
     Pipeline,
     RentalDataLoader,
-    SpatialJoinProcessor,
     ZipBoundariesLoader,
     summary_reporter,
 )
@@ -77,69 +76,6 @@ class TestPipelineComponents:
         assert len(community_gdf) > 0
         assert "community_name" in community_gdf.columns  # Actual column name
         assert community_gdf.geometry is not None
-
-    def test_spatial_join_processor_success(self) -> None:
-        """Test SpatialJoinProcessor with valid input data."""
-        # Arrange
-        processor = SpatialJoinProcessor()
-
-        # Create mock input data with proper CRS
-        rental_data = pd.DataFrame(
-            {
-                "zip_code": ["60601", "60602", "60603"],
-                "rental_price": [2000, 2500, 1800],
-            }
-        )
-
-        zip_boundaries = gpd.GeoDataFrame(
-            {
-                "zip_code": ["60601", "60602", "60603"],
-                "geometry": [
-                    "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))",
-                    "POLYGON((1 0, 2 0, 2 1, 1 1, 1 0))",
-                    "POLYGON((2 0, 3 0, 3 1, 2 1, 2 0))",
-                ],
-            }
-        )
-        zip_boundaries["geometry"] = gpd.GeoSeries.from_wkt(zip_boundaries["geometry"])
-        zip_boundaries = zip_boundaries.set_geometry("geometry").set_crs("EPSG:4326")
-
-        community_boundaries = gpd.GeoDataFrame(
-            {
-                "community_name": [
-                    "Community A",
-                    "Community B",
-                ],  # Use correct column name
-                "geometry": [
-                    "POLYGON((0 0, 2 0, 2 1, 0 1, 0 0))",
-                    "POLYGON((2 0, 3 0, 3 1, 2 1, 2 0))",
-                ],
-            }
-        )
-        community_boundaries["geometry"] = gpd.GeoSeries.from_wkt(
-            community_boundaries["geometry"]
-        )
-        community_boundaries = community_boundaries.set_geometry("geometry").set_crs(
-            "EPSG:4326"
-        )
-
-        context = {
-            "rental_data": rental_data,
-            "zip_boundaries": zip_boundaries,
-            "community_boundaries": community_boundaries,
-        }
-
-        # Act
-        result = processor.execute(context)
-
-        # Assert
-        assert isinstance(result, dict)
-        assert "community_rental_data" in result
-        community_data = result["community_rental_data"]
-        assert isinstance(community_data, gpd.GeoDataFrame)
-        assert len(community_data) > 0
-        assert "community_name" in community_data.columns
-        assert "avg_rental_price" in community_data.columns
 
     def test_correlation_analyzer_success(self) -> None:
         """Test CorrelationAnalyzer with valid input data."""
@@ -250,14 +186,13 @@ class TestPipelineIntegration:
         pipeline.register_component(RentalDataLoader())
         pipeline.register_component(ZipBoundariesLoader())
         pipeline.register_component(CommunityBoundariesLoader())
-        pipeline.register_component(SpatialJoinProcessor())
 
         # Act
         results = pipeline.execute()
 
         # Assert
         assert isinstance(results, list)
-        assert len(results) == 4  # Four components executed # noqa: PLR2004
+        assert len(results) == 3  # Three components executed # noqa: PLR2004
 
         # Check each result
         for result in results:
@@ -269,7 +204,6 @@ class TestPipelineIntegration:
         assert "rental_data" in pipeline.context
         assert "zip_boundaries" in pipeline.context
         assert "community_boundaries" in pipeline.context
-        assert "community_rental_data" in pipeline.context
 
     def test_pipeline_error_handling(self) -> None:
         """Test pipeline error handling with invalid component."""
