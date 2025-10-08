@@ -138,3 +138,9 @@ venv.bak/
 
 # data files
 *.avro
+
+# output files
+output/
+
+# data files
+data/
