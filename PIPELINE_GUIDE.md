@@ -35,13 +35,13 @@ rental_data = rental_data.merge(zip_boundaries, on='zip_code')
 ```
 
 **Problems with the monolithic approach:**
-- ❌ Can't reuse individual steps
-- ❌ Hard to test (all-or-nothing)
-- ❌ Difficult to debug (where did it break?)
-- ❌ Impossible to parallelize
-- ❌ Team members can't work independently
-- ❌ No visibility into what's happening
-- ❌ If step 5 fails, you re-run steps 1-4 unnecessarily
+- Can't reuse individual steps
+- Hard to test (all-or-nothing)
+- Difficult to debug (where did it break?)
+- Impossible to parallelize
+- Team members can't work independently
+- No visibility into what's happening
+- If step 5 fails, you re-run steps 1-4 unnecessarily
 
 ### The Pipeline Solution
 
@@ -74,13 +74,13 @@ results = pipeline.execute()
 ```
 
 **Benefits:**
-- ✅ Each component is independently testable
-- ✅ Easy to reuse components in different pipelines
-- ✅ Clear error messages (which component failed)
-- ✅ Team members own specific components
-- ✅ Can skip/replace components easily
-- ✅ Logging shows exactly what's happening
-- ✅ Results cached in context (don't recompute)
+- Each component is independently testable
+- Easy to reuse components in different pipelines
+- Clear error messages (which component failed)
+- Team members own specific components
+- Can skip/replace components easily
+- Logging shows exactly what's happening
+- Results cached in context (don't recompute)
 
 ---
 
@@ -386,19 +386,19 @@ Load → Clean → Analyze → ┐
 ### When NOT to Use a Pipeline
 
 **Pipelines add overhead. Don't use them if:**
-- ❌ You have a one-off 10-line script
-- ❌ The workflow is completely linear with no reuse
-- ❌ You're just exploring data (use notebook first)
-- ❌ No collaboration needed (solo project, throwaway code)
+- You have a one-off 10-line script
+- The workflow is completely linear with no reuse
+- You're just exploring data (use notebook first)
+- No collaboration needed (solo project, throwaway code)
 
 **Do use pipelines when:**
-- ✅ You have 3+ distinct processing steps
-- ✅ Multiple people working on the project
-- ✅ Components might be reused elsewhere
-- ✅ You need robust error handling
-- ✅ The workflow will grow over time
-- ✅ You need to test individual parts
-- ✅ You want clear logs of what happened
+- You have 3+ distinct processing steps
+- Multiple people working on the project
+- Components might be reused elsewhere
+- You need robust error handling
+- The workflow will grow over time
+- You need to test individual parts
+- You want clear logs of what happened
 
 ---
 
@@ -507,10 +507,10 @@ None of the above / need full control?
 ### Method 1: Inherit from Base Classes (Recommended for most cases)
 
 **When to use:**
-- ✅ Your component fits a clear category (load, process, analyze, visualize)
-- ✅ You want clear, self-documenting code
-- ✅ You're following a standard pattern
-- ✅ You want other developers to instantly understand what it does
+- Your component fits a clear category (load, process, analyze, visualize)
+- You want clear, self-documenting code
+- You're following a standard pattern
+- You want other developers to instantly understand what it does
 
 **Why it's better:**
 - Name tells you what it does: `RentalDataLoader` vs `RentalComponent`
@@ -542,15 +542,15 @@ class MyDataLoader(DataLoader):
 ### Method 2: Inherit from PipelineComponent (More Flexible)
 
 **When to use:**
-- ✅ Your component does something unique (e.g., sends emails, calls APIs, exports data)
-- ✅ You need to set custom dependencies
-- ✅ You want full control over component behavior
-- ✅ You're building something that combines multiple concerns
+- Your component does something unique (e.g., sends emails, calls APIs, exports data)
+- You need to set custom dependencies
+- You want full control over component behavior
+- You're building something that combines multiple concerns
 
 **Trade-offs:**
-- ✅ Pro: Maximum flexibility
-- ⚠️ Con: More boilerplate code
-- ⚠️ Con: Less self-documenting (need good naming)
+- Pro: Maximum flexibility
+- Con: More boilerplate code
+- Con: Less self-documenting (need good naming)
 
 **Real-world examples:**
 - Sending notification emails after analysis
@@ -577,17 +577,17 @@ class CustomAnalyzer(PipelineComponent):
 ### Method 3: Use the @pipeline_component Decorator (Quick & Simple)
 
 **When to use:**
-- ✅ You need something quick for prototyping/exploration
-- ✅ The logic is simple (< 20 lines)
-- ✅ You won't reuse this component elsewhere
-- ✅ You're doing a one-time analysis or report
+- You need something quick for prototyping/exploration
+- The logic is simple (< 20 lines)
+- You won't reuse this component elsewhere
+- You're doing a one-time analysis or report
 
 **Trade-offs:**
-- ✅ Pro: Fastest to write (just add @decorator)
-- ✅ Pro: Great for notebooks and quick scripts
-- ⚠️ Con: Harder to test in isolation
-- ⚠️ Con: Can't inherit behavior or add methods
-- ⚠️ Con: Mixes function and object-oriented styles
+- Pro: Fastest to write (just add @decorator)
+- Pro: Great for notebooks and quick scripts
+- Con: Harder to test in isolation
+- Con: Can't inherit behavior or add methods
+- Con: Mixes function and object-oriented styles
 
 **Perfect for:**
 - Summary reports
@@ -801,10 +801,10 @@ components/
 ```
 
 **Benefits:**
-- ✅ Zero merge conflicts on component code
-- ✅ Clear ownership (each person has their file)
-- ✅ Easy to review (small, focused PRs)
-- ✅ Can work in parallel without coordination
+- Zero merge conflicts on component code
+- Clear ownership (each person has their file)
+- Easy to review (small, focused PRs)
+- Can work in parallel without coordination
 
 ### Strategy 3: Feature-Based Modules (Best for complex projects)
 
@@ -881,9 +881,9 @@ git checkout -b feature/bob-spatial-join
 ```
 
 **3. Small, Focused PRs**
-- ✅ One component per PR
-- ✅ Include tests for your component
-- ✅ Update `__init__.py` in the same PR
+- One component per PR
+- Include tests for your component
+- Update `__init__.py` in the same PR
 
 **4. Parallel Development Flow**
 ```
@@ -942,12 +942,12 @@ from pipeline.components.rental_loader import RentalDataLoader
 3. **Register and run**: Add to pipeline, call `execute()`
 
 ### Pro Tips:
-- ✅ Use descriptive names for your components
-- ✅ Always return a dict with clear keys
-- ✅ Use `logger.info()` to track what's happening
-- ✅ Look at existing components as templates
-- ✅ Test with small data first
-- ✅ **One component per file = zero merge conflicts!**
+- Use descriptive names for your components
+- Always return a dict with clear keys
+- Use `logger.info()` to track what's happening
+- Look at existing components as templates
+- Test with small data first
+- **One component per file = zero merge conflicts!**
 
 ### Where to Start:
 1. **Copy an existing component** from `components.py`

@@ -11,14 +11,14 @@ import geopandas as gpd
 import pandas as pd
 import pytest
 
-from pipeline import (
+from housing import (
     CommunityBoundariesLoader,
     CorrelationAnalyzer,
-    Pipeline,
     RentalDataLoader,
     ZipBoundariesLoader,
     summary_reporter,
 )
+from pipeline import Pipeline
 from pipeline.base import PipelineComponent, PipelineResult
 from pipeline.config import ConfigManager, PipelineConfig
 

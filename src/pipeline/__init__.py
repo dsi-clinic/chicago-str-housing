@@ -1,4 +1,9 @@
-"""Spatial Data Analysis Pipeline"""
+"""Generic Pipeline Framework.
+
+This module provides the abstract base classes and infrastructure for building
+data analysis pipelines. It's domain-agnostic and can be used for any type
+of data processing workflow.
+"""
 
 from pipeline.base import (
     Analyzer,
@@ -10,38 +15,17 @@ from pipeline.base import (
     Visualizer,
     pipeline_component,
 )
-from pipeline.components import (
-    CommunityBoundariesLoader,
-    CorrelationAnalyzer,
-    CorrelationVisualizer,
-    RentalDataLoader,
-    TractAnalyzer,
-    TractBoundariesLoader,
-    TractToCommunityProcessor,
-    ZipBoundariesLoader,
-    ZipToTractProcessor,
-    summary_reporter,
-)
 
 __all__ = [
-    # Base classes
+    # Core pipeline classes
     "Pipeline",
     "PipelineComponent",
+    "PipelineResult",
+    # Base component types
     "DataLoader",
     "DataProcessor",
     "Analyzer",
     "Visualizer",
-    "PipelineResult",
+    # Utilities
     "pipeline_component",
-    # Components
-    "RentalDataLoader",
-    "ZipBoundariesLoader",
-    "CommunityBoundariesLoader",
-    "TractBoundariesLoader",
-    "ZipToTractProcessor",
-    "TractToCommunityProcessor",
-    "CorrelationAnalyzer",
-    "TractAnalyzer",
-    "CorrelationVisualizer",
-    "summary_reporter",
 ]
