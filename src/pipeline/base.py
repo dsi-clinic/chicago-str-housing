@@ -38,6 +38,12 @@ class PipelineComponent(ABC):
     """Abstract base class for pipeline components."""
 
     def __init__(self, name: str, description: str = "") -> None:
+        """Initialize the pipeline component.
+
+        Args:
+            name: Name of the component
+            description: Description of the component
+        """
         self.name = name
         self.description = description
         self.dependencies: list[str] = []
@@ -74,6 +80,13 @@ class DataLoader(PipelineComponent):
     """Base class for data loading components."""
 
     def __init__(self, name: str, file_path: str, description: str = "") -> None:
+        """Initialize the data loader.
+
+        Args:
+            name: Name of the loader
+            file_path: Path to the data file
+            description: Description of the loader
+        """
         super().__init__(name, description)
         self.file_path = Path(file_path)
         self.output_data = [name]
@@ -97,6 +110,13 @@ class Pipeline:
     def __init__(
         self, name: str, description: str = "", config: PipelineConfig | None = None
     ) -> None:
+        """Initialize the pipeline.
+
+        Args:
+            name: Name of the pipeline
+            description: Description of the pipeline
+            config: Optional pipeline configuration
+        """
         self.name = name
         self.description = description
         self.components: dict[str, PipelineComponent] = {}
@@ -173,7 +193,7 @@ class Pipeline:
             # Update context with configuration data
             self.context.update(
                 {
-                    "config": self.pipeline_config.dict(),
+                    "config": self.pipeline_config.model_dump(),
                     "data_paths": {
                         "rental_data": str(self.pipeline_config.data.rental_data_path),
                         "zip_boundaries": str(
