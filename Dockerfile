@@ -29,7 +29,10 @@ COPY pyproject.toml .
 RUN /usr/local/bin/uv venv
 ENV VIRTUAL_ENV=/project/.venv
 ENV PATH="/project/.venv/bin:$PATH"
-ENV PYTHONPATH=/project
+ENV PYTHONPATH=/project/src
 RUN uv sync
+
+# Ensure PYTHONPATH persists in interactive shells
+RUN echo 'export PYTHONPATH=/project/src' >> /root/.bashrc
 
 CMD ["/bin/bash"]

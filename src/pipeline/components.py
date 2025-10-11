@@ -56,6 +56,11 @@ class RentalDataLoader(DataLoader):
     """
 
     def __init__(self, file_path: str | None = None) -> None:
+        """Initialize the rental data loader.
+
+        Args:
+            file_path: Optional path to rental data file
+        """
         super().__init__(
             "rental_data",
             file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv",
@@ -98,6 +103,11 @@ class ZipBoundariesLoader(DataLoader):
     """
 
     def __init__(self, file_path: str | None = None) -> None:
+        """Initialize the zip boundaries loader.
+
+        Args:
+            file_path: Optional path to zip boundaries file
+        """
         super().__init__(
             "zip_boundaries",
             file_path or "/project/data/Boundaries_ZIP_Codes.csv",
@@ -137,6 +147,11 @@ class CommunityBoundariesLoader(DataLoader):
     """
 
     def __init__(self, file_path: str | None = None) -> None:
+        """Initialize the community boundaries loader.
+
+        Args:
+            file_path: Optional path to community boundaries file
+        """
         super().__init__(
             "community_boundaries",
             file_path or "/project/data/Boundaries_Community_Areas.csv",
@@ -178,6 +193,11 @@ class TractBoundariesLoader(DataLoader):
     """
 
     def __init__(self, file_path: str | None = None) -> None:
+        """Initialize the tract boundaries loader.
+
+        Args:
+            file_path: Optional path to tract boundaries file
+        """
         super().__init__(
             "tract_boundaries",
             file_path or "/project/data/Boundaries_Census_Tracts.csv",
@@ -251,6 +271,7 @@ class ZipToTractProcessor(DataProcessor):
     """
 
     def __init__(self) -> None:
+        """Initialize the zip to tract processor."""
         super().__init__(
             "zip_to_tract", "Transform rental data from zip codes to census tracts"
         )
@@ -397,6 +418,7 @@ class TractToCommunityProcessor(DataProcessor):
     """
 
     def __init__(self) -> None:
+        """Initialize the tract to community processor."""
         super().__init__(
             "tract_to_community", "Aggregate census tract data to community areas"
         )
@@ -442,7 +464,21 @@ class TractToCommunityProcessor(DataProcessor):
         )
 
         # Calculate area-weighted aggregates
-        tract_community_clean["tract_area"] = tract_community_clean.geometry.area
+        # Convert to projected CRS (UTM Zone 16N for Chicago) for accurate area calculations
+        # Note: tract_community_clean currently has centroid geometries, so we need original tract geometries
+        # Get original geometries from tract_data
+        original_geometries = tract_data.set_index("tract_geoid")["geometry"]
+        tract_community_clean = tract_community_clean.set_index("tract_geoid")
+        tract_community_clean["original_geometry"] = original_geometries
+        tract_community_clean = tract_community_clean.reset_index()
+
+        # Convert to projected CRS and calculate area
+        temp_gdf = gpd.GeoDataFrame(
+            tract_community_clean, geometry="original_geometry", crs=tract_data.crs
+        )
+        temp_gdf_projected = temp_gdf.to_crs("EPSG:32616")
+        tract_community_clean["tract_area"] = temp_gdf_projected.geometry.area
+
         tract_community_clean["weighted_rent"] = (
             tract_community_clean["avg_rental_price"]
             * tract_community_clean["tract_area"]
@@ -502,6 +538,7 @@ class CorrelationAnalyzer(Analyzer):
     """
 
     def __init__(self) -> None:
+        """Initialize the correlation analyzer."""
         super().__init__(
             "correlation_analysis", "Analyze correlations in community rental data"
         )
@@ -513,7 +550,9 @@ class CorrelationAnalyzer(Analyzer):
         data = context["community_rental_data"]
 
         # Calculate area statistics
-        data["area_km2"] = data.geometry.area / 1_000_000  # Convert to km²
+        # Convert to projected CRS (UTM Zone 16N for Chicago) for accurate area calculations
+        data_projected = data.to_crs("EPSG:32616")
+        data["area_km2"] = data_projected.geometry.area / 1_000_000  # Convert to km²
 
         # Prepare numeric columns for analysis
         numeric_cols = [
@@ -590,6 +629,7 @@ class TractAnalyzer(Analyzer):
     """
 
     def __init__(self) -> None:
+        """Initialize the tract analyzer."""
         super().__init__(
             "tract_analysis", "Analyze correlations in census tract rental data"
         )
@@ -601,7 +641,9 @@ class TractAnalyzer(Analyzer):
         data = context["tract_rental_data"]
 
         # Calculate area statistics
-        data["area_km2"] = data.geometry.area / 1_000_000  # Convert to km²
+        # Convert to projected CRS (UTM Zone 16N for Chicago) for accurate area calculations
+        data_projected = data.to_crs("EPSG:32616")
+        data["area_km2"] = data_projected.geometry.area / 1_000_000  # Convert to km²
 
         # Prepare numeric columns for analysis
         numeric_cols = [
@@ -695,6 +737,11 @@ class CorrelationVisualizer(Visualizer):
     """
 
     def __init__(self, output_dir: str | None = None) -> None:
+        """Initialize the correlation visualizer.
+
+        Args:
+            output_dir: Optional output directory for visualizations
+        """
         super().__init__(
             "correlation_visualization",
             "Create visualizations for correlation analysis",

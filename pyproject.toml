@@ -55,13 +55,19 @@ extend-select = [
 
 ignore = [
   "D415",   # allow first line of doctstrings to end without punctuation
-  "D107",   # Missing docstring in `__init__`
-  "ANN101", # Missing type annotation for `self` in method 
   "ANN002", # missing type on *args
   "ANN003", # missing type on **kwargs
+  "ANN101", # missing type annotation for self in method
   "B905",   # won't work on python <3.10
-  "N805",   # First argument of a method should be named `self` - false positive for class methods
-  "S101"    # Use of `assert`
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+  "S101",   # allow assert in tests
+  "ANN201", # missing return type annotation in tests
+  "PLR2004",# allow magic values in tests
+]
+"notebooks/**/*.ipynb" = [
 ]
 
 [tool.ruff.lint.pydocstyle]

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,9 @@ class DataConfig(BaseModel):
         description="Path to community area boundaries file",
     )
 
-    @validator("*", pre=True)
-    def validate_paths(cls: type["DataConfig"], v: str | Path) -> Path:  # noqa: N805
+    @field_validator("*", mode="before")
+    @classmethod
+    def validate_paths(cls: type["DataConfig"], v: str | Path) -> Path:
         """Convert string paths to Path objects."""
         if isinstance(v, str):
             return Path(v)
@@ -63,8 +64,9 @@ class OutputConfig(BaseModel):
         default="json", description="Format for results output"
     )
 
-    @validator("output_dir", pre=True)
-    def validate_output_dir(cls: type["OutputConfig"], v: str | Path) -> Path:  # noqa: N805
+    @field_validator("output_dir", mode="before")
+    @classmethod
+    def validate_output_dir(cls: type["OutputConfig"], v: str | Path) -> Path:
         """Convert string to Path and create directory if needed."""
         if isinstance(v, str):
             v = Path(v)
@@ -128,19 +130,23 @@ class PipelineConfig(BaseModel):
         default_factory=dict, description="Additional metadata"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        env_prefix = "PIPELINE_"
-        case_sensitive = False
-        validate_assignment = True
-        use_enum_values = True
+    model_config = ConfigDict(
+        env_prefix="PIPELINE_",
+        case_sensitive=False,
+        validate_assignment=True,
+        use_enum_values=True,
+    )
 
 
 class ConfigManager:
     """Manages pipeline configuration loading and validation."""
 
     def __init__(self, config_path: str | None = None) -> None:
+        """Initialize the config manager.
+
+        Args:
+            config_path: Optional path to configuration file
+        """
         self.config_path = config_path
         self.config: PipelineConfig | None = None
 
@@ -204,7 +210,7 @@ class ConfigManager:
         # Pydantic handles serialization automatically!
         if output_path.suffix.lower() in [".yaml", ".yml"]:
             # Convert Path objects to strings for YAML serialization
-            config_dict = self.config.dict()
+            config_dict = self.config.model_dump()
 
             def convert_paths(obj: Any) -> Any:  # noqa: ANN001, ANN401
                 if isinstance(obj, dict):
@@ -231,7 +237,7 @@ class ConfigManager:
         if not self.config:
             return {}
         # Pydantic handles this automatically!
-        return self.config.dict()
+        return self.config.model_dump()
 
 
 def create_default_config(output_path: str) -> None:

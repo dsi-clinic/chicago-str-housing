@@ -8,22 +8,15 @@ current_dir := $(notdir $(patsubst %/,%,$(dir $(mkfile_path))))
 current_abs_path := $(subst Makefile,,$(mkfile_path))
 
 # pipeline constants
-# PROJECT_NAME
 project_name := "2025-autumn-city-of-chicago-housing"
 project_dir := "$(current_abs_path)"
 
-# environment variables
-include .env
-
-# Check required environment variables
-ifeq ($(DATA_DIR),)
-    $(error DATA_DIR must be set in .env file)
-endif
-
+# environment variables (optional - .env may not exist)
+-include .env
 
 # Build Docker image 
-# Global mount for data directory
-mount_data := -v $(DATA_DIR):/project/data
+# Optional data directory mount (if DATA_DIR is set)
+mount_data := $(if $(DATA_DIR),-v $(DATA_DIR):/project/data,)
 
 .PHONY: build-only run-interactive test-pipeline test clean help devcontainer
 
@@ -32,7 +25,7 @@ build-only: ## Build Docker image only
 	docker compose build
 
 run-interactive: build-only ## Run interactive bash session in container
-	docker compose run -it --rm $(mount_data) $(project_name) /bin/bash
+	docker compose run -it --rm --service-ports $(mount_data) $(project_name) /bin/bash
 
 test-pipeline: build-only ## Run the pipeline example
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/pipeline/scripts/pipeline_usage.py
@@ -59,8 +52,8 @@ help: ## Show this help message
 	@echo "  test              Run all tests with pytest"
 	@echo "  test-pipeline     Run the pipeline example"
 	@echo ""
-	@echo "Environment variables required:"
-	@echo "  DATA_DIR - Path to data directory (set in .env file)"
+	@echo "Optional environment variables (.env file):"
+	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
 	@echo ""
 
 
