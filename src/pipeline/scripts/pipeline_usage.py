@@ -1,238 +1,256 @@
-"""Example usage of the Spatial Data Analysis Pipeline.
+"""Generic Pipeline Framework Demo.
 
-This script demonstrates census tract-level spatial analysis:
-1. Loading data from different formats (CSV with WKT geometries)
-2. Spatial joins with many-to-many relationships (zip → tract)
-3. Area-weighted aggregation across boundaries
-4. Statistical analysis on tract-level datasets
+This script demonstrates how to use the abstract pipeline framework
+with simple example components. This is a minimal demo showing:
+1. Creating custom pipeline components
+2. Registering components with a pipeline
+3. Executing the pipeline
+4. Accessing results
 
-This demonstrates the most challenging aspects of spatial data analysis.
+For a complete real-world example, see: src/housing/scripts/housing_eda_pipeline.py
 """
 
 import logging
 from typing import Any
 
 from pipeline import (
-    CommunityBoundariesLoader,
-    CorrelationAnalyzer,
+    Analyzer,
+    DataLoader,
+    DataProcessor,
     Pipeline,
     PipelineResult,
-    RentalDataLoader,
-    TractAnalyzer,
-    TractBoundariesLoader,
-    TractToCommunityProcessor,
-    ZipBoundariesLoader,
-    ZipToTractProcessor,
+    Visualizer,
     pipeline_component,
 )
 from pipeline.config import PipelineConfig
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def create_tract_analysis_pipeline() -> Pipeline:
-    """Create a pipeline for census tract-level analysis."""
-    # Load configuration
+# ============================================================================
+# EXAMPLE COMPONENTS
+# ============================================================================
+
+
+class ExampleDataLoader(DataLoader):
+    """Example data loader component."""
+
+    def __init__(self) -> None:
+        """Initialize the example data loader."""
+        super().__init__(
+            "example_loader",
+            "/project/data/example.csv",
+            "Load example data",
+        )
+
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Load example data."""
+        logger.info("Loading example data...")
+
+        # Simulate loading data
+        data = {
+            "values": [1, 2, 3, 4, 5],
+            "labels": ["A", "B", "C", "D", "E"],
+        }
+
+        logger.info("Loaded %d records", len(data["values"]))
+        return {"example_data": data}
+
+
+class ExampleProcessor(DataProcessor):
+    """Example data processor component."""
+
+    def __init__(self) -> None:
+        """Initialize the example processor."""
+        super().__init__(
+            "example_processor",
+            "Process example data",
+        )
+        self.required_data = ["example_data"]
+
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Process example data."""
+        logger.info("Processing example data...")
+
+        data = context["example_data"]
+
+        # Simulate processing - double all values
+        processed = {
+            "values": [v * 2 for v in data["values"]],
+            "labels": data["labels"],
+        }
+
+        logger.info("Processed %d records", len(processed["values"]))
+        return {"processed_data": processed}
+
+
+class ExampleAnalyzer(Analyzer):
+    """Example analyzer component."""
+
+    def __init__(self) -> None:
+        """Initialize the example analyzer."""
+        super().__init__(
+            "example_analyzer",
+            "Analyze processed data",
+        )
+        self.required_data = ["processed_data"]
+
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Analyze processed data."""
+        logger.info("Analyzing processed data...")
+
+        data = context["processed_data"]
+
+        # Calculate statistics
+        values = data["values"]
+        stats = {
+            "mean": sum(values) / len(values),
+            "min": min(values),
+            "max": max(values),
+            "count": len(values),
+        }
+
+        logger.info("Analysis complete:")
+        logger.info("  Mean: %.2f", stats["mean"])
+        logger.info("  Range: %d - %d", stats["min"], stats["max"])
+
+        return {"analysis_results": stats}
+
+
+class ExampleVisualizer(Visualizer):
+    """Example visualizer component."""
+
+    def __init__(self) -> None:
+        """Initialize the example visualizer."""
+        super().__init__(
+            "example_visualizer",
+            "Visualize analysis results",
+        )
+        self.required_data = ["analysis_results"]
+
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Visualize analysis results."""
+        logger.info("Creating visualizations...")
+
+        stats = context["analysis_results"]
+
+        # Simulate creating a visualization
+        logger.info("Visualization created with:")
+        logger.info("  %d data points", stats["count"])
+        logger.info("  Mean value: %.2f", stats["mean"])
+
+        return {"visualization_created": True}
+
+
+# ============================================================================
+# PIPELINE CREATION AND EXECUTION
+# ============================================================================
+
+
+def create_simple_pipeline() -> Pipeline:
+    """Create a simple demo pipeline."""
     config = PipelineConfig()
-    pipeline = Pipeline("Census Tract Analysis", config=config)
-    pipeline.load_config()
+    pipeline = Pipeline("Simple Demo Pipeline", config=config)
 
-    # Step 1: Load data sources
-    pipeline.register_component(RentalDataLoader())
-    pipeline.register_component(ZipBoundariesLoader())
-    pipeline.register_component(TractBoundariesLoader())
-
-    # Step 2: Perform spatial join (zip → tract with area weighting)
-    pipeline.register_component(ZipToTractProcessor())
-
-    # Step 3: Analyze at tract level
-    pipeline.register_component(TractAnalyzer())
+    # Register components in order
+    pipeline.register_component(ExampleDataLoader())
+    pipeline.register_component(ExampleProcessor())
+    pipeline.register_component(ExampleAnalyzer())
+    pipeline.register_component(ExampleVisualizer())
 
     return pipeline
 
 
-def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
-    """Run the complete tract-level analysis pipeline."""
-    logger.info("Starting Census Tract Analysis Pipeline")
-    logger.info("=" * 50)
-
-    pipeline = create_tract_analysis_pipeline()
-    results = pipeline.execute()
-
-    logger.info("Pipeline execution completed!")
-    logger.info("Generated %d results:", len(results))
-    for result in results:
-        status = "SUCCESS" if result.success else "FAILED"
-        logger.info("  • %s: %s", result.component_name, status)
-
-    # Show key results
-    if "zip_to_tract_crosswalk" in pipeline.context:
-        crosswalk = pipeline.context["zip_to_tract_crosswalk"]
-        logger.info("\nCrosswalk created: %d zip-tract mappings", len(crosswalk))
-
-    if "tract_rental_data" in pipeline.context:
-        tract_data = pipeline.context["tract_rental_data"]
-        logger.info("Tract data: %d tracts analyzed", len(tract_data))
-
-    return pipeline, results
-
-
-def run_partial_analysis() -> tuple[Pipeline, list[PipelineResult]]:
-    """Run only the data loading and spatial join (no analysis)."""
-    logger.info("Running Partial Analysis (Data Loading + Spatial Join)")
-    logger.info("=" * 55)
-
+def create_pipeline_with_decorator() -> Pipeline:
+    """Create a pipeline using the decorator pattern."""
     config = PipelineConfig()
-    pipeline = Pipeline("Partial Tract Analysis", config=config)
-    pipeline.load_config()
+    pipeline = Pipeline("Decorator Demo Pipeline", config=config)
 
-    # Only load data and perform spatial join
-    pipeline.register_component(RentalDataLoader())
-    pipeline.register_component(ZipBoundariesLoader())
-    pipeline.register_component(TractBoundariesLoader())
-    pipeline.register_component(ZipToTractProcessor())
+    # Register standard components
+    pipeline.register_component(ExampleDataLoader())
+    pipeline.register_component(ExampleProcessor())
 
-    results = pipeline.execute()
+    # Register decorator-based component
+    pipeline.register_component(custom_reporter)
 
-    logger.info("Partial analysis completed!")
-    logger.info("This demonstrates the zip-to-tract spatial join.")
-
-    return pipeline, results
-
-
-def run_hierarchical_aggregation() -> tuple[Pipeline, list[PipelineResult]]:
-    """Demonstrate hierarchical aggregation: Zip → Tract → Community."""
-    logger.info("Running Hierarchical Aggregation Analysis")
-    logger.info("=" * 50)
-    logger.info("Workflow: Zip codes → Census tracts → Community areas")
-
-    config = PipelineConfig()
-    pipeline = Pipeline("Hierarchical Aggregation", config=config)
-    pipeline.load_config()
-
-    # Step 1: Load all boundaries
-    pipeline.register_component(RentalDataLoader())
-    pipeline.register_component(ZipBoundariesLoader())
-    pipeline.register_component(TractBoundariesLoader())
-    pipeline.register_component(CommunityBoundariesLoader())
-
-    # Step 2: Zip → Tract aggregation
-    pipeline.register_component(ZipToTractProcessor())
-
-    # Step 3: Tract → Community aggregation (the clean way!)
-    pipeline.register_component(TractToCommunityProcessor())
-
-    # Step 4: Analyze at both levels
-    pipeline.register_component(TractAnalyzer())
-    pipeline.register_component(CorrelationAnalyzer())
-
-    results = pipeline.execute()
-
-    # Show comparison
-    if (
-        "tract_rental_data" in pipeline.context
-        and "community_rental_data" in pipeline.context
-    ):
-        tract_data = pipeline.context["tract_rental_data"]
-        community_data = pipeline.context["community_rental_data"]
-
-        logger.info("\n=== Multi-Level Analysis Results ===")
-        logger.info(
-            "Tract level: %d areas with data",
-            tract_data["avg_rental_price"].notna().sum(),
-        )
-        logger.info(
-            "Community level: %d areas with data",
-            community_data["avg_rental_price"].notna().sum(),
-        )
-        logger.info(
-            "Granularity increase: %.1fx more detail at tract level",
-            tract_data["avg_rental_price"].notna().sum()
-            / community_data["avg_rental_price"].notna().sum(),
-        )
-
-    return pipeline, results
-
-
-def run_custom_analysis() -> tuple[Pipeline, list[PipelineResult]]:
-    """Run tract analysis with custom statistics component."""
-    logger.info("Running Custom Tract Analysis")
-    logger.info("=" * 30)
-
-    config = PipelineConfig()
-    pipeline = Pipeline("Custom Tract Analysis", config=config)
-    pipeline.load_config()
-
-    # Add standard components
-    pipeline.register_component(RentalDataLoader())
-    pipeline.register_component(ZipBoundariesLoader())
-    pipeline.register_component(TractBoundariesLoader())
-    pipeline.register_component(ZipToTractProcessor())
-    pipeline.register_component(TractAnalyzer())
-
-    # Add custom analysis
-    pipeline.register_component(custom_tract_statistics)
-
-    results = pipeline.execute()
-
-    return pipeline, results
+    return pipeline
 
 
 @pipeline_component(
-    name="custom_tract_statistics", description="Custom tract-level statistics"
+    name="custom_reporter",
+    description="Custom reporter using decorator",
+    required_data=["processed_data"],
 )
-def custom_tract_statistics(context: dict[str, Any]) -> dict[str, Any]:
-    """Custom statistical analysis for tract data."""
-    logger.info("Running Custom Tract Statistics...")
+def custom_reporter(context: dict[str, Any]) -> dict[str, Any]:
+    """Custom reporter component created with decorator."""
+    logger.info("Running custom reporter...")
 
-    if "tract_rental_data" in context:
-        data = context["tract_rental_data"]
+    data = context["processed_data"]
 
-        # Calculate additional statistics
-        stats = {
-            "total_tracts": len(data),
-            "tracts_with_data": data["avg_rental_price"].notna().sum(),
-            "rental_price_range": {
-                "min": data["avg_rental_price"].min(),
-                "max": data["avg_rental_price"].max(),
-                "median": data["avg_rental_price"].median(),
-            },
-            "top_5_expensive_tracts": data.nlargest(5, "avg_rental_price")[
-                ["tract_geoid", "avg_rental_price"]
-            ].to_dict("records"),
-            "top_5_cheapest_tracts": data.nsmallest(5, "avg_rental_price")[
-                ["tract_geoid", "avg_rental_price"]
-            ].to_dict("records"),
-        }
+    print("\n" + "=" * 50)
+    print("CUSTOM REPORT")
+    print("=" * 50)
+    print(f"Processed {len(data['values'])} records")
+    print(f"Values: {data['values']}")
+    print(f"Labels: {data['labels']}")
+    print("=" * 50 + "\n")
 
-        logger.info("  • Total tracts: %d", stats["total_tracts"])
-        logger.info("  • Tracts with data: %d", stats["tracts_with_data"])
-        logger.info(
-            "  • Rental price range: $%.0f - $%.0f",
-            stats["rental_price_range"]["min"],
-            stats["rental_price_range"]["max"],
-        )
+    return {"report_generated": True}
 
-        return {"custom_tract_stats": stats}
 
-    return {}
+def run_simple_demo() -> tuple[Pipeline, list[PipelineResult]]:
+    """Run the simple pipeline demo."""
+    logger.info("=" * 60)
+    logger.info("SIMPLE PIPELINE DEMO")
+    logger.info("=" * 60)
+
+    pipeline = create_simple_pipeline()
+    results = pipeline.execute()
+
+    logger.info("\nPipeline completed!")
+    logger.info("Executed %d components", len(results))
+
+    # Show results summary
+    summary = pipeline.get_results_summary()
+    logger.info("Success rate: %.1f%%", summary["success_rate"] * 100)
+
+    return pipeline, results
+
+
+def run_decorator_demo() -> tuple[Pipeline, list[PipelineResult]]:
+    """Run the decorator-based pipeline demo."""
+    logger.info("\n" + "=" * 60)
+    logger.info("DECORATOR PATTERN DEMO")
+    logger.info("=" * 60)
+
+    pipeline = create_pipeline_with_decorator()
+    results = pipeline.execute()
+
+    logger.info("\nPipeline completed!")
+
+    return pipeline, results
+
+
+def main() -> None:
+    """Run all demo pipelines."""
+    logger.info("GENERIC PIPELINE FRAMEWORK DEMO")
+    logger.info("This demonstrates the abstract pipeline framework.")
+    logger.info(
+        "For a real-world example, see: housing/scripts/housing_eda_pipeline.py"
+    )
+    logger.info("")
+
+    # Run demos
+    pipeline1, results1 = run_simple_demo()
+    pipeline2, results2 = run_decorator_demo()
+
+    logger.info("\n" + "=" * 60)
+    logger.info("ALL DEMOS COMPLETED")
+    logger.info("=" * 60)
+    logger.info("Total pipelines executed: 2")
+    logger.info("Total components executed: %d", len(results1) + len(results2))
 
 
 if __name__ == "__main__":
-    logger.info("Census Tract Analysis Pipeline Examples")
-    logger.info("=" * 45)
-
-    logger.info("\n1. Running Full Tract Analysis...")
-    pipeline1, results1 = run_full_analysis()
-
-    logger.info("\n%s", "=" * 50)
-    logger.info("2. Running Hierarchical Aggregation (Zip → Tract → Community)...")
-    pipeline2, results2 = run_hierarchical_aggregation()
-
-    logger.info("\n%s", "=" * 50)
-    logger.info("3. Running Partial Analysis...")
-    pipeline3, results3 = run_partial_analysis()
-
-    logger.info("\n" + "=" * 50)
-    logger.info("4. Running Custom Analysis...")
-    pipeline4, results4 = run_custom_analysis()
+    main()

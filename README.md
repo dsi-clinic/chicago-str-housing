@@ -72,20 +72,29 @@ This pipeline demonstrates spatial analysis at the **census tract level** for fi
 - **Hierarchical**: Designed to aggregate up to counties, communities, etc.
 
 ## Pipeline Architecture
-The system uses a modular pipeline architecture with configurable components:
 
-### Core Components
-- **DataLoaders**: Load and clean data from different sources
-- **DataProcessors**: Transform and merge datasets
-- **Analyzers**: Perform statistical analysis on merged data
-- **Visualizers**: Create meaningful visualizations
-- **Configuration System**: Manage data paths and analysis parameters
+The system uses a modular pipeline architecture with two main packages:
+
+### Generic Pipeline Framework (`src/pipeline/`)
+A reusable, domain-agnostic framework for building data analysis pipelines:
+- **Base Classes**: `Pipeline`, `DataLoader`, `DataProcessor`, `Analyzer`, `Visualizer`
+- **Configuration System**: YAML/JSON config files with environment variable support
+- **Pipeline Orchestrator**: Manages component execution and shared context
+- **Error Handling**: Robust error handling and validation
+
+### Housing Components (`src/housing/`)
+Chicago housing-specific analysis components organized by type:
+- **Loaders** (`components/loaders/`): RentalDataLoader, ZipBoundariesLoader, CommunityBoundariesLoader, TractBoundariesLoader
+- **Processors** (`components/processors/`): ZipToTractProcessor, TractToCommunityProcessor
+- **Analyzers** (`components/analyzers/`): CorrelationAnalyzer, TractAnalyzer
+- **Visualizers** (`components/visualizers/`): CorrelationVisualizer
+- **Scripts** (`scripts/`): Complete housing analysis workflows
 
 ### Key Features
-- **Flexible Configuration**: YAML/JSON config files with environment variable support
-- **Professional Logging**: Structured logging throughout the pipeline
-- **Modular Design**: Easy to extend with new components
-- **Error Handling**: Robust error handling and validation
+- **Modular Design**: Each component in its own file for independent development
+- **Professional Logging**: Structured logging throughout
+- **Flexible Configuration**: Environment-based configuration
+- **Reusable Framework**: Generic pipeline can be used for any domain
 
 
 ## Quick Start
@@ -136,17 +145,28 @@ exit
 make test-pipeline
 ```
 
-### 3. Run the Pipeline Demo
+### 3. Run the Pipeline Demos
+
+**Housing EDA Pipeline** (Complete spatial analysis):
 ```bash
 # Outside the container
 make test-pipeline
 
 # Inside the container 
+uv run python src/housing/scripts/housing_eda_pipeline.py
+```
+
+**Generic Pipeline Demo** (Framework examples):
+```bash
+# Outside the container
+make test-generic-pipeline
+
+# Inside the container
 uv run python src/pipeline/scripts/pipeline_usage.py
 ```
 
-This will execute the spatial data analysis pipeline and generate:
-- Processed data with spatial joins
+The housing pipeline generates:
+- Processed data with spatial joins at multiple geographic levels
 - Correlation analysis results
 - Visualization plots
 - Summary reports
@@ -170,8 +190,8 @@ Open `notebooks/tract_analysis_demo.ipynb` to see the complete tract-level analy
 **Important**: When running Python code inside the container, prefix commands with `uv run` to maintain the proper environment:
 
 ```bash
-# Example: Running the pipeline
-uv run python src/housing/scripts/pipeline_usage.py
+# Example: Running the housing pipeline
+uv run python src/housing/scripts/housing_eda_pipeline.py
 
 # Example: Running tests
 uv run pytest tests/
@@ -181,40 +201,62 @@ uv run pytest tests/
 
 ### Working with the Pipeline System
 
-The project uses a modular pipeline system located in `src/pipeline/`. The system is organized as follows:
+The project is organized into two main packages:
 
+**Generic Pipeline Framework** (`src/pipeline/`):
 ```
 src/pipeline/
-├── __init__.py                    # Package initialization
-├── base.py                        # Base classes and pipeline orchestrator
-├── components.py                  # Concrete pipeline components
-├── config.py                      # Configuration management
-└── scripts/                       # Executable scripts
-    └── pipeline_usage.py          # Example pipeline usage
+├── __init__.py           # Base classes export
+├── base.py              # Abstract base classes
+├── config.py            # Configuration management
+└── scripts/
+    └── pipeline_usage.py    # Generic framework demo
+```
+
+**Housing Components** (`src/housing/`):
+```
+src/housing/
+├── __init__.py           # Housing components export
+├── components/
+│   ├── loaders/         # Data loading components
+│   ├── processors/      # Spatial processing components
+│   ├── analyzers/       # Statistical analysis components
+│   ├── visualizers/     # Visualization components
+│   ├── constants.py     # Shared constants
+│   └── utils.py         # Utility functions
+└── scripts/
+    └── housing_eda_pipeline.py  # Complete housing workflow
 ```
 
 ### Basic Pipeline Usage
 
 **Import and Use Components**:
 ```python
-# In notebooks or Python scripts
-from pipeline import (
-    Pipeline, RentalDataLoader, ZipBoundariesLoader,
-    CommunityBoundariesLoader, SpatialJoinProcessor,
-    CorrelationAnalyzer, CorrelationVisualizer, summary_reporter
-)
+# Import pipeline framework
+from pipeline import Pipeline
 from pipeline.config import PipelineConfig
+
+# Import housing components
+from housing import (
+    RentalDataLoader,
+    ZipBoundariesLoader,
+    CommunityBoundariesLoader,
+    ZipToTractProcessor,
+    TractAnalyzer,
+    CorrelationVisualizer,
+)
 
 # Create pipeline with configuration
 config = PipelineConfig()
 pipeline = Pipeline("My Analysis", config=config)
 pipeline.load_config()
 
-# Register components
+# Register housing components
 pipeline.register_component(RentalDataLoader())
 pipeline.register_component(ZipBoundariesLoader())
 pipeline.register_component(CommunityBoundariesLoader())
-pipeline.register_component(SpatialJoinProcessor())
+pipeline.register_component(ZipToTractProcessor())
+pipeline.register_component(TractAnalyzer())
 
 # Execute pipeline
 results = pipeline.execute()
@@ -222,7 +264,10 @@ results = pipeline.execute()
 
 **Run Example Scripts**:
 ```bash
-# Run the complete pipeline demonstration
+# Run the housing analysis pipeline
+uv run python src/housing/scripts/housing_eda_pipeline.py
+
+# Run the generic framework demo
 uv run python src/pipeline/scripts/pipeline_usage.py
 ```
 
@@ -257,16 +302,26 @@ config.data.rental_data_path = Path("/custom/path/data.csv")
 We use `docker` and `make` to run our code. Available `make` commands:
 
 * `make help`: Show all available commands and descriptions
-* `make build-only`: Build the Docker image only (useful for testing Dockerfile changes)
+* `make build-only`: Build the Docker image only
 * `make devcontainer`: Build and prepare devcontainer for VS Code/Cursor
 * `make run-interactive`: Create a container and load an interactive bash session
 * `make test`: Run all tests with pytest
-* `make test-pipeline`: Run the spatial data analysis pipeline demonstration
+* `make test-pipeline`: Run the housing EDA pipeline
+* `make test-generic-pipeline`: Run the generic pipeline framework demo
 * `make clean`: Clean up Docker images and containers
 
 **Note**: For notebook development, use the devcontainer workflow instead of command-line tools for the best experience.
 
 The file `Makefile` contains details about the specific commands that are run when calling each `make` target.
+
+## Documentation
+
+Comprehensive guides are available:
+
+* **PIPELINE_GUIDE.md**: Complete guide to the pipeline framework architecture
+* **COMPONENT_STRUCTURE.md**: Details on the component directory structure
+* **STUDENT_GUIDE.md**: Step-by-step guide for creating new components
+* **CENSUS_TRACT_GUIDE.md**: Guide to census tract-level analysis
 
 
 ## Style
