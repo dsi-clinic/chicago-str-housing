@@ -466,7 +466,7 @@ inspections_2024 = inspections[inspections['year'] == 2024]
 
 ```python
 # Turn your workflow into a reusable component
-# See STUDENT_GUIDE.md for template
+# See docs/STUDENT_GUIDE.md for template
 
 class InspectionToTractProcessor(DataProcessor):
     def __init__(self):

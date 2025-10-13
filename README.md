@@ -80,8 +80,8 @@ The pipeline transforms data through a spatial hierarchy:
 This enables both fine-grained tract-level analysis and aggregated community-level insights.
 
 **For detailed technical information**, see:
-- `CENSUS_TRACT_GUIDE.md` - Spatial aggregation methodology
-- `PIPELINE_GUIDE.md` - Pipeline architecture and components
+- `docs/CENSUS_TRACT_GUIDE.md` - Spatial aggregation methodology
+- `docs/PIPELINE_GUIDE.md` - Pipeline architecture and components
 
 ## Architecture
 
@@ -141,7 +141,7 @@ cp .env.example .env
 - Cached to `data/.cache/` on first run for faster subsequent runs
 - No manual download needed!
 
-See `CENSUS_TRACT_GUIDE.md` for detailed instructions.
+See `docs/CENSUS_TRACT_GUIDE.md` for detailed instructions.
 
 ### 3. Choose Your Development Workflow
 
@@ -210,7 +210,7 @@ Open `notebooks/tract_analysis_demo.ipynb` to see the complete tract-level analy
 - Crosswalk creation
 - Tract-level statistical analysis
 
-**For detailed instructions on obtaining tract data**, see `CENSUS_TRACT_GUIDE.md`
+**For detailed instructions on obtaining tract data**, see `docs/CENSUS_TRACT_GUIDE.md`
 
 ## Development
 
@@ -227,7 +227,7 @@ uv run pytest tests/
 
 ### Creating New Components
 
-See `STUDENT_GUIDE.md` for step-by-step instructions on:
+See `docs/STUDENT_GUIDE.md` for step-by-step instructions on:
 - Creating loaders, processors, analyzers, and visualizers
 - Registering components in the pipeline
 - Common patterns and best practices
@@ -239,7 +239,7 @@ The pipeline uses YAML configuration files with environment variable support. Co
 - Analysis parameters
 - Component execution order
 
-See `PIPELINE_GUIDE.md` for configuration details and `config/pipeline_config.yaml` for examples.
+See `docs/PIPELINE_GUIDE.md` for configuration details and `config/pipeline_config.yaml` for examples.
 
 ### Data Management
 
@@ -296,7 +296,7 @@ ruff format
 
 ## Documentation
 
-- **PIPELINE_GUIDE.md** - Pipeline framework architecture
-- **CENSUS_TRACT_GUIDE.md** - Spatial aggregation methodology  
-- **STUDENT_GUIDE.md** - Creating new components
-- **COMPONENT_STRUCTURE.md** - Directory structure reference
+- **docs/PIPELINE_GUIDE.md** - Pipeline framework architecture
+- **docs/CENSUS_TRACT_GUIDE.md** - Spatial aggregation methodology  
+- **docs/STUDENT_GUIDE.md** - Creating new components
+- **docs/COMPONENT_STRUCTURE.md** - Directory structure reference
