@@ -40,61 +40,68 @@ Key questions include:
     - Provide evidence-based insights for anticipating and addressing housing challenges.
 
 ## Data
-- [Chicago’s Affordable Rental Housing Developments](https://data.cityofchicago.org/Community-Economic-Development/Affordable-Rental-Housing-Developments/s6ha-ppgi/about_data): Thousands of affordable units that are supported by City of Chicago programs to maintain affordability in local neighborhoods. Includes location data, management companies, and number of units
+
+### Primary Datasets
+- [Chicago's Affordable Rental Housing Developments](https://data.cityofchicago.org/Community-Economic-Development/Affordable-Rental-Housing-Developments/s6ha-ppgi/about_data): Thousands of affordable units that are supported by City of Chicago programs to maintain affordability in local neighborhoods. Includes location data, management companies, and number of units
 - [House Share Prohibited Buildings List](https://data.cityofchicago.org/Buildings/House-Share-Prohibited-Buildings-List/7bzs-jsyj/about_data): A list of buildings excluded from short-term rental activity under the Shared Housing Ordinance. Includes location data, number of units, and dates.
 - [Foreclosed Rental Properties dataset](https://data.cityofchicago.org/Community-Economic-Development/Foreclosed-Rental-Property/yhcw-iu53/about_data): Foreclosed rental properties registered with the Chicago Department of Housing under the Keep Chicago Renting ordinance. Includes owner information, address, date, previous notices, and management names.
-- [Zillow Observed Rent Index (ZORI)](https://www.zillow.com/research/data/): available by zip code
-- [Chicago Spatial Datasets](https://guides.lib.uchicago.edu/c.php?g=720045&p=8072546): links to base layers for community areas and zip code boundaries
-- [American Community Survey Data](https://www.census.gov/programs-surveys/acs/data.html)
+- [Zillow Observed Rent Index (ZORI)](https://www.zillow.com/research/data/): Available by ZIP code
+- [American Community Survey Data](https://www.census.gov/programs-surveys/acs/data.html): Census demographic and socioeconomic data
+
+### Spatial Boundary Data
+The pipeline uses three levels of geographic boundaries for spatial analysis:
+
+**Census Tracts** (Fine-grained, ~1,300 tracts in Cook County):
+- **Source**: [2023 TIGER/Line Shapefiles](https://www.census.gov/cgi-bin/geo/shapefiles/index.php?year=2023&layergroup=Census+Tracts)
+- **Location**: Extract `tl_2023_17_tract.zip` to `data/tl_2023_17_tract/`
+- **Why**: Standardized statistical boundaries aligned with Census data; ideal for detecting fine-grained neighborhood patterns
+
+**Community Areas** (77 neighborhoods):
+- **Source**: [Chicago Data Portal API](https://data.cityofchicago.org/resource/igwz-8jzy.json)
+- **Location**: Automatically fetched and cached to `data/.cache/community_boundaries.json`
+- **Why**: Official Chicago neighborhood boundaries used for planning and reporting
+
+**ZIP Codes** (59 postal zones):
+- **Source**: [Chicago Data Portal API](https://data.cityofchicago.org/resource/unjd-c2ca.json)
+- **Location**: Automatically fetched and cached to `data/.cache/zip_boundaries.json`
+- **Why**: Bridge between postal-based data (e.g., rental prices) and statistical boundaries
+
+**Note**: API responses are automatically cached locally after the first fetch, making subsequent pipeline runs much faster and reducing load on the Chicago Data Portal servers.
 
 
-## The Pipeline: Census Tract-Level Analysis
+## Pipeline Overview
 
-This pipeline demonstrates spatial analysis at the **census tract level** for fine-grained neighborhood analysis:
+This pipeline performs spatial analysis at the **census tract level** for fine-grained neighborhood analysis. Census tracts (~1,300 in Cook County) provide standardized, census-aligned boundaries that are ideal for detecting neighborhood patterns and joining with demographic data.
 
-### Data Sources
-- **Rental Data**: CSV with zip codes and rental prices (ZORI dataset)
-- **Zip Boundaries**: CSV with WKT polygon strings for zip code boundaries  
-- **Census Tract Boundaries**: CSV with WKT polygon strings for tract boundaries
+The pipeline transforms data through a spatial hierarchy:
+1. **ZIP codes** (postal boundaries) → **Census tracts** (statistical boundaries)
+2. **Census tracts** → **Community areas** (Chicago neighborhoods)
 
-### Key Capabilities
-- **Zip-to-Tract Mapping**: Handles many-to-many relationships with area-weighted aggregation
-- **Tract-to-Community Aggregation**: Clean hierarchical aggregation from tracts to neighborhoods
-- **Spatial Joins**: Transforms data from zip codes (postal) to census tracts (statistical)
-- **Crosswalk Creation**: Generates reusable zip-to-tract mapping with intersection weights
-- **Multi-Level Analysis**: Analyze at tract level (800+ areas) OR aggregate to community level (77 areas)
+This enables both fine-grained tract-level analysis and aggregated community-level insights.
 
-### Why Census Tracts as the Base Unit?
-- **Standardized**: Consistent boundaries across the entire US
-- **Census-aligned**: Easy to join with ACS demographic data
-- **Fine-grained**: ~4,000 residents per tract vs ~35,000 per community area
-- **Equity analysis**: Detect block-level disparities that larger geographies mask
-- **Hierarchical**: Designed to aggregate up to counties, communities, etc.
+**For detailed technical information**, see:
+- `CENSUS_TRACT_GUIDE.md` - Spatial aggregation methodology
+- `PIPELINE_GUIDE.md` - Pipeline architecture and components
 
-## Pipeline Architecture
+## Architecture
 
-The system uses a modular pipeline architecture with two main packages:
+The codebase is organized into two main packages:
 
-### Generic Pipeline Framework (`src/pipeline/`)
-A reusable, domain-agnostic framework for building data analysis pipelines:
-- **Base Classes**: `Pipeline`, `DataLoader`, `DataProcessor`, `Analyzer`, `Visualizer`
-- **Configuration System**: YAML/JSON config files with environment variable support
-- **Pipeline Orchestrator**: Manages component execution and shared context
-- **Error Handling**: Robust error handling and validation
+**Generic Pipeline Framework** (`src/pipeline/`):
+- Reusable, domain-agnostic framework for data analysis pipelines
+- Base classes: `Pipeline`, `DataLoader`, `DataProcessor`, `Analyzer`, `Visualizer`
+- YAML/JSON configuration with environment variable support
 
-### Housing Components (`src/housing/`)
-Chicago housing-specific analysis components organized by type:
-- **Loaders** (`components/loaders/`): RentalDataLoader, ZipBoundariesLoader, CommunityBoundariesLoader, TractBoundariesLoader
-- **Processors** (`components/processors/`): ZipToTractProcessor, TractToCommunityProcessor
-- **Analyzers** (`components/analyzers/`): CorrelationAnalyzer, TractAnalyzer
-- **Visualizers** (`components/visualizers/`): CorrelationVisualizer
-- **Scripts** (`scripts/`): Complete housing analysis workflows
+**Housing Components** (`src/housing/`):
+- Chicago-specific analysis components
+- Organized by type: loaders, processors, analyzers, visualizers, scripts
+- Implements the spatial aggregation workflow
 
-### Key Features
-- **Modular Design**: Each component in its own file for independent development
-- **Professional Logging**: Structured logging throughout
-- **Flexible Configuration**: Environment-based configuration
-- **Reusable Framework**: Generic pipeline can be used for any domain
+### Design Considerations
+- **Modularity**: Each component is independently developed and testable
+- **Separation of concerns**: Generic framework vs. domain-specific logic
+- **Configuration-driven**: Data paths and parameters externalized
+- **Logging**: Structured logging throughout for debugging and monitoring
 
 
 ## Quick Start
@@ -112,7 +119,31 @@ cp .env.example .env
 # Example: DATA_DIR=/Users/yourname/project/data
 ```
 
-### 2. Choose Your Development Workflow
+### 2. Prepare Data Files
+
+**Required: Census Tract Boundaries**
+1. Download [2023 TIGER/Line Illinois Census Tracts](https://www2.census.gov/geo/tiger/TIGER2023/TRACT/tl_2023_17_tract.zip)
+2. Extract to your data directory:
+   ```bash
+   # Option A - Command line
+   unzip tl_2023_17_tract.zip -d data/tl_2023_17_tract/
+   
+   # Option B - GUI (easier)
+   # Move zip to data/ folder and double-click to extract
+   ```
+3. Result: All shapefile components in `data/tl_2023_17_tract/`
+
+**Required: Rental Price Data**
+- Download ZORI data and place in `data/Zip_zori_uc_sfrcondomfr_sm_month.csv`
+
+**Automatic: Boundary APIs**
+- Community and ZIP boundaries are fetched automatically from Chicago Data Portal
+- Cached to `data/.cache/` on first run for faster subsequent runs
+- No manual download needed!
+
+See `CENSUS_TRACT_GUIDE.md` for detailed instructions.
+
+### 3. Choose Your Development Workflow
 
 #### Option A: Development Container (Recommended)
 **Best for**: Interactive development, notebooks, and full IDE integration
@@ -145,7 +176,7 @@ exit
 make test-pipeline
 ```
 
-### 3. Run the Pipeline Demos
+### 4. Run the Pipeline Demos
 
 **Housing EDA Pipeline** (Complete spatial analysis):
 ```bash
@@ -171,7 +202,7 @@ The housing pipeline generates:
 - Visualization plots
 - Summary reports
 
-### 4. Explore the Notebook
+### 5. Explore the Notebook
 
 Open `notebooks/tract_analysis_demo.ipynb` to see the complete tract-level analysis workflow:
 - Zip code to census tract spatial joins
@@ -181,159 +212,91 @@ Open `notebooks/tract_analysis_demo.ipynb` to see the complete tract-level analy
 
 **For detailed instructions on obtaining tract data**, see `CENSUS_TRACT_GUIDE.md`
 
-## Technical Expectations
+## Development
 
-### Container-Based Development
-
-**All code must be run inside the Docker container.** This ensures consistent environments across different machines and eliminates "works on my machine" issues.
-
-**Important**: When running Python code inside the container, prefix commands with `uv run` to maintain the proper environment:
+**All code must run inside the Docker container** to ensure consistent environments. Prefix Python commands with `uv run`:
 
 ```bash
-# Example: Running the housing pipeline
+# Run analysis pipelines
 uv run python src/housing/scripts/housing_eda_pipeline.py
+uv run python src/pipeline/scripts/pipeline_usage.py
 
-# Example: Running tests
+# Run tests
 uv run pytest tests/
 ```
 
-## Usage & Examples
+### Creating New Components
 
-### Working with the Pipeline System
+See `STUDENT_GUIDE.md` for step-by-step instructions on:
+- Creating loaders, processors, analyzers, and visualizers
+- Registering components in the pipeline
+- Common patterns and best practices
 
-The project is organized into two main packages:
+### Configuration
 
-**Generic Pipeline Framework** (`src/pipeline/`):
-```
-src/pipeline/
-├── __init__.py           # Base classes export
-├── base.py              # Abstract base classes
-├── config.py            # Configuration management
-└── scripts/
-    └── pipeline_usage.py    # Generic framework demo
-```
+The pipeline uses YAML configuration files with environment variable support. Configuration includes:
+- Data file paths (can be local files or URLs)
+- Analysis parameters
+- Component execution order
 
-**Housing Components** (`src/housing/`):
-```
-src/housing/
-├── __init__.py           # Housing components export
-├── components/
-│   ├── loaders/         # Data loading components
-│   ├── processors/      # Spatial processing components
-│   ├── analyzers/       # Statistical analysis components
-│   ├── visualizers/     # Visualization components
-│   ├── constants.py     # Shared constants
-│   └── utils.py         # Utility functions
-└── scripts/
-    └── housing_eda_pipeline.py  # Complete housing workflow
-```
-
-### Basic Pipeline Usage
-
-**Import and Use Components**:
-```python
-# Import pipeline framework
-from pipeline import Pipeline
-from pipeline.config import PipelineConfig
-
-# Import housing components
-from housing import (
-    RentalDataLoader,
-    ZipBoundariesLoader,
-    CommunityBoundariesLoader,
-    ZipToTractProcessor,
-    TractAnalyzer,
-    CorrelationVisualizer,
-)
-
-# Create pipeline with configuration
-config = PipelineConfig()
-pipeline = Pipeline("My Analysis", config=config)
-pipeline.load_config()
-
-# Register housing components
-pipeline.register_component(RentalDataLoader())
-pipeline.register_component(ZipBoundariesLoader())
-pipeline.register_component(CommunityBoundariesLoader())
-pipeline.register_component(ZipToTractProcessor())
-pipeline.register_component(TractAnalyzer())
-
-# Execute pipeline
-results = pipeline.execute()
-```
-
-**Run Example Scripts**:
-```bash
-# Run the housing analysis pipeline
-uv run python src/housing/scripts/housing_eda_pipeline.py
-
-# Run the generic framework demo
-uv run python src/pipeline/scripts/pipeline_usage.py
-```
-
-### Configuration Management
-
-The pipeline uses a flexible configuration system:
-
-```python
-# Use default configuration
-config = PipelineConfig()
-
-# Load from YAML file
-from pipeline.config import ConfigManager
-config_manager = ConfigManager("config/pipeline_config.yaml")
-config = config_manager.load_config()
-
-# Create custom configuration
-config = PipelineConfig()
-config.data.rental_data_path = Path("/custom/path/data.csv")
-```
+See `PIPELINE_GUIDE.md` for configuration details and `config/pipeline_config.yaml` for examples.
 
 ### Data Management
 
 - Set `DATA_DIR` in your `.env` file to specify where data lives on your host
 - This directory is mounted to `/project/data` inside the container
 - Keep data separate from code to avoid repository bloat and enable easy data sharing
-- The pipeline automatically validates data file existence 
+- The pipeline automatically validates data file existence
 
-
-### Docker & Make Commands
-
-We use `docker` and `make` to run our code. Available `make` commands:
-
-* `make help`: Show all available commands and descriptions
-* `make build-only`: Build the Docker image only
-* `make devcontainer`: Build and prepare devcontainer for VS Code/Cursor
-* `make run-interactive`: Create a container and load an interactive bash session
-* `make test`: Run all tests with pytest
-* `make test-pipeline`: Run the housing EDA pipeline
-* `make test-generic-pipeline`: Run the generic pipeline framework demo
-* `make clean`: Clean up Docker images and containers
-
-**Note**: For notebook development, use the devcontainer workflow instead of command-line tools for the best experience.
-
-The file `Makefile` contains details about the specific commands that are run when calling each `make` target.
-
-## Documentation
-
-Comprehensive guides are available:
-
-* **PIPELINE_GUIDE.md**: Complete guide to the pipeline framework architecture
-* **COMPONENT_STRUCTURE.md**: Details on the component directory structure
-* **STUDENT_GUIDE.md**: Step-by-step guide for creating new components
-* **CENSUS_TRACT_GUIDE.md**: Guide to census tract-level analysis
-
-
-## Style
-We use [`ruff`](https://docs.astral.sh/ruff/) to enforce style standards and grade code quality. This is an automated code checker that looks for specific issues in the code that need to be fixed to make it readable and consistent with common standards. `ruff` is run before each commit via [`pre-commit`](https://pre-commit.com/). If it fails, the commit will be blocked and the user will be shown what needs to be changed.
-
-Once you have followed the quick setup instructions above for installing dependencies, you can run:
-```bash
-pre-commit run --all-files
+**Data Directory Structure**:
+```
+data/
+├── .cache/                                  # Auto-generated API caches
+│   ├── community_boundaries.json           # Community areas (2.1 MB)
+│   └── zip_boundaries.json                 # ZIP codes (1.5 MB)
+├── tl_2023_17_tract/                       # Census tract shapefiles
+│   ├── tl_2023_17_tract.shp               # Main shapefile
+│   ├── tl_2023_17_tract.shx               # Shape index
+│   ├── tl_2023_17_tract.dbf               # Attributes
+│   ├── tl_2023_17_tract.prj               # Projection
+│   └── tl_2023_17_tract.cpg               # Character encoding
+└── Zip_zori_uc_sfrcondomfr_sm_month.csv   # Rental price data
 ```
 
-You can also run `ruff` directly:
+**Cache Management**:
+- API responses are automatically cached after first fetch
+- To refresh cached data: `rm -rf data/.cache/`
+- Cache files are gitignored (inside `data/`) 
+
+
+### Make Commands
+
+Common commands (run `make help` for full list):
+
+* `make devcontainer` - Build devcontainer for VS Code/Cursor
+* `make run-interactive` - Interactive bash session in container
+* `make test` - Run all tests
+* `make test-pipeline` - Run housing analysis pipeline
+* `make clean` - Clean up Docker artifacts
+
+See `Makefile` for implementation details.
+
+### Code Quality
+
+We use [`ruff`](https://docs.astral.sh/ruff/) for code formatting and linting, enforced via [`pre-commit`](https://pre-commit.com/) hooks:
+
 ```bash
+# Run all checks
+pre-commit run --all-files
+
+# Or run ruff directly
 ruff check
 ruff format
 ```
+
+## Documentation
+
+- **PIPELINE_GUIDE.md** - Pipeline framework architecture
+- **CENSUS_TRACT_GUIDE.md** - Spatial aggregation methodology  
+- **STUDENT_GUIDE.md** - Creating new components
+- **COMPONENT_STRUCTURE.md** - Directory structure reference

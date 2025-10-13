@@ -40,12 +40,15 @@ class CorrelationAnalyzer(Analyzer):
         data["area_km2"] = data_projected.geometry.area / 1_000_000  # Convert to km²
 
         # Prepare numeric columns for analysis
+        # Use zip_count if available (from direct zip aggregation), otherwise tract_count (from tract aggregation)
+        count_col = "zip_count" if "zip_count" in data.columns else "tract_count"
+
         numeric_cols = [
             "area_weighted_avg_rent",
             "avg_rental_price",
             "min_rental_price",
             "max_rental_price",
-            "zip_count",
+            count_col,
             "area_km2",
         ]
 
@@ -60,11 +63,12 @@ class CorrelationAnalyzer(Analyzer):
         correlation_matrix = analysis_data.corr()
 
         # Key correlations to highlight
+        count_label = "Zip Count" if count_col == "zip_count" else "Tract Count"
         key_correlations = {
             "Area vs Average Rent": correlation_matrix.loc[
                 "area_km2", "avg_rental_price"
             ],
-            "Area vs Zip Count": correlation_matrix.loc["area_km2", "zip_count"],
+            f"Area vs {count_label}": correlation_matrix.loc["area_km2", count_col],
             "Min vs Max Rent": correlation_matrix.loc[
                 "min_rental_price", "max_rental_price"
             ],

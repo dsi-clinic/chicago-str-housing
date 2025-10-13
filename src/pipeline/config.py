@@ -24,20 +24,27 @@ class DataConfig(BaseModel):
         default=Path("/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv"),
         description="Path to rental price data file",
     )
-    zip_boundaries_path: Path = Field(
-        default=Path("/project/data/Boundaries_ZIP_Codes.csv"),
-        description="Path to ZIP code boundaries file",
+    zip_boundaries_path: Path | str = Field(
+        default="https://data.cityofchicago.org/resource/unjd-c2ca.json",
+        description="Path to ZIP code boundaries file or URL",
     )
-    community_boundaries_path: Path = Field(
-        default=Path("/project/data/Boundaries_Community_Areas.csv"),
-        description="Path to community area boundaries file",
+    community_boundaries_path: Path | str = Field(
+        default="https://data.cityofchicago.org/resource/igwz-8jzy.json",
+        description="Path to community area boundaries file or URL",
+    )
+    tract_boundaries_path: Path = Field(
+        default=Path("/project/data/tl_2023_17_tract/tl_2023_17_tract.shp"),
+        description="Path to census tract boundaries shapefile",
     )
 
     @field_validator("*", mode="before")
     @classmethod
-    def validate_paths(cls: type["DataConfig"], v: str | Path) -> Path:
-        """Convert string paths to Path objects."""
+    def validate_paths(cls: type["DataConfig"], v: str | Path) -> Path | str:
+        """Convert string paths to Path objects, but keep URLs as strings."""
         if isinstance(v, str):
+            # Keep URLs as strings, convert file paths to Path
+            if v.startswith("http://") or v.startswith("https://"):
+                return v
             return Path(v)
         return v
 
@@ -195,7 +202,13 @@ class ConfigManager:
         ]
 
         for name, path in data_paths:
-            if not path.exists():
+            # Skip validation for URLs
+            if isinstance(path, str) and (
+                path.startswith("http://") or path.startswith("https://")
+            ):
+                continue
+            # Check file existence for local paths
+            if isinstance(path, Path) and not path.exists():
                 logger.warning("Data file not found: %s at %s", name, path)
 
     def save_config(self, output_path: str) -> None:

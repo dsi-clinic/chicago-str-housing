@@ -2,494 +2,493 @@
 
 ## Overview
 
-This guide explains how to aggregate data from **zip codes to census tracts** for more granular neighborhood analysis in Chicago.
+This guide explains how to work with **census tracts** for spatial aggregation in Chicago. The typical workflow is:
 
-## Why Use Census Tracts Instead of Community Areas?
+1. **Point data → Census tracts** (spatial join + aggregation)
+2. **Census tracts → Community areas** (area-weighted aggregation)
 
-### Census Tracts
-- **More granular**: ~800 tracts in Chicago vs 77 community areas
-- **Standardized**: Consistent boundaries across the entire US
-- **Smaller size**: Average ~4,000 residents per tract
-- **Better for equity analysis**: Can identify block-level disparities
-- **Census data aligned**: Easy to join with ACS demographic data
-
-### Community Areas  
-- **Larger**: 77 areas covering entire city
-- **Locally meaningful**: Based on historical Chicago neighborhoods
-- **Easier visualization**: Less cluttered maps
-- **Stable boundaries**: Defined in 1920s, rarely change
-
-### When to Use Each
-
-| Use Census Tracts When... | Use Community Areas When... |
-|---------------------------|----------------------------|
-| You need fine-grained analysis | You want neighborhood-level overview |
-| Joining with census demographic data | Working with Chicago-specific datasets |
-| Detecting local variations | Communicating to general public |
-| Performing equity analysis | Historical trend analysis |
+This two-step process provides both fine-grained analysis and neighborhood-level summaries.
 
 ---
 
-## Getting Census Tract Boundary Data
+## Why Census Tracts?
 
-### Option 1: Chicago Data Portal (Recommended for Chicago)
+### The Three Geographic Levels
 
-**Best for**: Quick start with Chicago data
+| Level | Count | Size | Best For |
+|-------|-------|------|----------|
+| **Points** | Thousands | Individual locations | Raw data (Airbnb, STR prohibitions) |
+| **Census Tracts** | ~801 | ~4,000 residents | Fine-grained analysis, density calculations |
+| **Community Areas** | 77 | ~35,000 residents | Neighborhood summaries, public communication |
 
-1. **Visit**: [Chicago Data Portal - Census Tracts 2010](https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-Census-Tracts-2010/5jrd-6zik)
+### When to Use Each Level
 
-2. **Export to CSV**:
-   - Click "Export" button
-   - Select "CSV" format
-   - Download the file
+**Use Census Tracts when:**
+- Calculating densities (per km²)
+- Joining with census demographic data (ACS)
+- Detecting local variations and hotspots
 
-3. **Save the file**:
+**Use Community Areas when:**
+- Summarizing for public communication
+- Matching local neighborhood names
+
+---
+
+## The Two-Step Aggregation Pattern
+
+### Pattern Overview
+
+```
+Point Data (Airbnb, STR)
+    ↓ (spatial join: which tract is each point in?)
+Census Tracts (aggregated counts, densities)
+    ↓ (area-weighted aggregation)
+Community Areas (neighborhood summaries)
+```
+
+### Why Two Steps?
+
+1. **Granularity**: Tracts preserve local detail that would be lost going directly to communities
+2. **Density calculations**: Tracts have consistent size, good for per-km² metrics
+3. **Flexibility**: Can analyze at either tract or community level
+4. **Accuracy**: Area-weighted aggregation preserves spatial precision
+
+---
+
+## Step 1: Points to Census Tracts
+
+### Get Census Tract Boundaries
+
+**Use 2023 TIGER/Line Shapefiles (matches 2019-2023 ACS 5-year estimates)**
+
+1. Visit: [2023 TIGER/Line® Shapefiles: Census Tracts](https://www.census.gov/cgi-bin/geo/shapefiles/index.php?year=2023&layergroup=Census+Tracts)
+2. Select **Illinois** from the state dropdown
+3. Click **Download** to get `tl_2023_17_tract.zip`
+4. Extract the zip to a subdirectory in your data folder:
+   
+   **Option A - Command line:**
    ```bash
-   # Save to your data directory
-   mv ~/Downloads/Boundaries_-_Census_Tracts_-_2010.csv /project/data/Boundaries_Census_Tracts.csv
+   # Extract to a subdirectory (keeps data/ clean)
+   unzip tl_2023_17_tract.zip -d /project/data/tl_2023_17_tract/
    ```
-
-4. **Check the data structure**:
-   - Should have columns: `GEOID10`, `the_geom`, `TRACTCE10`, etc.
-   - `the_geom` contains WKT polygon strings
-   - `GEOID10` is the 11-digit tract identifier (State+County+Tract)
-
-### Option 2: US Census Bureau TIGER/Line Files
-
-**Best for**: Any location in the US, most current boundaries
-
-1. **Visit**: [Census TIGER/Line Shapefiles](https://www.census.gov/cgi-bin/geo/shapefiles/index.php)
-
-2. **Select parameters**:
-   - Year: 2020 (most recent) or 2010 (matches community areas)
-   - Layer type: "Census Tracts"
-   - State: "Illinois"
-
-3. **Download and convert**:
-   ```python
-   import geopandas as gpd
    
-   # Read shapefile
-   tracts = gpd.read_file("tl_2020_17_tract.shp")
+   **Option B - GUI (easier):**
+   - Move `tl_2023_17_tract.zip` to `/project/data/`
+   - Double-click the zip file (automatically creates `tl_2023_17_tract/` folder)
    
-   # Filter to Cook County (Chicago)
-   chicago_tracts = tracts[tracts['COUNTYFP'] == '031']
-   
-   # Export to CSV with WKT geometry
-   chicago_tracts['the_geom'] = chicago_tracts.geometry.to_wkt()
-   chicago_tracts.to_csv('/project/data/Boundaries_Census_Tracts.csv', index=False)
-   ```
+   **Result:** Files will be in `/project/data/tl_2023_17_tract/`:
+   - `tl_2023_17_tract.shp` (main file)
+   - `tl_2023_17_tract.shx` (shape index)
+   - `tl_2023_17_tract.dbf` (attributes)
+   - `tl_2023_17_tract.prj` (projection)
+   - `tl_2023_17_tract.cpg` (character encoding)
 
-### Option 3: HUD USPS Crosswalk (No Geometries)
+**Why 2023 TIGER/Line?**
+- Matches the 2019-2023 ACS 5-year estimates (most recent)
+- Includes all Illinois tracts (filter to Cook County for Chicago)
+- Standard format for joining with census demographic data
 
-**Best for**: Just the zip-to-tract mapping without spatial analysis
+### Spatial Join: Points to Tracts
 
-1. **Visit**: [HUD USPS ZIP-Tract Crosswalk](https://www.huduser.gov/portal/datasets/usps_crosswalk.html)
-
-2. **Download**: Choose the most recent quarter
-
-3. **File format**:
-   ```
-   ZIP,TRACT,RES_RATIO,BUS_RATIO,OTH_RATIO,TOT_RATIO
-   60601,17031081403,0.0,1.0,0.0,1.0
-   60602,17031081600,0.12,0.88,0.0,1.0
-   ```
-
-4. **Note**: This gives you the crosswalk directly but no geometries for mapping
-
----
-
-## Understanding the Zip-to-Tract Relationship
-
-### Key Concept: Many-to-Many Mapping
-
-**Unlike zip codes and community areas, zip-to-tract mapping is many-to-many:**
-
-```
-ZIP 60614 ──┬──> Tract 17031060100 (40% overlap)
-            ├──> Tract 17031060200 (35% overlap)  
-            └──> Tract 17031060300 (25% overlap)
-
-Tract 17031060200 <──┬── ZIP 60614 (60% overlap)
-                     └── ZIP 60657 (40% overlap)
-```
-
-### Why This Matters
-
-1. **Area weighting is critical**: 
-   - Can't just assign a zip's value to all intersecting tracts
-   - Must weight by intersection area
-
-2. **Data aggregation requires care**:
-   - Simple averages will be wrong
-   - Need area-weighted averages
-
-3. **The crosswalk is valuable**:
-   - Save it for reuse with other datasets
-   - Documents the mapping for reproducibility
-
----
-
-## Using the Pipeline Components
-
-### Basic Usage
+**Example: Airbnb listings**
 
 ```python
-from pipeline import (
-    Pipeline,
-    RentalDataLoader,
-    ZipBoundariesLoader,
-    TractBoundariesLoader,
-    ZipToTractProcessor,
-    TractAnalyzer,
-)
-from pipeline.config import PipelineConfig
+import pandas as pd
+import geopandas as gpd
 
-# Create pipeline
+# Load point data
+airbnb = pd.read_csv('/project/data/listings.csv')
+airbnb_gdf = gpd.GeoDataFrame(
+    airbnb,
+    geometry=gpd.points_from_xy(airbnb.longitude, airbnb.latitude),
+    crs="EPSG:4326"
+)
+
+# Load tract boundaries from TIGER/Line shapefile
+tracts_gdf = gpd.read_file('/project/data/tl_2023_17_tract/tl_2023_17_tract.shp')
+
+# Filter to Cook County (Chicago) only
+tracts_gdf = tracts_gdf[tracts_gdf['COUNTYFP'] == '031'].copy()
+
+# Create standardized tract ID (GEOID is the 11-digit tract identifier)
+tracts_gdf['tract_geoid'] = tracts_gdf['GEOID']
+
+# Spatial join: which tract is each point in?
+airbnb_with_tracts = gpd.sjoin(
+    airbnb_gdf,
+    tracts_gdf[['tract_geoid', 'geometry']],
+    how='left',
+    predicate='within'
+)
+```
+
+### Aggregate to Tract Level
+
+**Count and density:**
+
+```python
+# Calculate tract areas (needed for density)
+tracts_gdf = tracts_gdf.to_crs("EPSG:3857")  # Project to meters
+tracts_gdf['area_km2'] = tracts_gdf.geometry.area / 1_000_000
+tracts_gdf = tracts_gdf.to_crs("EPSG:4326")  # Back to lat/lon
+
+# Aggregate points by tract
+tract_agg = airbnb_with_tracts.groupby('tract_geoid').agg({
+    'id': 'count',  # Number of listings
+    'price': 'mean'  # Average price
+}).rename(columns={'id': 'airbnb_count', 'price': 'avg_price'}).reset_index()
+
+# Calculate density
+tract_agg = tract_agg.merge(
+    tracts_gdf[['tract_geoid', 'area_km2']],
+    on='tract_geoid'
+)
+tract_agg['airbnb_density'] = tract_agg['airbnb_count'] / tract_agg['area_km2']
+```
+
+---
+
+## Step 2: Tracts to Community Areas
+
+### Get Community Area Boundaries
+
+```python
+# Load from Chicago Data Portal JSON endpoint
+community_gdf = gpd.read_file('https://data.cityofchicago.org/resource/igwz-8jzy.json')
+
+# Standardize community area identifier
+community_gdf['community_area'] = community_gdf['area_numbe']
+```
+
+**Note:** The pipeline loaders automatically cache API responses in `/project/data/.cache/` to avoid repeated API calls. The cache is used on subsequent runs, making the pipeline much faster.
+
+### Area-Weighted Aggregation
+
+**Why area-weighted?** Tracts often cross community boundaries. A tract that's 30% in one community and 70% in another should contribute proportionally.
+
+```python
+# 1. Find intersections between tracts and communities
+tracts_proj = tracts_gdf.to_crs("EPSG:3857")
+community_proj = community_gdf.to_crs("EPSG:3857")
+
+intersections = gpd.overlay(
+    tracts_proj,
+    community_proj[['community_area', 'geometry']],
+    how='intersection'
+)
+
+# 2. Calculate intersection areas
+intersections['intersection_area'] = intersections.geometry.area
+
+# 3. Merge with tract data
+intersections = intersections.merge(
+    tract_agg,
+    on='tract_geoid',
+    how='left'
+)
+
+# 4. Calculate weighted values
+intersections['weighted_count'] = (
+    intersections['airbnb_count'] * 
+    intersections['intersection_area'] / 
+    intersections['area_km2']
+)
+
+# 5. Aggregate to community level
+community_agg = intersections.groupby('community_area').agg({
+    'weighted_count': 'sum',
+    'intersection_area': 'sum'
+}).reset_index()
+
+community_agg['airbnb_density'] = (
+    community_agg['weighted_count'] / 
+    (community_agg['intersection_area'] / 1_000_000)  # Convert to km²
+)
+```
+
+---
+
+## Using Pipeline Components
+
+The pipeline handles this automatically!
+
+### Example: Airbnb Analysis
+
+```python
+from pipeline import Pipeline
+from pipeline.config import PipelineConfig
+from housing.components import (
+    AirbnbDataLoader,
+    TractBoundariesLoader,
+    CommunityBoundariesLoader,
+    AirbnbToTractProcessor,
+    TractToCommunityProcessor
+)
+
 config = PipelineConfig()
-pipeline = Pipeline("Tract Analysis", config=config)
+pipeline = Pipeline("Airbnb Analysis", config=config)
 pipeline.load_config()
 
 # Load data
-pipeline.register_component(RentalDataLoader())
-pipeline.register_component(ZipBoundariesLoader())
+pipeline.register_component(AirbnbDataLoader())
 pipeline.register_component(TractBoundariesLoader())
+pipeline.register_component(CommunityBoundariesLoader())
 
-# Spatial join and analysis
-pipeline.register_component(ZipToTractProcessor())
-pipeline.register_component(TractAnalyzer())
+# Two-step aggregation
+pipeline.register_component(AirbnbToTractProcessor())
+pipeline.register_component(TractToCommunityProcessor())
 
 # Execute
 results = pipeline.execute()
 
 # Access results
-tract_data = pipeline.context["tract_rental_data"]
-crosswalk = pipeline.context["zip_to_tract_crosswalk"]
+tract_data = pipeline.context["airbnb_tract_data"]
+community_data = pipeline.context["community_airbnb_data"]
 ```
 
-### Component Details
+### Available Processors
 
-#### `TractBoundariesLoader`
-
-Loads census tract boundary data from CSV with WKT geometries.
-
-**Input**: CSV file with columns:
-- `the_geom` or `geometry`: WKT polygon string
-- `GEOID10`, `TRACTCE10`, or similar: Tract identifier
-
-**Output**: `tract_boundaries` GeoDataFrame
-
-**Configuration**:
-```python
-# Default path
-loader = TractBoundariesLoader()
-
-# Custom path
-loader = TractBoundariesLoader("/path/to/tracts.csv")
-```
-
-#### `ZipToTractProcessor`
-
-Performs spatial join from zip codes to census tracts with area-weighted aggregation.
-
-**Requirements**: 
-- `rental_data` (from RentalDataLoader)
-- `zip_boundaries` (from ZipBoundariesLoader)
-- `tract_boundaries` (from TractBoundariesLoader)
-
-**Outputs**:
-- `tract_rental_data`: GeoDataFrame with tract-level aggregated rental data
-- `zip_to_tract_crosswalk`: DataFrame mapping zips to tracts with intersection areas
-
-**Key features**:
-- Calculates actual intersection areas (not just overlap flags)
-- Area-weighted aggregation for accurate prices
-- Handles many-to-many relationships properly
-
-#### `TractAnalyzer`
-
-Performs statistical analysis on tract-level data.
-
-**Requirements**: `tract_rental_data`
-
-**Outputs**:
-- `tract_correlation_matrix`: Correlation analysis
-- `tract_analysis_data`: Clean analysis dataset
-- `tract_summary_stats`: Summary statistics
+| Processor | Input | Output |
+|-----------|-------|--------|
+| `AirbnbToTractProcessor` | Airbnb points → | Tract aggregation with density |
+| `ZipToTractProcessor` | ZIP polygons → | Tract aggregation (rental prices) |
+| `TractToCommunityProcessor` | Tract data → | Community aggregation |
 
 ---
 
-## The Zip-to-Tract Crosswalk
+## Common Calculations
 
-### What It Contains
+### 1. Density (per km²)
 
 ```python
-crosswalk.head()
+# Always calculate density at tract level
+tract_agg['density'] = tract_agg['count'] / tract_agg['area_km2']
+
+# Why: Tracts have consistent size, makes density comparable
 ```
 
-| zip_code | tract_geoid | intersection_area |
-|----------|-------------|-------------------|
-| 60614 | 17031060100 | 0.0023 |
-| 60614 | 17031060200 | 0.0018 |
-| 60614 | 17031060300 | 0.0012 |
+### 2. Count Aggregation
 
-### How to Use It
-
-**1. Map any zip code data to tracts**:
 ```python
-# You have some data by zip code
-zip_data = pd.DataFrame({
-    'zip_code': ['60614', '60657', '60640'],
-    'some_value': [100, 200, 150]
-})
+# For counts: simple sum (but weighted when aggregating tracts→communities)
+tract_total_count = tract_agg['count'].sum()
 
-# Join with crosswalk
-merged = zip_data.merge(crosswalk, on='zip_code')
+# For weighted community aggregation, see area-weighted section above
+```
 
-# Calculate area-weighted values for each tract
-merged['weighted_value'] = merged['some_value'] * merged['intersection_area']
+### 3. Average Values
 
-tract_values = merged.groupby('tract_geoid').agg({
-    'weighted_value': 'sum',
-    'intersection_area': 'sum'
-}).reset_index()
+```python
+# For tract-level averages
+tract_agg['avg_value'] = tract_agg['total_value'] / tract_agg['count']
 
-tract_values['tract_value'] = (
-    tract_values['weighted_value'] / tract_values['intersection_area']
+# For community-level weighted averages
+community_agg['weighted_avg'] = (
+    community_agg['weighted_total'] / community_agg['weighted_count']
 )
 ```
 
-**2. Understand zip coverage**:
+---
+
+## Practical Example: Building Your Own Aggregation
+
+### Scenario: You have building inspection data
+
 ```python
-# How many tracts does each zip overlap?
-zip_coverage = crosswalk.groupby('zip_code').size()
-print(zip_coverage.describe())
+# 1. Load your point data
+inspections = pd.read_csv('building_inspections.csv')
+# Should have: latitude, longitude, violation_count, etc.
 
-# Which zip has the most tract overlaps?
-max_zip = zip_coverage.idxmax()
-print(f"Zip {max_zip} overlaps {zip_coverage.max()} tracts")
-```
+# 2. Create GeoDataFrame
+inspections_gdf = gpd.GeoDataFrame(
+    inspections,
+    geometry=gpd.points_from_xy(inspections.longitude, inspections.latitude),
+    crs="EPSG:4326"
+)
 
-**3. Save for reuse**:
-```python
-# Save crosswalk
-crosswalk.to_csv('/project/data/zip_to_tract_crosswalk.csv', index=False)
+# 3. Spatial join to tracts
+tracts_gdf = gpd.read_file('/project/data/tl_2023_17_tract/tl_2023_17_tract.shp')
+tracts_gdf = tracts_gdf[tracts_gdf['COUNTYFP'] == '031'].copy()  # Cook County
+tracts_gdf['tract_geoid'] = tracts_gdf['GEOID']
 
-# Load later
-crosswalk = pd.read_csv('/project/data/zip_to_tract_crosswalk.csv')
+inspections_with_tract = gpd.sjoin(
+    inspections_gdf,
+    tracts_gdf[['tract_geoid', 'geometry']],
+    how='left',
+    predicate='within'
+)
+
+# 4. Aggregate by tract
+tract_inspections = inspections_with_tract.groupby('tract_geoid').agg({
+    'building_id': 'count',
+    'violation_count': 'sum'
+}).rename(columns={'building_id': 'inspection_count'}).reset_index()
+
+# 5. Add density
+tracts_gdf_proj = tracts_gdf.to_crs("EPSG:3857")
+tracts_gdf_proj['area_km2'] = tracts_gdf_proj.geometry.area / 1_000_000
+tracts_gdf_proj = tracts_gdf_proj.to_crs("EPSG:4326")
+
+tract_inspections = tract_inspections.merge(
+    tracts_gdf_proj[['tract_geoid', 'area_km2']],
+    on='tract_geoid'
+)
+tract_inspections['inspection_density'] = (
+    tract_inspections['inspection_count'] / tract_inspections['area_km2']
+)
+
+# 6. Join geometries for mapping
+tract_inspections_gdf = tracts_gdf.merge(
+    tract_inspections,
+    on='tract_geoid',
+    how='left'
+)
+
+# 7. Map it
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(12, 10))
+tract_inspections_gdf.plot(
+    column='inspection_density',
+    cmap='YlOrRd',
+    legend=True,
+    ax=ax
+)
+plt.title('Building Inspections per km² by Census Tract')
+plt.savefig('inspection_density_map.png')
 ```
 
 ---
 
-## Example: Complete Workflow
+## Common Issues
 
-### Step 1: Prepare Data
+### Issue 1: Points Missing Tract Assignment
 
-```bash
-# Download tract boundaries
-# Save to /project/data/Boundaries_Census_Tracts.csv
+**Symptom**: Many rows have `NaN` for `tract_geoid` after spatial join
 
-# Verify existing data
-ls /project/data/
-# Should have:
-# - Boundaries_Census_Tracts.csv
-# - Boundaries_ZIP_Codes.csv  
-# - Zip_zori_uc_sfrcondomfr_sm_month.csv
-```
+**Causes**:
+- Points outside Chicago/Cook County boundaries
+- CRS mismatch
+- Geometry errors
+- Shapefile not filtered to Cook County
 
-### Step 2: Run Pipeline
-
+**Solutions**:
 ```python
-from pipeline import Pipeline, RentalDataLoader, ZipBoundariesLoader
-from pipeline import TractBoundariesLoader, ZipToTractProcessor, TractAnalyzer
-from pipeline.config import PipelineConfig
+# Check how many points have no tract
+missing = inspections_with_tract['tract_geoid'].isna().sum()
+print(f"{missing} points have no tract assignment")
 
-config = PipelineConfig()
-pipeline = Pipeline("Tract Analysis", config=config)
-pipeline.load_config()
+# Verify tract file loaded correctly
+print(f"Total tracts loaded: {len(tracts_gdf)}")
+print(f"Tracts in Cook County: {len(tracts_gdf[tracts_gdf['COUNTYFP'] == '031'])}")
 
-pipeline.register_component(RentalDataLoader())
-pipeline.register_component(ZipBoundariesLoader())
-pipeline.register_component(TractBoundariesLoader())
-pipeline.register_component(ZipToTractProcessor())
-pipeline.register_component(TractAnalyzer())
+# Check CRS match
+print(f"Points CRS: {inspections_gdf.crs}")
+print(f"Tracts CRS: {tracts_gdf.crs}")
 
-results = pipeline.execute()
+# Check bounds overlap
+print(f"Points bounds: {inspections_gdf.total_bounds}")
+print(f"Tracts bounds: {tracts_gdf.total_bounds}")
+
+# Fix: Reproject to same CRS
+inspections_gdf = inspections_gdf.to_crs(tracts_gdf.crs)
 ```
 
-### Step 3: Explore Results
+### Issue 2: Density Calculation Errors
 
-```python
-# Get tract data
-tract_data = pipeline.context["tract_rental_data"]
-print(f"Total tracts: {len(tract_data)}")
-print(f"Tracts with data: {tract_data['avg_rental_price'].notna().sum()}")
+**Symptom**: Extremely high or low density values
 
-# Get crosswalk
-crosswalk = pipeline.context["zip_to_tract_crosswalk"]
-print(f"Total zip-tract mappings: {len(crosswalk)}")
-
-# Get statistics
-stats = pipeline.context["tract_summary_stats"]
-print(f"Average rent: ${stats['avg_rental_price']:,.2f}")
-print(f"Std deviation: ${stats['rental_price_std']:,.2f}")
-```
-
-### Step 4: Export Results
-
-```python
-# Export tract data
-tract_export = tract_data.drop(columns=['geometry', 'the_geom'], errors='ignore')
-tract_export.to_csv('/project/data/tract_rental_prices.csv', index=False)
-
-# Export crosswalk
-crosswalk.to_csv('/project/data/zip_to_tract_crosswalk.csv', index=False)
-
-# Export as GeoJSON for mapping
-tract_data.to_file('/project/data/tract_rental_prices.geojson', driver='GeoJSON')
-```
-
----
-
-## Common Issues and Solutions
-
-### Issue 1: Tract File Not Found
-
-**Error**: `FileNotFoundError: Census tract boundaries file not found`
-
-**Solution**: 
-```python
-# Check if file exists
-import os
-os.path.exists('/project/data/Boundaries_Census_Tracts.csv')
-
-# If False, download from Chicago Data Portal
-# See "Getting Census Tract Boundary Data" above
-```
-
-### Issue 2: Wrong Column Names
-
-**Error**: `ValueError: No geometry column found in census tract data`
-
-**Solution**: The loader tries common column names. If your file has different columns:
-
-```python
-import pandas as pd
-
-# Check what columns you have
-df = pd.read_csv('/project/data/Boundaries_Census_Tracts.csv')
-print(df.columns)
-
-# If geometry column is named differently, rename it:
-df = df.rename(columns={'YOUR_GEOM_COL': 'the_geom'})
-df.to_csv('/project/data/Boundaries_Census_Tracts.csv', index=False)
-```
-
-### Issue 3: No Intersections Found
-
-**Error**: Pipeline runs but `tract_rental_data` is empty
-
-**Cause**: CRS mismatch or no geographic overlap
+**Cause**: Area not in km² or wrong units
 
 **Solution**:
 ```python
-# Check CRS of each dataset
-zip_bounds = pipeline.context["zip_boundaries"]
-tract_bounds = pipeline.context["tract_boundaries"]
+# Always project to meters before calculating area
+gdf_proj = gdf.to_crs("EPSG:3857")  # Web Mercator (meters)
+gdf_proj['area_m2'] = gdf_proj.geometry.area
+gdf_proj['area_km2'] = gdf_proj['area_m2'] / 1_000_000
 
-print(f"Zip CRS: {zip_bounds.crs}")
-print(f"Tract CRS: {tract_bounds.crs}")
-
-# Check geographic bounds
-print(f"Zip bounds: {zip_bounds.total_bounds}")
-print(f"Tract bounds: {tract_bounds.total_bounds}")
-
-# If CRS different, they should be reprojected (processor does this)
-# If bounds don't overlap, you have wrong geography
+# Then convert back to geographic CRS for mapping
+gdf = gdf_proj.to_crs("EPSG:4326")
 ```
 
-### Issue 4: Memory Issues with Large Areas
+### Issue 3: Slow Spatial Operations
 
-**Error**: Process killed or very slow
+**Symptom**: Spatial join or overlay takes forever
 
-**Cause**: Calculating intersections for many geometries is memory-intensive
-
-**Solution**: Process in batches
+**Solutions**:
 ```python
-# Modify ZipToTractProcessor to work in chunks
-# Or filter to specific area first:
-
-tract_bounds_filtered = tract_bounds[
-    tract_bounds['COUNTYFP'] == '031'  # Cook County only
+# 1. Use spatial index (happens automatically with GeoPandas)
+# 2. Filter to relevant area first
+chicago_bounds = tracts_gdf.total_bounds
+points_chicago = points_gdf.cx[
+    chicago_bounds[0]:chicago_bounds[2],
+    chicago_bounds[1]:chicago_bounds[3]
 ]
+
+# 3. Simplify geometries (for tracts/communities, not points)
+tracts_gdf['geometry'] = tracts_gdf.geometry.simplify(0.001)
 ```
 
 ---
 
 ## Next Steps
 
-### 1. Join Census Demographic Data
+### 1. Add Census Demographics
 
 ```python
-# Get ACS data for tracts
-# Example: income, population, race/ethnicity
+# Get ACS data from census.gov API or data.census.gov
+acs_data = pd.read_csv('acs_tract_demographics.csv')
 
-acs_data = pd.read_csv('acs_tract_data.csv')
-# Should have 'tract_geoid' column
-
-# Join with rental data
-enriched = tract_data.merge(
-    acs_data, 
-    left_on='tract_geoid', 
-    right_on='tract_geoid',
+# Join with your tract data
+enriched = tract_inspections.merge(
+    acs_data,
+    left_on='tract_geoid',
+    right_on='GEOID',
     how='left'
 )
+
+# Analyze correlations
+enriched['median_income'].corr(enriched['violation_count'])
 ```
 
-### 2. Visualize on a Map
+### 2. Temporal Analysis
 
 ```python
-import matplotlib.pyplot as plt
+# If your data has dates
+inspections_2023 = inspections[inspections['year'] == 2023]
+inspections_2024 = inspections[inspections['year'] == 2024]
 
-# Choropleth map
-fig, ax = plt.subplots(figsize=(12, 10))
-
-tract_data.plot(
-    column='avg_rental_price',
-    cmap='YlOrRd',
-    legend=True,
-    ax=ax
-)
-
-plt.title('Average Rental Price by Census Tract')
-plt.savefig('tract_rental_map.png')
+# Aggregate each year separately
+# Compare densities over time
 ```
 
-### 3. Cluster Analysis
+### 3. Create a Pipeline Component
 
 ```python
-from sklearn.cluster import KMeans
+# Turn your workflow into a reusable component
+# See STUDENT_GUIDE.md for template
 
-# Prepare features
-features = tract_data[['avg_rental_price', 'zip_count', 'area_km2']].dropna()
-
-# Cluster
-kmeans = KMeans(n_clusters=5, random_state=42)
-tract_data['cluster'] = kmeans.fit_predict(features)
-
-# Map clusters
-tract_data.plot(column='cluster', categorical=True, legend=True)
-```
-
-### 4. Compare with Community Areas
-
-```python
-# Run both pipelines
-# Compare granularity and insights
-
-print(f"Community areas: {len(community_data)}")
-print(f"Census tracts: {len(tract_data)}")
-print(f"Granularity ratio: {len(tract_data) / len(community_data):.1f}x")
+class InspectionToTractProcessor(DataProcessor):
+    def __init__(self):
+        super().__init__(
+            "inspection_tract_processor",
+            "Aggregate inspections to census tracts"
+        )
+    
+    def execute(self, context):
+        # Your aggregation logic here
+        # Return tract-level data
+        return {"tract_inspections": tract_inspections}
 ```
 
 ---
+
+## Key Takeaways
+
+✅ **Two-step aggregation**: Points → Tracts → Communities  
+✅ **Calculate density** at tract level (per km²)  
+✅ **Use area-weighted aggregation** for tract → community  
+✅ **Always check CRS** before spatial operations  
+✅ **Pipeline components** handle this automatically
+
+For more details on pipeline architecture, see [PIPELINE_GUIDE.md](PIPELINE_GUIDE.md).
