@@ -1,5 +1,9 @@
 # Student Guide: Working with Housing Components
 
+**Prerequisites:** Read [PIPELINE_GUIDE.md](PIPELINE_GUIDE.md) for core pipeline concepts.
+
+---
+
 ## Quick Reference
 
 ### Component File Locations
@@ -17,235 +21,202 @@
 
 #### Data Loaders
 - `RentalDataLoader` - ZORI rental price data
-- `ZipBoundariesLoader` - Zip code boundaries
+- `ZipBoundariesLoader` - ZIP code boundaries
 - `CommunityBoundariesLoader` - Community area boundaries  
 - `TractBoundariesLoader` - Census tract boundaries
+- `AirbnbDataLoader` - Airbnb listing data
+- `STRProhibitionDataLoader` - STR prohibition data
 
 #### Processors
-- `ZipToTractProcessor` - Zip → Tract spatial join
+- `ZipToTractProcessor` - ZIP → Tract spatial join (includes KNN interpolation)
 - `TractToCommunityProcessor` - Tract → Community aggregation
+- `AirbnbToTractProcessor` - Airbnb → Tract aggregation
 
 #### Analyzers
 - `CorrelationAnalyzer` - Community-level correlation analysis
 - `TractAnalyzer` - Tract-level analysis
+- `AirbnbRentalAnalyzer` - Airbnb vs rental price analysis
+- `STRProhibitionAnalyzer` - STR prohibition density analysis
+- `STRTemporalAnalyzer` - Temporal pattern analysis
 
 #### Visualizers
-- `CorrelationVisualizer` - Creates correlation plots
+- `CorrelationVisualizer` - Correlation plots
+- `AirbnbMapVisualizer` - Airbnb spatial maps
+- `STRProhibitionVisualizer` - STR prohibition charts
+- `STRDensityMapVisualizer` - STR density maps
+- `STRTemporalVisualizer` - Temporal analysis plots
+
+---
 
 ## How to Create a New Component
 
-### Step 1: Choose Component Type
+### Step 1: Choose Your Starting Point
 
-Decide what type of component you're creating:
-- **Loader**: Loads data from files
-- **Processor**: Transforms or joins data
-- **Analyzer**: Performs statistical analysis
-- **Visualizer**: Creates charts/visualizations
+**Copy an existing component similar to what you need:**
+- New loader? Copy `loaders/rental_data.py`
+- New spatial processor? Copy `processors/zip_to_tract.py`
+- New analyzer? Copy `analyzers/correlation.py`
+- New visualizer? Copy `visualizers/correlation.py`
 
-### Step 2: Create Your File
-
-Create a new `.py` file in the appropriate directory:
-
-```bash
-# For a new loader
-touch src/housing/components/loaders/my_loader.py
-
-# For a new analyzer
-touch src/housing/components/analyzers/my_analyzer.py
-```
-
-### Step 3: Write Your Component
-
-Use this template based on your component type:
-
-#### **Template: Data Loader**
+### Step 2: Component Template
 
 ```python
-"""Description of what data this loads."""
+"""Brief description of what this component does."""
 
 import logging
 from typing import Any
 import pandas as pd
 
-from pipeline.base import DataLoader
+from pipeline.base import DataLoader  # or DataProcessor, Analyzer, Visualizer
 
 logger = logging.getLogger(__name__)
 
 
-class MyDataLoader(DataLoader):
-    """Load my custom data.
+class MyComponent(DataLoader):
+    """One-line summary.
     
-    Detailed description of what this component does.
+    Detailed explanation of what this does, inputs, and outputs.
     """
 
     def __init__(self, file_path: str | None = None) -> None:
-        """Initialize the loader.
+        """Initialize the component.
         
         Args:
-            file_path: Optional path to data file
+            file_path: Path to data file (optional)
         """
         super().__init__(
-            "my_data",  # Name used in pipeline context
-            file_path or "/project/data/my_data.csv",
-            "Load my custom data",  # Description
+            "my_component",  # Name (key in context)
+            file_path or "/project/data/default.csv",
+            "Brief description",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Load and process the data."""
-        logger.info("Loading data from: %s", self.file_path)
+        """Execute the component logic.
         
-        # Your loading logic here
+        Args:
+            context: Pipeline context with data from previous components
+            
+        Returns:
+            Dictionary with results to add to context
+        """
+        logger.info("Starting my component...")
+        
+        # Get data from context (if needed)
+        # input_data = context.get("some_data")
+        
+        # Your logic here
         df = pd.read_csv(self.file_path)
         
-        # Clean and process data
-        # ...
+        logger.info("Processed %d records", len(df))
         
-        logger.info("Loaded %d records", len(df))
-        
-        # Return data with a key name
         return {"my_data": df}
 ```
 
-#### **Template: Processor**
+### Step 3: Register Your Component
 
 ```python
-"""Description of what processing this does."""
-
-import logging
-from typing import Any
-import geopandas as gpd
-
-from pipeline.base import DataProcessor
-
-logger = logging.getLogger(__name__)
-
-
-class MyProcessor(DataProcessor):
-    """Process data in some way.
-    
-    Detailed description.
-    """
-
-    def __init__(self) -> None:
-        """Initialize the processor."""
-        super().__init__(
-            "my_processor",
-            "Process and transform data",
-        )
-
-    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Perform the processing."""
-        logger.info("Processing data...")
-        
-        # Get data from context
-        input_data = context["some_input_data"]
-        
-        # Your processing logic here
-        processed_data = input_data  # ... transform it
-        
-        logger.info("Processing complete")
-        
-        return {"processed_data": processed_data}
-```
-
-#### **Template: Analyzer**
-
-```python
-"""Description of what analysis this performs."""
-
-import logging
-from typing import Any
-
-from pipeline.base import Analyzer
-from housing.components.constants import CORRELATION_STRONG_THRESHOLD
-
-logger = logging.getLogger(__name__)
-
-
-class MyAnalyzer(Analyzer):
-    """Analyze data to find insights.
-    
-    Detailed description.
-    """
-
-    def __init__(self) -> None:
-        """Initialize the analyzer."""
-        super().__init__(
-            "my_analysis",
-            "Perform statistical analysis on data",
-        )
-
-    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Perform the analysis."""
-        logger.info("Performing analysis...")
-        
-        # Get data from context
-        data = context["input_data"]
-        
-        # Your analysis logic here
-        results = {}  # Calculate statistics, correlations, etc.
-        
-        logger.info("Analysis complete")
-        
-        return {"analysis_results": results}
-```
-
-### Step 4: Register Your Component
-
-Add your component to the appropriate `__init__.py`:
-
-```python
+# 1. Add to the specific __init__.py
 # In src/housing/components/loaders/__init__.py
-from housing.components.loaders.my_loader import MyDataLoader
+from housing.components.loaders.my_component import MyComponent
 
 __all__ = [
-    ...,
-    "MyDataLoader",  # Add your component
+    # ... existing components
+    "MyComponent",
 ]
-```
 
-```python
+# 2. Add to the main __init__.py
 # In src/housing/components/__init__.py  
-from housing.components.loaders import MyDataLoader
+from housing.components.loaders import MyComponent
 
 __all__ = [
-    ...,
-    "MyDataLoader",  # Add your component
+    # ... existing components
+    "MyComponent",
 ]
 ```
 
-### Step 5: Use Your Component
-
-Now you can use it in pipelines:
+### Step 4: Use in a Pipeline
 
 ```python
-from housing import MyDataLoader
 from pipeline import Pipeline
+from pipeline.config import PipelineConfig
+from housing.components import MyComponent
 
-pipeline = Pipeline("My Analysis")
-pipeline.register_component(MyDataLoader())
+config = PipelineConfig()
+pipeline = Pipeline("My Analysis", config=config)
+pipeline.load_config()
+
+pipeline.register_component(MyComponent())
 results = pipeline.execute()
+
+# Access your results
+my_data = pipeline.context["my_data"]
 ```
 
-## Testing Your Component
+---
 
-### Unit Test Template
+## Common Issues & Solutions
+
+### Import Errors
+
+```python
+# ❌ Wrong
+from components.loaders import MyLoader
+
+# ✅ Correct
+from housing.components.loaders import MyLoader
+# or
+from housing import MyLoader
+```
+
+### Missing Context Keys
+
+```python
+# ❌ Risky - crashes if key missing
+data = context["my_data"]
+
+# ✅ Safe - checks first
+if "my_data" not in context:
+    logger.error("Required data 'my_data' not in context")
+    return {}
+data = context["my_data"]
+```
+
+### File Paths
+
+```python
+# ❌ Hardcoded
+def __init__(self):
+    self.path = "/home/student/data.csv"
+
+# ✅ Configurable with default
+def __init__(self, file_path: str | None = None):
+    self.path = file_path or "/project/data/default.csv"
+    
+# ✅✅ Even better - use config
+def execute(self, context):
+    path = self.config.data.rental_data_path
+```
+
+---
+
+## Testing
+
+### Write a Simple Test
 
 ```python
 # In tests/test_my_component.py
 import pytest
-from housing import MyDataLoader
+from housing.components import MyComponent
 
-def test_my_loader_success():
-    """Test MyDataLoader with valid data."""
+def test_my_component():
     # Arrange
-    loader = MyDataLoader()
+    component = MyComponent()
+    context = {}  # Add any required context data
     
     # Act
-    result = loader.execute({})
+    result = component.execute(context)
     
     # Assert
-    assert isinstance(result, dict)
     assert "my_data" in result
     assert len(result["my_data"]) > 0
 ```
@@ -253,14 +224,16 @@ def test_my_loader_success():
 ### Run Tests
 
 ```bash
-# Run all tests
+# All tests
 make test
 
-# Run specific test file
+# Specific test
 uv run python -m pytest tests/test_my_component.py -v
 ```
 
-## Common Patterns
+---
+
+## Project-Specific Tips
 
 ### Using Constants
 
@@ -274,120 +247,45 @@ if correlation >= CORRELATION_STRONG_THRESHOLD:
     strength = "Strong"
 ```
 
-### Accessing Context Data
-
-```python
-def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-    # Data added by previous components
-    rental_data = context["rental_data"]
-    boundaries = context["zip_boundaries"]
-    
-    # Use the data
-    # ...
-    
-    # Return new data to context
-    return {"my_result": result}
-```
-
-### Logging
+### Logging Best Practices
 
 ```python
 import logging
 logger = logging.getLogger(__name__)
 
-logger.info("Processing %d records", len(data))
-logger.warning("Missing data for zip code: %s", zip_code)
-logger.error("Failed to process: %s", error_msg)
+# Use meaningful messages
+logger.info("Loading data from: %s", self.file_path)
+logger.info("Loaded %d ZIP codes with rental data", len(df))
+logger.warning("Missing rental price for %d ZIP codes", missing_count)
+logger.error("Failed to load data: %s", str(e))
 ```
 
-## Tips & Best Practices
+### Return Dictionary Structure
 
-### DO:
-- Use descriptive component names
-- Add docstrings to classes and methods
-- Log important steps and results
-- Handle errors gracefully
-- Return results in a dictionary with clear keys
-- Write tests for your components
-
-### DON'T:
-- Hardcode file paths (use parameters)
-- Assume data exists (check first)
-- Ignore errors (log and handle them)
-- Create circular dependencies between components
-- Modify data in the context directly
-
-## Getting Help
-
-### Example Components to Study
-
-Start by looking at these well-documented examples:
-
-1. **Simple Loader**: `loaders/rental_data.py`
-2. **Spatial Processor**: `processors/zip_to_tract.py`
-3. **Statistical Analyzer**: `analyzers/correlation.py`
-4. **Visualizer**: `visualizers/correlation.py`
-
-### Common Issues
-
-**Import Error:**
 ```python
-# Wrong
-from components.loaders import MyLoader
-
-# Correct
-from housing.components.loaders import MyLoader
-# or
-from housing import MyLoader
+# Always return a dict with clear, descriptive keys
+return {
+    "rental_data": df,              # Main data
+    "rental_summary": summary_dict, # Optional summary info
+    "rental_metadata": metadata     # Optional metadata
+}
 ```
 
-**Context Key Error:**
-```python
-# Risky - will crash if key missing
-data = context["my_data"]
+---
 
-# Safe - checks first
-if "my_data" not in context:
-    logger.error("Required data 'my_data' not in context")
-    return {}
-data = context["my_data"]
-```
+## Best Practices Checklist
 
-**File Path Error:**
-```python
-# Hardcoded
-def __init__(self):
-    self.path = "/home/student/data.csv"
+When creating a new component:
 
-# Configurable with default
-def __init__(self, file_path: str | None = None):
-    self.path = file_path or "/project/data/default.csv"
-```
-
-## Resources
-
-- **Pipeline Guide**: `PIPELINE_GUIDE.md`
-- **Component Structure**: `COMPONENT_STRUCTURE.md`
-- **Tests**: `tests/test_pipeline_system.py`
-
-## Quick Commands
-
-```bash
-# Run housing pipeline
-make test-pipeline
-
-# Run generic pipeline demo
-make test-generic-pipeline
-
-# Run all tests
-make test
-
-# Interactive shell
-make run-interactive
-
-# Build container
-make build-only
-```
-
-Good luck with your components!
+- [ ] Chose appropriate base class (DataLoader, DataProcessor, Analyzer, Visualizer)
+- [ ] Added type hints to methods
+- [ ] Wrote docstrings for class and methods
+- [ ] Used `logger.info()` for important steps
+- [ ] Handled errors gracefully (try/except)
+- [ ] Used config for file paths (not hardcoded)
+- [ ] Checked context keys before accessing
+- [ ] Returned results in a clear dict
+- [ ] Registered in both `__init__.py` files
+- [ ] Wrote at least one unit test
+- [ ] Ran `ruff check` and `ruff format`
 
