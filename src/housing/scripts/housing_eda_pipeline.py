@@ -16,6 +16,8 @@ from housing import (
     CommunityBoundariesLoader,
     CorrelationAnalyzer,
     RentalDataLoader,
+    RentalDistributionVisualizer,
+    RentalMapVisualizer,
     TractAnalyzer,
     TractBoundariesLoader,
     TractToCommunityProcessor,
@@ -123,6 +125,10 @@ def run_hierarchical_aggregation() -> tuple[Pipeline, list[PipelineResult]]:
     # Step 4: Analyze at both levels
     pipeline.register_component(TractAnalyzer())
     pipeline.register_component(CorrelationAnalyzer())
+
+    # Step 5: Visualize rental distributions at both levels
+    pipeline.register_component(RentalDistributionVisualizer())
+    pipeline.register_component(RentalMapVisualizer())
 
     results = pipeline.execute()
 

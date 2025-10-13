@@ -18,7 +18,11 @@ from housing.components.loaders import (
 )
 from housing.components.processors import TractToCommunityProcessor, ZipToTractProcessor
 from housing.components.utils import summary_reporter
-from housing.components.visualizers import CorrelationVisualizer
+from housing.components.visualizers import (
+    CorrelationVisualizer,
+    RentalDistributionVisualizer,
+    RentalMapVisualizer,
+)
 
 __all__ = [
     # Loaders
@@ -34,6 +38,8 @@ __all__ = [
     "TractAnalyzer",
     # Visualizers
     "CorrelationVisualizer",
+    "RentalDistributionVisualizer",
+    "RentalMapVisualizer",
     # Utils
     "summary_reporter",
 ]
