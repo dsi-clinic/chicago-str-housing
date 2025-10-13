@@ -257,10 +257,23 @@ class TestConfigurationManagement:
         config = PipelineConfig()
 
         # Act & Assert
-        # Test that required paths exist
+        # Test that required paths exist (or are URLs)
         assert config.data.rental_data_path.exists()
-        assert config.data.zip_boundaries_path.exists()
-        assert config.data.community_boundaries_path.exists()
+
+        # ZIP and Community boundaries can be URLs or file paths
+        zip_path_str = str(config.data.zip_boundaries_path)
+        if zip_path_str.startswith("http://") or zip_path_str.startswith("https://"):
+            assert "cityofchicago.org" in zip_path_str  # Verify it's a valid URL
+        else:
+            assert config.data.zip_boundaries_path.exists()
+
+        community_path_str = str(config.data.community_boundaries_path)
+        if community_path_str.startswith("http://") or community_path_str.startswith(
+            "https://"
+        ):
+            assert "cityofchicago.org" in community_path_str  # Verify it's a valid URL
+        else:
+            assert config.data.community_boundaries_path.exists()
 
     def test_config_manager_loading(self) -> None:
         """Test ConfigManager loading configuration."""

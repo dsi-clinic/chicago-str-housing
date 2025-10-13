@@ -5,9 +5,10 @@ analysis:
   spatial_join_predicate: intersects
 components: []
 data:
-  community_boundaries_path: /project/data/Boundaries_Community_Areas.csv
+  community_boundaries_path: https://data.cityofchicago.org/resource/igwz-8jzy.json
   rental_data_path: /project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv
-  zip_boundaries_path: /project/data/Boundaries_ZIP_Codes.csv
+  tract_boundaries_path: /project/data/tl_2023_17_tract/tl_2023_17_tract.shp
+  zip_boundaries_path: https://data.cityofchicago.org/resource/unjd-c2ca.json
 description: Analyze rental prices and house share prohibitions in Chicago
 execution_order: []
 metadata: {}
