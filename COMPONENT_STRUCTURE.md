@@ -2,7 +2,7 @@
 
 ## Overview
 
-The housing components have been organized into a modular directory structure where each component lives in its own file. This makes it easy for students to work independently on different components without merge conflicts.
+The housing components have been organized into a modular directory structure where each component lives in its own file. This makes it easy for contributors to work independently on different components without merge conflicts.
 
 ## New Directory Structure
 
@@ -74,10 +74,6 @@ Utility functions:
 
 ## Import Patterns
 
-### For Students Working on Individual Components
-
-Students can import what they need from the base pipeline and constants:
-
 ```python
 # In a loader file (e.g., loaders/rental_data.py)
 from pipeline.base import DataLoader
@@ -95,17 +91,4 @@ from housing.components.constants import CORRELATION_STRONG_THRESHOLD
 
 class CorrelationAnalyzer(Analyzer):
     ...
-```
-
-### For Users of the Housing Package
-
-Import from the housing package directly (unchanged from before):
-
-```python
-from housing import (
-    RentalDataLoader,
-    ZipBoundariesLoader,
-    CorrelationAnalyzer,
-    TractAnalyzer,
-)
 ```
