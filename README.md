@@ -173,7 +173,7 @@ pre-commit install
 exit
 
 # Test your setup
-make test-pipeline
+make test
 ```
 
 ### 4. Run the Pipeline Demos
@@ -181,7 +181,7 @@ make test-pipeline
 **Housing EDA Pipeline** (Complete spatial analysis):
 ```bash
 # Outside the container
-make test-pipeline
+make run-eda-pipeline
 
 # Inside the container 
 uv run python src/housing/scripts/housing_eda_pipeline.py
@@ -190,7 +190,7 @@ uv run python src/housing/scripts/housing_eda_pipeline.py
 **Generic Pipeline Demo** (Framework examples):
 ```bash
 # Outside the container
-make test-generic-pipeline
+make run-generic-pipeline
 
 # Inside the container
 uv run python src/pipeline/scripts/pipeline_usage.py
@@ -276,7 +276,7 @@ Common commands (run `make help` for full list):
 * `make devcontainer` - Build devcontainer for VS Code/Cursor
 * `make run-interactive` - Interactive bash session in container
 * `make test` - Run all tests
-* `make test-pipeline` - Run housing analysis pipeline
+* `make run-eda-pipeline` - Run housing analysis pipeline
 * `make clean` - Clean up Docker artifacts
 
 See `Makefile` for implementation details.
