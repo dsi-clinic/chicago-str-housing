@@ -18,9 +18,14 @@ logger = logging.getLogger(__name__)
 
 
 class DataConfig(BaseModel):
-    """Configuration for data sources."""
+    """Configuration for data sources.
 
-    rental_data_path: Path = Field(
+    This class accepts arbitrary data path fields from the config file.
+    Students can add new data sources in the YAML without modifying this code.
+    """
+
+    # Default data paths - these will be overridden by YAML config
+    rental_data_path: Path | str = Field(
         default=Path("/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv"),
         description="Path to rental price data file",
     )
@@ -32,10 +37,13 @@ class DataConfig(BaseModel):
         default="https://data.cityofchicago.org/resource/igwz-8jzy.json",
         description="Path to community area boundaries file or URL",
     )
-    tract_boundaries_path: Path = Field(
+    tract_boundaries_path: Path | str = Field(
         default=Path("/project/data/tl_2023_17_tract/tl_2023_17_tract.shp"),
         description="Path to census tract boundaries shapefile",
     )
+
+    # Allow additional fields from YAML config
+    model_config = ConfigDict(extra="allow")
 
     @field_validator("*", mode="before")
     @classmethod
@@ -89,21 +97,6 @@ class AnalysisConfig(BaseModel):
         ge=0.0,
         le=1.0,
         description="Minimum correlation threshold for significance",
-    )
-    min_zip_codes_per_community: int = Field(
-        default=1, ge=1, description="Minimum ZIP codes required per community area"
-    )
-    recent_months: int = Field(
-        default=12,
-        ge=1,
-        le=60,
-        description="Number of recent months to include in analysis",
-    )
-    spatial_join_predicate: Literal["intersects", "within", "contains", "overlaps"] = (
-        Field(
-            default="intersects",
-            description="Spatial join predicate for ZIP-community mapping",
-        )
     )
 
 
@@ -191,17 +184,31 @@ class ConfigManager:
             return self.config
 
     def _validate_data_files(self) -> None:
-        """Validate that data files exist."""
+        """Validate that data files exist (defined + extra fields)."""
         if not self.config:
             return
 
-        data_paths = [
-            ("rental_data", self.config.data.rental_data_path),
-            ("zip_boundaries", self.config.data.zip_boundaries_path),
-            ("community_boundaries", self.config.data.community_boundaries_path),
-        ]
+        # Collect all data paths (defined fields + extra fields from YAML)
+        all_paths = {}
 
-        for name, path in data_paths:
+        # Get defined fields
+        all_paths.update(self.config.data.model_dump())
+
+        # Get extra fields (added dynamically from YAML)
+        if (
+            hasattr(self.config.data, "__pydantic_extra__")
+            and self.config.data.__pydantic_extra__
+        ):
+            all_paths.update(self.config.data.__pydantic_extra__)
+
+        # Validate all paths
+        for field_name, path in all_paths.items():
+            if not field_name.endswith("_path"):
+                continue
+
+            # Clean name for logging (remove '_path' suffix)
+            clean_name = field_name.replace("_path", "")
+
             # Skip validation for URLs
             if isinstance(path, str) and (
                 path.startswith("http://") or path.startswith("https://")
@@ -209,7 +216,7 @@ class ConfigManager:
                 continue
             # Check file existence for local paths
             if isinstance(path, Path) and not path.exists():
-                logger.warning("Data file not found: %s at %s", name, path)
+                logger.warning("Data file not found: %s at %s", clean_name, path)
 
     def save_config(self, output_path: str) -> None:
         """Save current configuration to file."""

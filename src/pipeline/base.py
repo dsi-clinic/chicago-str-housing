@@ -190,23 +190,42 @@ class Pipeline:
         self.pipeline_config = config_manager.load_config()
 
         if self.pipeline_config:
+            # Dynamically extract all data paths from config (defined + extra fields)
+            data_paths = {}
+
+            # Get defined fields
+            for (
+                field_name,
+                field_value,
+            ) in self.pipeline_config.data.model_dump().items():
+                if field_name.endswith("_path"):
+                    clean_name = field_name.replace("_path", "")
+                    data_paths[clean_name] = str(field_value)
+
+            # Get extra fields (added dynamically from YAML)
+            if (
+                hasattr(self.pipeline_config.data, "__pydantic_extra__")
+                and self.pipeline_config.data.__pydantic_extra__
+            ):
+                for (
+                    field_name,
+                    field_value,
+                ) in self.pipeline_config.data.__pydantic_extra__.items():
+                    if field_name.endswith("_path"):
+                        clean_name = field_name.replace("_path", "")
+                        data_paths[clean_name] = str(field_value)
+
             # Update context with configuration data
             self.context.update(
                 {
                     "config": self.pipeline_config.model_dump(),
-                    "data_paths": {
-                        "rental_data": str(self.pipeline_config.data.rental_data_path),
-                        "zip_boundaries": str(
-                            self.pipeline_config.data.zip_boundaries_path
-                        ),
-                        "community_boundaries": str(
-                            self.pipeline_config.data.community_boundaries_path
-                        ),
-                    },
+                    "data_paths": data_paths,
                     "output_dir": str(self.pipeline_config.output.output_dir),
                 }
             )
-            logger.info("Loaded pipeline configuration")
+            logger.info(
+                "Loaded pipeline configuration with %d data paths", len(data_paths)
+            )
 
     def add_to_context(self, key: str, value: Any) -> None:  # noqa: ANN401
         """Add data to the pipeline context."""
