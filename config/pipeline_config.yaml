@@ -1,8 +1,5 @@
 analysis:
   correlation_threshold: 0.1
-  min_zip_codes_per_community: 1
-  recent_months: 12
-  spatial_join_predicate: intersects
 components: []
 data:
   community_boundaries_path: https://data.cityofchicago.org/resource/igwz-8jzy.json
