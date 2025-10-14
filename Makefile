@@ -18,46 +18,43 @@ project_dir := "$(current_abs_path)"
 # Optional data directory mount (if DATA_DIR is set)
 mount_data := $(if $(DATA_DIR),-v $(DATA_DIR):/project/data,)
 
-.PHONY: build-only run-interactive test-pipeline test-generic-pipeline test clean help devcontainer
+.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline    
 
-# Build Docker image 
-build-only: ## Build Docker image only
-	docker compose build
-
-run-interactive: build-only ## Run interactive bash session in container
-	docker compose run -it --rm --service-ports $(mount_data) $(project_name) /bin/bash
-
-test-pipeline: build-only ## Run the housing EDA pipeline
-	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/housing_eda_pipeline.py
-
-test-generic-pipeline: build-only ## Run the generic pipeline demo
-	docker compose run --rm $(mount_data) $(project_name) uv run python src/pipeline/scripts/pipeline_usage.py
-
-test: build-only ## Run all tests with pytest
-	docker compose run --rm $(mount_data) $(project_name) uv run python -m pytest -v
-
-clean: ## Clean up Docker images and containers
-	docker compose down --rmi all --volumes --remove-orphans
-	docker image prune -f
-
-devcontainer: ## Build and prepare devcontainer (run this before opening in VS Code/Cursor)
-	docker compose build
-	@echo "Dev container ready! Open this folder in VS Code/Cursor and select 'Reopen in Container'"
-
-help: ## Show this help message
+help: ## Show the help message
 	@echo "Available commands:"
 	@echo ""
-	@echo "  build-only        Build Docker image only"
-	@echo "  clean             Clean up Docker images and containers"
-	@echo "  devcontainer      Build and prepare devcontainer for VS Code/Cursor"
 	@echo "  help                   Show this help message"
+	@echo "  build-only             Build Docker image only"
+	@echo "  devcontainer           Build and prepare devcontainer for VS Code/Cursor"
 	@echo "  run-interactive        Run interactive bash session in container"
+	@echo "  clean                  Clean up Docker images and containers"
 	@echo "  test                   Run all tests with pytest"
-	@echo "  test-pipeline          Run the housing EDA pipeline"
-	@echo "  test-generic-pipeline  Run the generic pipeline demo"
+	@echo "  run-generic-pipeline  Run the generic pipeline demo"
+	@echo "  run-eda-pipeline          Run the housing EDA pipeline"
 	@echo ""
 	@echo "Optional environment variables (.env file):"
 	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
 	@echo ""
 
+build-only: ## Build Docker image only
+	docker compose build
 
+devcontainer: ## Build and prepare devcontainer (run this before opening in VS Code/Cursor)
+	docker compose build
+	@echo "Dev container ready! Open this folder in VS Code/Cursor and select 'Reopen in Container'"
+
+run-interactive: build-only ## Run interactive bash session in container
+	docker compose run -it --rm --service-ports $(mount_data) $(project_name) /bin/bash
+
+clean: ## Clean up Docker images and containers
+	docker compose down --rmi all --volumes --remove-orphans
+	docker image prune -f
+
+test: build-only ## Run all tests with pytest
+	docker compose run --rm $(mount_data) $(project_name) uv run python -m pytest -v
+
+run-generic-pipeline: build-only ## Run the generic pipeline demo
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/pipeline/scripts/pipeline_usage.py
+
+run-eda-pipeline: build-only ## Run the housing EDA pipeline
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/housing_eda_pipeline.py
