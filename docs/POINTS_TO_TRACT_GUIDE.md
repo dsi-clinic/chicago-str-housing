@@ -1,110 +1,56 @@
 # Points to Tract Aggregation Guide
 
+> Use `PointsToTractProcessor` to aggregate point data to census tracts with automatic spatial joins and density calculations.
+
 ## Overview
 
-The `PointsToTractProcessor` component provides a reusable way to aggregate point datato census tract level.
-
-## Components
-
-### 1. `PointsToTractProcessor` (General Purpose)
-
-A flexible processor for any point data aggregation.
+Aggregates point data (individual locations) to census tract polygons.
 
 **What it does:**
-1. Spatial join: matches each point to its census tract
-2. Aggregates points by tract (count, averages, etc.)
-3. Calculates point density per km²
-4. Returns tract-level GeoDataFrame
-
----
+- Matches each point to its census tract
+- Aggregates by tract (count, mean, sum, custom)
+- Calculates density (points per km²)
+- Returns GeoDataFrame with tract geometries + data
 
 ## Basic Usage
 
-### Example 1: Airbnb Listings
-
 ```python
-from housing import AirbnbDataLoader, TractBoundariesLoader, AirbnbToTractProcessor
-from pipeline import Pipeline
-from pipeline.config import PipelineConfig
+from housing import PointsToTractProcessor, TractBoundariesLoader
 
-# Create pipeline
-config = PipelineConfig()
-pipeline = Pipeline("Airbnb Tract Analysis", config=config)
-pipeline.load_config()
+pipeline.register_component(YourPointDataLoader())  # Load points
+pipeline.register_component(TractBoundariesLoader())  # Load tracts
 
-# Load data
-pipeline.register_component(AirbnbDataLoader())  # Loads as 'airbnb_data'
-pipeline.register_component(TractBoundariesLoader())  # Loads as 'tract_boundaries'
-
-# Aggregate to tracts
-pipeline.register_component(AirbnbToTractProcessor())
-
-# Run
-results = pipeline.execute()
-
-# Access results
-airbnb_tracts = pipeline.context['airbnb_tract_data']
-print(airbnb_tracts.columns)
-# Output: ['tract_geoid', 'geometry', 'point_count', 'price_mean', 'price_median', 
-#          'price_min', 'price_max', 'area_km2', 'point_density']
-```
-
-### Example 2: Custom Point Data
-
-```python
-from housing import PointsToTractProcessor
-
-# For custom point data (e.g., crime incidents)
-crime_processor = PointsToTractProcessor(
-    input_key="crime_data",           # Context key for input points
-    output_key="crime_tract_data",    # Context key for output
-    id_column="incident_id",          # Column to count
+processor = PointsToTractProcessor(
+    input_key="your_point_data",
+    output_key="your_tract_data",
+    id_column="point_id",
     aggregate_columns={
-        "severity": "max",            # Maximum severity per tract
-        "arrests": "sum",             # Total arrests per tract
-    },
-    calculate_density=True            # Calculate crimes per km²
-)
-
-pipeline.register_component(crime_processor)
-```
-
-### Example 3: STR Prohibitions
-
-```python
-from housing import PointsToTractProcessor
-
-# Aggregate STR prohibition zones
-str_processor = PointsToTractProcessor(
-    input_key="str_prohibitions",
-    output_key="str_tract_data",
-    id_column="zone_id",
-    aggregate_columns={
-        "prohibition_type": lambda x: x.mode()[0] if len(x) > 0 else None,  # Most common type
-        "effective_date": "min",      # Earliest prohibition date
+        "value": "mean",
+        "category": lambda x: x.mode()[0] if len(x) > 0 else None,
     },
     calculate_density=True
 )
+
+pipeline.register_component(processor)
 ```
 
----
+## Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `input_key` | str | `"point_data"` | Context key for input points |
+| `output_key` | str | `"tract_aggregated_data"` | Context key for output |
+| `id_column` | str\|None | `None` | Column to count (None = count rows) |
+| `aggregate_columns` | dict | `{}` | `{column: agg}` e.g., `{"price": "mean"}` |
+| `calculate_density` | bool | `True` | Calculate points per km² |
 
 ## Input Requirements
 
-### Point Data (GeoDataFrame)
+**Point Data:** GeoDataFrame with Point geometries and CRS defined
 
-Your point data must be a GeoPandas GeoDataFrame with:
-- **geometry column**: Point geometries
-- **CRS defined**: e.g., `EPSG:4326` (lat/lon)
-- Any additional columns you want to aggregate
-
-Example:
 ```python
 import geopandas as gpd
-import pandas as pd
-
-# From CSV with lat/lon
-df = pd.read_csv('my_points.csv')
+df = pd.read_csv('points.csv')
 point_gdf = gpd.GeoDataFrame(
     df,
     geometry=gpd.points_from_xy(df.longitude, df.latitude),
@@ -112,215 +58,67 @@ point_gdf = gpd.GeoDataFrame(
 )
 ```
 
-### Tract Boundaries (from context)
+**Tract Boundaries:** Use `TractBoundariesLoader()`
 
-The processor expects `tract_boundaries` in the pipeline context. Use `TractBoundariesLoader` to load:
-
-```python
-from housing import TractBoundariesLoader
-pipeline.register_component(TractBoundariesLoader())
-```
-
----
-
-## Output Structure
-
-The processor returns a GeoDataFrame with:
+## Output
 
 | Column | Description |
 |--------|-------------|
-| `tract_geoid` | Census tract identifier |
-| `geometry` | Tract polygon geometry |
-| `point_count` | Number of points in tract |
-| `area_km2` | Tract area in km² |
+| `tract_geoid` | Census tract ID |
+| `geometry` | Tract polygon |
+| `point_count` | Number of points |
 | `point_density` | Points per km² |
-| *custom columns* | Aggregated values from your configuration |
+| `area_km2` | Tract area |
+| *custom* | Aggregated values |
 
-### Summary Statistics
-
-Also returns a summary dict:
-```python
-summary = pipeline.context['airbnb_tract_data_summary']
-# {
-#     'total_tracts': 801,
-#     'tracts_with_points': 245,
-#     'total_points': 4521,
-#     'avg_points_per_tract': 5.6,
-#     'max_points_per_tract': 87
-# }
-```
-
----
-
-## Aggregation Options
+## Aggregation Examples
 
 ### Count Only
-
 ```python
-processor = PointsToTractProcessor(
-    input_key="points",
-    output_key="tract_counts"
-    # No id_column or aggregate_columns needed
-)
+PointsToTractProcessor(input_key="violations", output_key="violation_tracts")
 ```
 
 ### Multiple Aggregations
-
 ```python
-processor = PointsToTractProcessor(
-    input_key="listings",
-    output_key="listing_tracts",
-    id_column="listing_id",
-    aggregate_columns={
-        "price": ["mean", "median", "std"],
-        "bedrooms": "max",
-        "host_id": "nunique",  # Count unique hosts
-    }
-)
+aggregate_columns={
+    "severity": ["mean", "max"],
+    "arrests": "sum",
+    "officer_id": "nunique",
+}
 ```
 
 ### Custom Functions
-
 ```python
-processor = PointsToTractProcessor(
-    input_key="violations",
-    output_key="violation_tracts",
-    aggregate_columns={
-        "severity": lambda x: (x >= 3).sum(),  # Count severe violations
-        "fine_amount": "sum",
-    }
-)
+aggregate_columns={
+    "violations": lambda x: (x > 0).sum(),  # Count with violations
+    "fine_amount": "sum",
+}
 ```
 
----
-
-## Pipeline Integration
-
-### Complete Example: Airbnb Density Analysis
+## Multi-Level Workflow
 
 ```python
-from housing import (
-    AirbnbDataLoader,
-    TractBoundariesLoader,
-    AirbnbToTractProcessor,
-)
-from pipeline import Pipeline
+from housing import TractToCommunityProcessor
 
-pipeline = Pipeline("Airbnb Density Analysis")
-pipeline.load_config()
-
-# Step 1: Load data
-pipeline.register_component(AirbnbDataLoader())
-pipeline.register_component(TractBoundariesLoader())
-
-# Step 2: Aggregate to tracts
-pipeline.register_component(AirbnbToTractProcessor(
-    input_key="airbnb_data",
-    output_key="airbnb_tracts",
-    id_column="id",
-    price_column="price"
+# Points → Tracts
+pipeline.register_component(PointsToTractProcessor(
+    input_key="point_data",
+    output_key="tract_data"
 ))
 
-# Step 3: Run
-results = pipeline.execute()
-
-# Step 4: Analyze
-tracts = pipeline.context['airbnb_tracts']
-high_density = tracts[tracts['point_density'] > tracts['point_density'].quantile(0.75)]
-print(f"High density tracts: {len(high_density)}")
-print(f"Average price in high density: ${high_density['price_mean'].mean():.2f}")
+# Tracts → Communities
+pipeline.register_component(CommunityBoundariesLoader())
+pipeline.register_component(TractToCommunityProcessor())
 ```
 
----
+## Tips
 
-## Comparison with Other Processors
-
-| Processor | Input → Output | Use Case |
-|-----------|---------------|----------|
-| `PointsToTractProcessor` | **Points → Tracts** | Airbnb, STR, crime, violations |
-| `ZipToTractProcessor` | ZIP polygons → Tracts | Rental price data from ZIP codes |
-| `TractToCommunityProcessor` | Tracts → Communities | Aggregate tracts to neighborhoods |
-
-### Typical Workflow
-
-```
-Point Data (Airbnb)
-    ↓ PointsToTractProcessor
-Census Tracts (density, averages)
-    ↓ TractToCommunityProcessor
-Community Areas (neighborhood summaries)
-```
-
----
-
-## Tips & Best Practices
-
-### 1. **Always Calculate Density for Points**
-```python
-calculate_density=True  # This normalizes by area
-```
-
-### 2. **Use Appropriate Aggregations**
-- **Counts**: Sum or count
-- **Prices/Values**: Mean, median (weighted if possible)
-- **Categories**: Mode (most common)
-- **Dates**: Min (earliest), max (latest)
-
-### 3. **Check Match Rate**
-The processor logs how many points matched to tracts:
-```
-INFO: Matched 4521/4580 points to census tracts (98.7%)
-```
-
-Unmatched points are usually outside Chicago boundaries.
-
-### 4. **Tracts with Zero Points**
-By default, tracts with no points have `point_count = 0`. Use this for:
-```python
-# Find tracts with no Airbnb
-no_airbnb = tracts[tracts['point_count'] == 0]
-```
-
----
+- **Always use density** for comparisons (normalizes by area)
+- **Check logs** for match rate: `Matched 4521/4580 (98.7%)`
+- **Zero-point tracts** have `point_count=0` (not dropped)
+- **CRS is automatic** - handles projection for area calc
 
 ## Troubleshooting
 
-### Issue: Low match rate (<90%)
-
-**Possible causes:**
-- Point data CRS doesn't match tract CRS
-- Points outside Chicago/Cook County
-- Invalid geometries
-
-**Solution:**
-```python
-# Check CRS
-print(point_data.crs)  # Should be EPSG:4326 or similar
-point_data = point_data.to_crs("EPSG:4326")
-```
-
-### Issue: Density values seem wrong
-
-**Cause:** Not using projected CRS for area calculation
-
-**Solution:** The processor handles this automatically! It:
-1. Projects to EPSG:32616 (UTM Zone 16N for Chicago)
-2. Calculates area in meters
-3. Converts to km²
-4. Reprojects back to original CRS
-
-No action needed!
-
----
-
-## Next Steps
-
-After aggregating points to tracts, you can:
-
-1. **Visualize density maps**
-2. **Aggregate to community areas** using `TractToCommunityProcessor`
-3. **Join with census demographic data** using tract GEOID
-4. **Analyze spatial patterns** (hotspots, clusters)
-
-See `CENSUS_TRACT_GUIDE.md` for more analysis patterns.
-
+**Low match rate?** Points outside Chicago or CRS mismatch  
+**Need details?** See `CENSUS_TRACT_GUIDE.md`

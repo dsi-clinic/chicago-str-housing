@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 import geopandas as gpd
+import pandas as pd
 
 from pipeline.base import DataProcessor
 
@@ -109,9 +110,21 @@ class PointsToTractProcessor(DataProcessor):
         # Perform aggregation
         tract_agg = points_with_tract.groupby("tract_geoid").agg(agg_dict).reset_index()
 
-        # Rename count column
+        # Flatten MultiIndex columns if they exist
+        if isinstance(tract_agg.columns, pd.MultiIndex):
+            tract_agg.columns = [
+                "_".join(col).strip() if col[1] else col[0]
+                for col in tract_agg.columns.to_numpy()
+            ]
+
+        # Rename count column (after flattening, it will have "_count" suffix)
         count_col = self.id_column or points_with_tract.columns[0]
-        tract_agg = tract_agg.rename(columns={count_col: "point_count"})
+        count_col_name = (
+            f"{count_col}_count"
+            if f"{count_col}_count" in tract_agg.columns
+            else count_col
+        )
+        tract_agg = tract_agg.rename(columns={count_col_name: "point_count"})
 
         logger.info("Aggregated to %d census tracts", len(tract_agg))
 
