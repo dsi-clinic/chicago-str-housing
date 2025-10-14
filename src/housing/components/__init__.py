@@ -16,7 +16,12 @@ from housing.components.loaders import (
     TractBoundariesLoader,
     ZipBoundariesLoader,
 )
-from housing.components.processors import TractToCommunityProcessor, ZipToTractProcessor
+from housing.components.processors import (
+    AirbnbToTractProcessor,
+    PointsToTractProcessor,
+    TractToCommunityProcessor,
+    ZipToTractProcessor,
+)
 from housing.components.utils import summary_reporter
 from housing.components.visualizers import (
     CorrelationVisualizer,
@@ -33,6 +38,8 @@ __all__ = [
     # Processors
     "ZipToTractProcessor",
     "TractToCommunityProcessor",
+    "PointsToTractProcessor",
+    "AirbnbToTractProcessor",
     # Analyzers
     "CorrelationAnalyzer",
     "TractAnalyzer",
