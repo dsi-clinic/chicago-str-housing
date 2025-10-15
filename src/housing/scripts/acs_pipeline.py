@@ -2,7 +2,7 @@
 
 import logging
 
-from housing.components import ACSLoader
+from housing.components import ACSLoader, ACSToTractProcessor, TractBoundariesLoader
 from pipeline import Pipeline
 from pipeline.config import PipelineConfig
 
@@ -18,6 +18,8 @@ def create_acs_pipeline() -> Pipeline:
 
     # 2. Register your components
     pipeline.register_component(ACSLoader())
+    pipeline.register_component(TractBoundariesLoader())
+    pipeline.register_component(ACSToTractProcessor())
 
     # 3. Run it!
     results = pipeline.execute()

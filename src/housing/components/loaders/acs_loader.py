@@ -141,7 +141,7 @@ class ACSLoader(DataLoader):
                 "NAME": "census_full_name",
                 "B01003_001E": "population",
                 "B19013_001E": "median_house_income",
-                "B25034_001E": "total house built",
+                "B25034_001E": "total_house_built",
                 "B25034_002E": "2020_or_later",
                 "B25034_003E": "2010_2019",
                 "B25034_004E": "2000_2009",
@@ -162,5 +162,5 @@ class ACSLoader(DataLoader):
             + acs_data["tract"].astype(str).str.zfill(6)
         )
         logger.info("\n%s", acs_data.head())
-        logger.info("Load %d census tract with ACS data", len(acs_data))
+        logger.info("Load %d ACS data", len(acs_data))
         return {"acs_data": acs_data}

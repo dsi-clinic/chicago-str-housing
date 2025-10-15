@@ -1,5 +1,6 @@
 """Data processors for housing analysis."""
 
+from housing.components.processors.acs_to_tract import ACSToTractProcessor
 from housing.components.processors.points_to_tract import (
     AirbnbToTractProcessor,
     PointsToTractProcessor,
@@ -12,4 +13,5 @@ __all__ = [
     "TractToCommunityProcessor",
     "PointsToTractProcessor",
     "AirbnbToTractProcessor",
+    "ACSToTractProcessor"
 ]

@@ -18,6 +18,7 @@ from housing.components.loaders import (
     ZipBoundariesLoader,
 )
 from housing.components.processors import (
+    ACSToTractProcessor,
     AirbnbToTractProcessor,
     PointsToTractProcessor,
     TractToCommunityProcessor,
@@ -38,6 +39,7 @@ __all__ = [
     "CommunityBoundariesLoader",
     "TractBoundariesLoader",
     # Processors
+    "ACSToTractProcessor",
     "ZipToTractProcessor",
     "TractToCommunityProcessor",
     "PointsToTractProcessor",
