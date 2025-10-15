@@ -11,6 +11,7 @@ Components are organized into subdirectories:
 """
 
 from housing.components import (
+    ACSLoader,
     AirbnbToTractProcessor,
     CommunityBoundariesLoader,
     CorrelationAnalyzer,

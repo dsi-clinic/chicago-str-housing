@@ -1,5 +1,6 @@
 """Data loaders for housing analysis."""
 
+from housing.components.loaders.acs_loader import ACSLoader
 from housing.components.loaders.community_boundaries import CommunityBoundariesLoader
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
@@ -10,4 +11,5 @@ __all__ = [
     "ZipBoundariesLoader",
     "CommunityBoundariesLoader",
     "TractBoundariesLoader",
+    "ACSLoader"
 ]

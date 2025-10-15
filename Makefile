@@ -31,6 +31,7 @@ help: ## Show the help message
 	@echo "  test                   Run all tests with pytest"
 	@echo "  run-generic-pipeline  Run the generic pipeline demo"
 	@echo "  run-eda-pipeline          Run the housing EDA pipeline"
+	@echo "  run-acs-pipeline          Run the ACS Data pipeline"
 	@echo ""
 	@echo "Optional environment variables (.env file):"
 	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
@@ -58,3 +59,6 @@ run-generic-pipeline: build-only ## Run the generic pipeline demo
 
 run-eda-pipeline: build-only ## Run the housing EDA pipeline
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/housing_eda_pipeline.py
+
+run-acs-pipeline: build-only ## Run the ACS Data pipeline
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/acs_pipeline.py

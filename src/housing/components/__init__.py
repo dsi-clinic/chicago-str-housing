@@ -11,6 +11,7 @@ This package contains all housing-specific components organized by type:
 
 from housing.components.analyzers import CorrelationAnalyzer, TractAnalyzer
 from housing.components.loaders import (
+    ACSLoader,
     CommunityBoundariesLoader,
     RentalDataLoader,
     TractBoundariesLoader,
@@ -31,6 +32,7 @@ from housing.components.visualizers import (
 
 __all__ = [
     # Loaders
+    "ACSLoader",
     "RentalDataLoader",
     "ZipBoundariesLoader",
     "CommunityBoundariesLoader",
