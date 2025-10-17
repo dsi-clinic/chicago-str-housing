@@ -2,7 +2,7 @@
 
 import logging
 
-from housing import CommunityBoundariesLoader, ForeclosedDataLoader, PointsToTractProcessor, TractToCommunityProcessor
+from housing import CommunityBoundariesLoader, ForeclosedDataLoader, PointsToTractProcessor, TractBoundariesLoader, TractToCommunityProcessor, ZipBoundariesLoader, ZipToTractProcessor, RentalDataLoader
 from pipeline import Pipeline, PipelineResult
 from pipeline.config import PipelineConfig
 
@@ -20,10 +20,24 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     
     # Step 1: Load necessary data
     pipeline.register_component(ForeclosedDataLoader())
+    pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(CommunityBoundariesLoader())
+    pipeline.register_component(ZipBoundariesLoader())
+    pipeline.register_component(RentalDataLoader())
 
     # Step 2: Points → Tract aggregation
-    pipeline.register_component(PointsToTractProcessor())
+    processor = PointsToTractProcessor(
+        input_key="foreclosed_data",
+        output_key="foreclosed_tract_data",
+        id_column="ID",
+        aggregate_columns={
+        },
+        calculate_density=True
+    )
+
+    pipeline.register_component(processor)
+
+    pipeline.register_component(ZipToTractProcessor())
 
     # Step 3: Tract → Community aggregation
     pipeline.register_component(TractToCommunityProcessor())
