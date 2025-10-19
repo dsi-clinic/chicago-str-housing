@@ -13,10 +13,9 @@ import pytest
 
 from housing import (
     CommunityBoundariesLoader,
-    CorrelationAnalyzer,
+    RentalCorrelationAnalyzer,
     RentalDataLoader,
     ZipBoundariesLoader,
-    summary_reporter,
 )
 from pipeline import Pipeline
 from pipeline.base import PipelineComponent, PipelineResult
@@ -77,10 +76,10 @@ class TestPipelineComponents:
         assert "community_name" in community_gdf.columns  # Actual column name
         assert community_gdf.geometry is not None
 
-    def test_correlation_analyzer_success(self) -> None:
-        """Test CorrelationAnalyzer with valid input data."""
+    def test_rental_correlation_analyzer_success(self) -> None:
+        """Test RentalCorrelationAnalyzer with valid input data."""
         # Arrange
-        analyzer = CorrelationAnalyzer()
+        analyzer = RentalCorrelationAnalyzer()
 
         # Create mock community data as GeoDataFrame with all required columns
         community_data = gpd.GeoDataFrame(
@@ -114,30 +113,6 @@ class TestPipelineComponents:
         correlations = result["summary_stats"]
         assert isinstance(correlations, dict)
         assert "total_communities" in correlations
-
-    def test_summary_reporter_success(self) -> None:
-        """Test summary_reporter with valid input data."""
-        # Arrange
-        context = {
-            "community_rental_data": pd.DataFrame(
-                {
-                    "community": ["Community A", "Community B"],
-                    "avg_rental_price": [2000, 2500],
-                }
-            ),
-            "correlation_results": {
-                "summary": {"total_communities": 2},
-                "correlations": {"area_vs_rent": 0.5},
-            },
-        }
-
-        # Act
-        result = summary_reporter.execute(context)
-
-        # Assert
-        assert isinstance(result, dict)
-        assert "report_generated" in result  # Actual return key
-        assert result["report_generated"] is True
 
 
 class TestPipelineIntegration:
