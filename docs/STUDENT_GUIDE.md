@@ -33,14 +33,14 @@
 - `AirbnbToTractProcessor` - Airbnb → Tract aggregation
 
 #### Analyzers
-- `CorrelationAnalyzer` - Community-level correlation analysis
-- `TractAnalyzer` - Tract-level analysis
+- `RentalCorrelationAnalyzer` - Community-level rental correlation analysis
+- `RentalTractAnalyzer` - Tract-level rental analysis
 - `AirbnbRentalAnalyzer` - Airbnb vs rental price analysis
 - `STRProhibitionAnalyzer` - STR prohibition density analysis
 - `STRTemporalAnalyzer` - Temporal pattern analysis
 
 #### Visualizers
-- `CorrelationVisualizer` - Correlation plots
+- `RentalCorrelationVisualizer` - Rental correlation plots
 - `AirbnbMapVisualizer` - Airbnb spatial maps
 - `STRProhibitionVisualizer` - STR prohibition charts
 - `STRDensityMapVisualizer` - STR density maps

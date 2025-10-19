@@ -1,6 +1,8 @@
-"""Census tract-level analyzer.
+"""Rental tract-level analyzer.
 
-This module performs statistical analysis on tract-level rental data.
+This module performs statistical analysis specifically on tract-level rental data.
+This is a specialized analyzer for rental price data - students should create their
+own analyzers for other data types.
 """
 
 import logging
@@ -16,17 +18,18 @@ from pipeline.base import Analyzer
 logger = logging.getLogger(__name__)
 
 
-class TractAnalyzer(Analyzer):
+class RentalTractAnalyzer(Analyzer):
     """Analyze census tract-level rental data.
 
     This demonstrates analysis at a more granular level than community areas.
     Tracts are smaller, so we can detect more localized patterns.
+    Students should create their own analyzers for other data types (crime, housing violations, etc.).
     """
 
     def __init__(self) -> None:
-        """Initialize the tract analyzer."""
+        """Initialize the rental tract analyzer."""
         super().__init__(
-            "tract_analysis", "Analyze correlations in census tract rental data"
+            "rental_tract_analysis", "Analyze correlations in census tract rental data"
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:

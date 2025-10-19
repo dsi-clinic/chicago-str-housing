@@ -1,6 +1,8 @@
-"""Correlation analysis visualizer.
+"""Rental correlation analysis visualizer.
 
-This module creates visualizations for correlation analysis results.
+This module creates visualizations specifically for rental data correlation analysis.
+This is a specialized visualizer for rental price data - students should create their
+own visualizers for other data types.
 """
 
 import logging
@@ -16,21 +18,22 @@ from pipeline.base import Visualizer
 logger = logging.getLogger(__name__)
 
 
-class CorrelationVisualizer(Visualizer):
-    """Create visualizations for the correlation analysis.
+class RentalCorrelationVisualizer(Visualizer):
+    """Create visualizations for rental data correlation analysis.
 
-    This demonstrates how to create meaningful visualizations from merged spatial data.
+    This demonstrates how to create meaningful visualizations from rental data.
+    Students should create their own visualizers for other data types (crime, housing violations, etc.).
     """
 
     def __init__(self, output_dir: str | None = None) -> None:
-        """Initialize the correlation visualizer.
+        """Initialize the rental correlation visualizer.
 
         Args:
             output_dir: Optional output directory for visualizations
         """
         super().__init__(
-            "correlation_visualization",
-            "Create visualizations for correlation analysis",
+            "rental_correlation_visualization",
+            "Create visualizations for rental correlation analysis",
         )
         self.output_dir = output_dir or "/project/output"
 

@@ -1,6 +1,8 @@
-"""Community-level correlation analyzer.
+"""Rental correlation analysis component.
 
-This module performs statistical correlation analysis on community-level rental data.
+This module performs correlation analysis specifically on rental data at different
+geographic levels (tract and community area). This is a specialized analyzer
+for rental price data - students should create their own analyzers for other data types.
 """
 
 import logging
@@ -16,16 +18,18 @@ from pipeline.base import Analyzer
 logger = logging.getLogger(__name__)
 
 
-class CorrelationAnalyzer(Analyzer):
-    """Analyze correlations in the merged spatial dataset.
+class RentalCorrelationAnalyzer(Analyzer):
+    """Analyze correlations in rental data at community level.
 
-    This demonstrates how to perform statistical analysis on merged spatial data.
+    This demonstrates how to perform statistical analysis on rental data.
+    Students should create their own analyzers for other data types (crime, housing violations, etc.).
     """
 
     def __init__(self) -> None:
-        """Initialize the correlation analyzer."""
+        """Initialize the rental correlation analyzer."""
         super().__init__(
-            "correlation_analysis", "Analyze correlations in community rental data"
+            "rental_correlation_analysis",
+            "Analyze correlations in community rental data",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:

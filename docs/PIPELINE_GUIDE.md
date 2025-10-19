@@ -44,7 +44,7 @@ from housing.components import (
     RentalDataLoader,
     ZipToTractProcessor,
     TractToCommunityProcessor,
-    CorrelationAnalyzer,
+    RentalCorrelationAnalyzer,
     Visualizer
 )
 
@@ -52,7 +52,7 @@ pipeline = Pipeline("Housing Analysis")
 pipeline.register_component(RentalDataLoader())
 pipeline.register_component(ZipToTractProcessor())
 pipeline.register_component(TractToCommunityProcessor())
-pipeline.register_component(CorrelationAnalyzer())
+pipeline.register_component(RentalRentalCorrelationAnalyzer())
 pipeline.register_component(Visualizer())
 
 results = pipeline.execute()
@@ -265,12 +265,12 @@ TractToCommunityProcessor() # Second aggregation
   → Returns: {"community_rental_data": GeoDataFrame}
 
 # 3. Analysis
-CorrelationAnalyzer()
+RentalCorrelationAnalyzer()
   → Reads: community_rental_data
   → Returns: {"correlation_results": dict}
 
 # 4. Visualization
-CorrelationVisualizer()
+RentalCorrelationVisualizer()
   → Reads: correlation_results
   → Returns: {"correlation_plot": Figure}
 ```
