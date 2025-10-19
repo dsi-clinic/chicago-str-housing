@@ -328,8 +328,6 @@ ruff format
 
 ## Documentation
 
-- **docs/PIPELINE_GUIDE.md** - Pipeline framework architecture
-- **docs/CENSUS_TRACT_GUIDE.md** - Spatial aggregation methodology
-- **docs/TRACT_TO_COMMUNITY_GUIDE.md** - Tract to community area aggregation
-- **docs/STUDENT_GUIDE.md** - Creating new components
-- **docs/COMPONENT_STRUCTURE.md** - Directory structure reference
+- **docs/PIPELINE_GUIDE.md** - Pipeline architecture and available components
+- **docs/SPATIAL_AGGREGATION_GUIDE.md** - Spatial data aggregation (points→tracts→communities)
+- **docs/STUDENT_GUIDE.md** - Quick start guide for creating new components

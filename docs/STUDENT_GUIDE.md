@@ -1,90 +1,63 @@
-# Student Guide: Working with Housing Components
+# Student Guide
 
-**Prerequisites:** Read [PIPELINE_GUIDE.md](PIPELINE_GUIDE.md) for core pipeline concepts.
+Quick guide for working with housing analysis components.
 
----
+## Quick Start
 
-## Quick Reference
+### Run the Main Pipeline
 
-### Component File Locations
+```bash
+# Run the complete housing analysis
+docker compose run --rm 2025-autumn-city-of-chicago-housing python src/housing/scripts/housing_eda_pipeline.py
+```
 
-| Component Type | Location | Example |
-|---------------|----------|---------|
-| **Data Loaders** | `src/housing/components/loaders/` | `rental_data.py` |
-| **Processors** | `src/housing/components/processors/` | `zip_to_tract.py` |
-| **Analyzers** | `src/housing/components/analyzers/` | `correlation.py` |
-| **Visualizers** | `src/housing/components/visualizers/` | `correlation.py` |
-| **Constants** | `src/housing/components/constants.py` | Thresholds, config |
-| **Utilities** | `src/housing/components/utils.py` | Helper functions |
+This generates:
+- Rental price distributions and maps
+- STR prohibition analysis and correlations  
+- Airbnb listings analysis
+- All visualizations saved to `output/`
 
-### Available Components
+## Available Components
 
-#### Data Loaders
+### Data Loaders
 - `RentalDataLoader` - ZORI rental price data
-- `ZipBoundariesLoader` - ZIP code boundaries
-- `CommunityBoundariesLoader` - Community area boundaries  
-- `TractBoundariesLoader` - Census tract boundaries
-- `AirbnbDataLoader` - Airbnb listing data
+- `AirbnbDataLoader` - Airbnb listings data
 - `STRProhibitionDataLoader` - STR prohibition data
+- `TractBoundariesLoader`, `CommunityBoundariesLoader`, `ZipBoundariesLoader`, `CityBoundariesLoader`
 
-#### Processors
-- `ZipToTractProcessor` - ZIP → Tract spatial join (includes KNN interpolation)
-- `TractToCommunityProcessor` - Tract → Community aggregation
+### Processors
+- `ZipToTractProcessor` - ZIP → Tract spatial join
 - `PointsToTractProcessor` - Point data → Tract aggregation
+- `TractToCommunityProcessor` - Tract → Community aggregation
 
-#### Analyzers
-- `RentalCorrelationAnalyzer` - Community-level rental correlation analysis
-- `RentalTractAnalyzer` - Tract-level rental analysis
+### Analyzers
+- `RentalTractAnalyzer` - Tract-level analysis
 - `STRProhibitionAnalyzer` - STR prohibition density analysis
 
-#### Visualizers
-- `RentalCorrelationVisualizer` - Rental correlation plots
-- `RentalDistributionVisualizer` - Rental price distribution plots
-- `RentalMapVisualizer` - Rental price spatial maps
-- `AirbnbDistributionVisualizer` - Airbnb distribution plots
-- `AirbnbMapVisualizer` - Airbnb spatial maps
-- `STRDistributionVisualizer` - STR prohibition distribution plots
-- `STRMapVisualizer` - STR prohibition spatial maps
-- `STRProhibitionVisualizer` - STR prohibition correlation charts
+### Visualizers
+- `RentalMapVisualizer`, `RentalDistributionVisualizer` - Rental analysis
+- `AirbnbMapVisualizer`, `AirbnbDistributionVisualizer` - Airbnb analysis
+- `STRMapVisualizer`, `STRDistributionVisualizer` - STR analysis
+- `STRProhibitionVisualizer` - STR correlation charts
 
----
+## Creating New Components
 
-## How to Create a New Component
+### 1. Copy Similar Component
+```bash
+# Example: Create new loader
+cp src/housing/components/loaders/rental_data.py src/housing/components/loaders/my_loader.py
+```
 
-### Step 1: Choose Your Starting Point
-
-**Copy an existing component similar to what you need:**
-- New loader? Copy `loaders/rental_data.py`
-- New spatial processor? Copy `processors/zip_to_tract.py`
-- New analyzer? Copy `analyzers/correlation.py`
-- New visualizer? Copy `visualizers/correlation.py`
-
-### Step 2: Component Template
-
+### 2. Template
 ```python
-"""Brief description of what this component does."""
-
-import logging
+from pipeline.base import DataLoader
 from typing import Any
-import pandas as pd
-
-from pipeline.base import DataLoader  # or DataProcessor, Analyzer, Visualizer
+import logging
 
 logger = logging.getLogger(__name__)
 
-
 class MyComponent(DataLoader):
-    """One-line summary.
-    
-    Detailed explanation of what this does, inputs, and outputs.
-    """
-
     def __init__(self, file_path: str | None = None) -> None:
-        """Initialize the component.
-        
-        Args:
-            file_path: Path to data file (optional)
-        """
         super().__init__(
             "my_component",  # Name (key in context)
             file_path or "/project/data/default.csv",
@@ -92,129 +65,73 @@ class MyComponent(DataLoader):
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Execute the component logic.
-        
-        Args:
-            context: Pipeline context with data from previous components
-            
-        Returns:
-            Dictionary with results to add to context
-        """
         logger.info("Starting my component...")
         
-        # Get data from context (if needed)
-        # input_data = context.get("some_data")
-        
         # Your logic here
-        df = pd.read_csv(self.file_path)
-        
-        logger.info("Processed %d records", len(df))
-        
+        result = {"my_data": processed_data}
+        return result
+```
+
+### 3. Use Direct Imports
+```python
+# In your pipeline script
+from housing.components.loaders.my_loader import MyComponent
+
+pipeline.register_component(MyComponent())
+```
+
+## Common Patterns
+
+### Spatial Analysis
+```python
+pipeline = Pipeline("Spatial Analysis")
+pipeline.register_component(RentalDataLoader())
+pipeline.register_component(TractBoundariesLoader())
+pipeline.register_component(ZipToTractProcessor())
+pipeline.register_component(TractToCommunityProcessor())
+pipeline.register_component(RentalTractAnalyzer())
+results = pipeline.execute()
+```
+
+### Point Data Analysis
+```python
+# For Airbnb or STR data
+pipeline.register_component(AirbnbDataLoader())
+pipeline.register_component(TractBoundariesLoader())
+pipeline.register_component(PointsToTractProcessor("airbnb_data", "airbnb_tract_data"))
+pipeline.register_component(TractToCommunityProcessor())
+```
+
+## Adding New Data Sources
+
+### 1. Create Data Loader
+```python
+class MyDataLoader(DataLoader):
+    def __init__(self) -> None:
+        super().__init__("my_data", "Load my data")
+
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        # Load your data
+        df = pd.read_csv("/path/to/data.csv")
         return {"my_data": df}
 ```
 
-### Step 3: Use Direct Imports
-
-The project uses direct imports - no need to manage `__init__.py` files!
-
+### 2. Add to Pipeline
 ```python
-# In your pipeline script - direct imports
-from housing.components.loaders.my_component import MyComponent
-
-# Or import from main housing package (if added to housing/__init__.py)
-from housing import MyComponent
+from housing.components.loaders.my_data import MyDataLoader
+pipeline.register_component(MyDataLoader())
 ```
 
-### Step 4: Use in a Pipeline
-
+### 3. Process if Needed
 ```python
-from pipeline import Pipeline
-from pipeline.config import PipelineConfig
-from housing.components.loaders.my_component import MyComponent
-
-config = PipelineConfig()
-pipeline = Pipeline("My Analysis", config=config)
-pipeline.load_config()
-
-pipeline.register_component(MyComponent())
-results = pipeline.execute()
-
-# Access your results
-my_data = pipeline.context["my_data"]
+# If it's point data, aggregate to tracts
+if is_point_data:
+    pipeline.register_component(PointsToTractProcessor("my_data", "my_tract_data"))
 ```
-
----
-
-## Common Issues & Solutions
-
-### Import Errors
-
-```python
-# ❌ Wrong
-from components.loaders import MyLoader
-
-# ✅ Correct - direct import
-from housing.components.loaders.my_loader import MyLoader
-
-# ✅ Also correct - from main package
-from housing import MyLoader
-```
-
-### Missing Context Keys
-
-```python
-# ❌ Risky - crashes if key missing
-data = context["my_data"]
-
-# ✅ Safe - checks first
-if "my_data" not in context:
-    logger.error("Required data 'my_data' not in context")
-    return {}
-data = context["my_data"]
-```
-
-### File Paths
-
-```python
-# ❌ Hardcoded
-def __init__(self):
-    self.path = "/home/student/data.csv"
-
-# ✅ Configurable with default
-def __init__(self, file_path: str | None = None):
-    self.path = file_path or "/project/data/default.csv"
-    
-# ✅✅ Even better - use config
-def execute(self, context):
-    path = self.config.data.rental_data_path
-```
-
----
 
 ## Testing
 
-### Write a Simple Test
-
-```python
-# In tests/test_my_component.py
-import pytest
-from housing.components.loaders.my_component import MyComponent
-
-def test_my_component():
-    # Arrange
-    component = MyComponent()
-    context = {}  # Add any required context data
-    
-    # Act
-    result = component.execute(context)
-    
-    # Assert
-    assert "my_data" in result
-    assert len(result["my_data"]) > 0
-```
-
 ### Run Tests
-
 ```bash
 # All tests
 make test
@@ -223,61 +140,55 @@ make test
 uv run python -m pytest tests/test_my_component.py -v
 ```
 
----
-
-## Project-Specific Tips
-
-### Using Constants
-
+### Write Tests
 ```python
-from housing.components.constants import (
-    CORRELATION_STRONG_THRESHOLD,
-    CORRELATION_MODERATE_THRESHOLD,
-)
-
-if correlation >= CORRELATION_STRONG_THRESHOLD:
-    strength = "Strong"
+def test_my_component():
+    component = MyComponent()
+    context = {}  # Add required context data
+    result = component.execute(context)
+    assert "my_data" in result
 ```
 
-### Logging Best Practices
+## Troubleshooting
 
+### Import Errors
 ```python
-import logging
-logger = logging.getLogger(__name__)
+# ❌ Wrong
+from components.loaders import MyLoader
 
-# Use meaningful messages
-logger.info("Loading data from: %s", self.file_path)
-logger.info("Loaded %d ZIP codes with rental data", len(df))
-logger.warning("Missing rental price for %d ZIP codes", missing_count)
-logger.error("Failed to load data: %s", str(e))
+# ✅ Correct - direct import
+from housing.components.loaders.my_loader import MyLoader
 ```
 
-### Return Dictionary Structure
-
+### Missing Context Data
 ```python
-# Always return a dict with clear, descriptive keys
-return {
-    "rental_data": df,              # Main data
-    "rental_summary": summary_dict, # Optional summary info
-    "rental_metadata": metadata     # Optional metadata
-}
+# ❌ Risky
+data = context["my_data"]
+
+# ✅ Safe
+if "my_data" not in context:
+    logger.error("Required data missing")
+    return {}
+data = context["my_data"]
 ```
 
----
+### File Paths
+```python
+# ❌ Hardcoded
+def __init__(self):
+    self.path = "/home/student/data.csv"
 
-## Best Practices Checklist
+# ✅ Configurable
+def __init__(self, file_path: str | None = None):
+    self.path = file_path or "/project/data/default.csv"
+```
 
-When creating a new component:
+## Best Practices
 
-- [ ] Chose appropriate base class (DataLoader, DataProcessor, Analyzer, Visualizer)
-- [ ] Added type hints to methods
-- [ ] Wrote docstrings for class and methods
-- [ ] Used `logger.info()` for important steps
-- [ ] Handled errors gracefully (try/except)
-- [ ] Used config for file paths (not hardcoded)
-- [ ] Checked context keys before accessing
-- [ ] Returned results in a clear dict
-- [ ] Used direct imports in pipeline scripts
-- [ ] Wrote at least one unit test
-- [ ] Ran `ruff check` and `ruff format`
-
+- **Use direct imports** for clarity
+- **Check context keys** before accessing data
+- **Log important steps** with `logger.info()`
+- **Handle errors gracefully** with try/except
+- **Use configuration** for file paths
+- **Return clear dictionary keys**
+- **Write tests** for new components

@@ -11,7 +11,6 @@ Components are organized into subdirectories:
 """
 
 # Direct imports - no need to manage __init__.py files!
-from housing.components.analyzers.rental_correlation import RentalCorrelationAnalyzer
 from housing.components.analyzers.rental_tract import RentalTractAnalyzer
 from housing.components.analyzers.str_prohibition import STRProhibitionAnalyzer
 from housing.components.loaders.airbnb_data import AirbnbDataLoader
@@ -28,9 +27,6 @@ from housing.components.visualizers.airbnb_distribution import (
     AirbnbDistributionVisualizer,
 )
 from housing.components.visualizers.airbnb_map import AirbnbMapVisualizer
-from housing.components.visualizers.rental_correlation import (
-    RentalCorrelationVisualizer,
-)
 from housing.components.visualizers.rental_distribution import (
     RentalDistributionVisualizer,
 )
@@ -46,8 +42,6 @@ __all__ = [
     "CityBoundariesLoader",
     "CommunityBoundariesLoader",
     "PointsToTractProcessor",
-    "RentalCorrelationAnalyzer",
-    "RentalCorrelationVisualizer",
     "RentalDataLoader",
     "RentalDistributionVisualizer",
     "RentalMapVisualizer",
