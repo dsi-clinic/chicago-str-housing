@@ -17,7 +17,6 @@ from housing.components.loaders import (
     ZipBoundariesLoader,
 )
 from housing.components.processors import (
-    AirbnbToTractProcessor,
     PointsToTractProcessor,
     TractToCommunityProcessor,
     ZipToTractProcessor,
@@ -39,7 +38,6 @@ __all__ = [
     "ZipToTractProcessor",
     "TractToCommunityProcessor",
     "PointsToTractProcessor",
-    "AirbnbToTractProcessor",
     # Analyzers
     "CorrelationAnalyzer",
     "TractAnalyzer",

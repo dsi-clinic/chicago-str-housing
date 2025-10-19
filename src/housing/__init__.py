@@ -11,7 +11,6 @@ Components are organized into subdirectories:
 """
 
 from housing.components import (
-    AirbnbToTractProcessor,
     CommunityBoundariesLoader,
     CorrelationAnalyzer,
     CorrelationVisualizer,
@@ -35,7 +34,7 @@ __all__ = [
     "ZipToTractProcessor",
     "TractToCommunityProcessor",
     "PointsToTractProcessor",
-    "AirbnbToTractProcessor",
+    "AirbnbRentalAnalyzer",
     "CorrelationAnalyzer",
     "TractAnalyzer",
     "CorrelationVisualizer",

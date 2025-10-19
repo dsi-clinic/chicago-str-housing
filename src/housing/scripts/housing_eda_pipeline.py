@@ -48,7 +48,19 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(ZipToTractProcessor())
 
     # Step 3: Tract → Community aggregation (the clean way!)
-    pipeline.register_component(TractToCommunityProcessor())
+    pipeline.register_component(
+        TractToCommunityProcessor(
+            input_key="tract_rental_data",
+            output_key="community_rental_data",
+            id_column="tract_geoid",
+            aggregate_columns={
+                "avg_rental_price": ["mean", "min", "max"],
+                "min_rental_price": "min",
+                "max_rental_price": "max",
+            },
+            area_weighted_columns=["avg_rental_price"],
+        )
+    )
 
     # Step 4: Analyze at both levels
     pipeline.register_component(TractAnalyzer())
