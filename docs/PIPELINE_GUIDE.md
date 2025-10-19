@@ -40,20 +40,18 @@ zip_boundaries = gpd.read_file("zips.geojson")
 ```python
 # The pipeline way - clean, maintainable, powerful
 from pipeline import Pipeline
-from housing.components import (
-    RentalDataLoader,
-    ZipToTractProcessor,
-    TractToCommunityProcessor,
-    RentalCorrelationAnalyzer,
-    Visualizer
-)
+from housing.components.loaders.rental_data import RentalDataLoader
+from housing.components.processors.zip_to_tract import ZipToTractProcessor
+from housing.components.processors.tract_to_community import TractToCommunityProcessor
+from housing.components.analyzers.rental_correlation import RentalCorrelationAnalyzer
+from housing.components.visualizers.rental_correlation import RentalCorrelationVisualizer
 
 pipeline = Pipeline("Housing Analysis")
 pipeline.register_component(RentalDataLoader())
 pipeline.register_component(ZipToTractProcessor())
 pipeline.register_component(TractToCommunityProcessor())
-pipeline.register_component(RentalRentalCorrelationAnalyzer())
-pipeline.register_component(Visualizer())
+pipeline.register_component(RentalCorrelationAnalyzer())
+pipeline.register_component(RentalCorrelationVisualizer())
 
 results = pipeline.execute()
 ```

@@ -1,7 +1,7 @@
-"""Rental price map visualizer.
+"""Airbnb price map visualizer.
 
-This module creates choropleth maps showing rental price distributions
-at both tract and community area levels.
+This module creates choropleth maps showing Airbnb price distributions
+at census tract level.
 """
 
 import logging
@@ -19,68 +19,68 @@ logger = logging.getLogger(__name__)
 MIN_LAND_AREA_SQ_METERS = 10000
 
 
-class RentalMapVisualizer(Visualizer):
-    """Create choropleth maps for rental prices.
+class AirbnbMapVisualizer(Visualizer):
+    """Create choropleth maps for Airbnb prices.
 
-    Shows rental prices as geographic maps at both census tract and
-    community area levels.
+    Shows Airbnb prices as geographic maps at census tract level.
     """
 
     def __init__(self, output_dir: str | None = None) -> None:
-        """Initialize the rental map visualizer.
+        """Initialize the Airbnb map visualizer.
 
         Args:
             output_dir: Optional output directory for visualizations
         """
         super().__init__(
-            "rental_map_visualization",
-            "Create choropleth maps for rental prices",
+            "airbnb_map_visualization",
+            "Create choropleth maps for Airbnb prices",
         )
         self.output_dir = output_dir or "/project/output"
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Create rental price map visualizations."""
-        logger.info("Creating rental price map visualizations...")
+        """Create Airbnb price map visualizations."""
+        logger.info("Creating Airbnb price map visualizations...")
 
-        tract_data = context.get("tract_rental_data")
-        community_data = context.get("community_rental_data")
+        tract_data = context.get("airbnb_tract_data")
         tract_boundaries = context.get("tract_boundaries")
-        community_boundaries = context.get("community_boundaries")
         city_boundaries = context.get("city_boundaries")
 
-        if tract_data is None and community_data is None:
-            logger.warning("No rental data available for mapping")
+        if tract_data is None:
+            logger.warning("No Airbnb tract data available for mapping")
+            return {}
+
+        if tract_boundaries is None:
+            logger.warning("No tract boundaries available, skipping map visualization")
             return {}
 
         # Create figure with subplots
         fig, axes = plt.subplots(1, 2, figsize=(20, 10))
         fig.suptitle(
-            "Chicago Average Rental Prices by Geography",
+            "Chicago Airbnb Analysis by Census Tract",
             fontsize=20,
             fontweight="bold",
             y=0.98,  # Move title higher
         )
 
-        # Get common bounds from community boundaries for consistent zoom
-        common_bounds = None
-        if community_boundaries is not None:
-            common_bounds = (
-                community_boundaries.total_bounds
-            )  # [minx, miny, maxx, maxy]
+        # Get bounds from city boundaries for proper zoom on Chicago
+        if city_boundaries is not None:
+            # Use city boundaries for zoom
+            common_bounds = city_boundaries.total_bounds  # [minx, miny, maxx, maxy]
+        else:
+            # Fallback to tract boundaries
+            common_bounds = tract_boundaries.total_bounds
 
-        # 1. Census Tract Level Map
-        if tract_data is not None and tract_boundaries is not None:
+        # 1. Airbnb Price Choropleth
+        if "price_numeric_mean" in tract_data.columns:
             # Merge tract data with boundaries for plotting
             tract_map_data = tract_boundaries.merge(
-                tract_data[["tract_geoid", "avg_rental_price"]],
+                tract_data[["tract_geoid", "price_numeric_mean"]],
                 on="tract_geoid",
                 how="left",
             )
 
             # Filter out Lake Michigan and other water-only tracts
-            # ALAND = land area in square meters; water tracts have ALAND = 0 or very small
             if "ALAND" in tract_map_data.columns:
-                # Only keep tracts with significant land area
                 tract_map_data = tract_map_data[
                     tract_map_data["ALAND"] > MIN_LAND_AREA_SQ_METERS
                 ].copy()
@@ -99,15 +99,15 @@ class RentalMapVisualizer(Visualizer):
 
             # Create choropleth
             tract_map_data.plot(
-                column="avg_rental_price",
+                column="price_numeric_mean",
                 ax=axes[0],
                 legend=True,
-                cmap="RdYlGn_r",  # Red (expensive) to Green (affordable)
+                cmap="viridis",  # Purple to yellow gradient
                 edgecolor="black",
                 linewidth=0.1,
                 missing_kwds={"color": "lightgrey", "label": "No Data"},
                 legend_kwds={
-                    "label": "Average Rental Price ($)",
+                    "label": "Average Airbnb Price ($)",
                     "orientation": "horizontal",
                     "shrink": 0.8,
                     "pad": 0.05,
@@ -115,22 +115,21 @@ class RentalMapVisualizer(Visualizer):
             )
 
             axes[0].set_title(
-                f"Census Tract Level (n={tract_data['avg_rental_price'].notna().sum()})",
+                f"Airbnb Price Distribution (n={tract_data['price_numeric_mean'].notna().sum()})",
                 fontsize=16,
             )
             axes[0].axis("off")
 
-            # Set common bounds if available
-            if common_bounds is not None:
-                axes[0].set_xlim(common_bounds[0], common_bounds[2])
-                axes[0].set_ylim(common_bounds[1], common_bounds[3])
+            # Set common bounds
+            axes[0].set_xlim(common_bounds[0], common_bounds[2])
+            axes[0].set_ylim(common_bounds[1], common_bounds[3])
 
             # Add statistics text
-            tract_prices = tract_data["avg_rental_price"].dropna()
+            airbnb_prices = tract_data["price_numeric_mean"].dropna()
             stats_text = (
-                f"Min: ${tract_prices.min():.0f}\n"
-                f"Median: ${tract_prices.median():.0f}\n"
-                f"Max: ${tract_prices.max():.0f}"
+                f"Min: ${airbnb_prices.min():.0f}\n"
+                f"Median: ${airbnb_prices.median():.0f}\n"
+                f"Max: ${airbnb_prices.max():.0f}"
             )
             axes[0].text(
                 0.02,
@@ -142,37 +141,42 @@ class RentalMapVisualizer(Visualizer):
                 bbox={"boxstyle": "round,pad=0.5", "facecolor": "white", "alpha": 0.8},
             )
 
-        # 2. Community Area Level Map
-        if community_data is not None and community_boundaries is not None:
-            # Merge community data with boundaries for plotting
-            community_map_data = community_boundaries.merge(
-                community_data[["community_name", "avg_rental_price"]],
-                on="community_name",
+        # 2. Airbnb Density Choropleth
+        if "point_density" in tract_data.columns:
+            # Merge tract data with boundaries for plotting
+            tract_map_data = tract_boundaries.merge(
+                tract_data[["tract_geoid", "point_density"]],
+                on="tract_geoid",
                 how="left",
             )
+
+            # Filter out Lake Michigan and other water-only tracts
+            if "ALAND" in tract_map_data.columns:
+                tract_map_data = tract_map_data[
+                    tract_map_data["ALAND"] > MIN_LAND_AREA_SQ_METERS
+                ].copy()
 
             # Clip to city boundaries if available
             if city_boundaries is not None:
                 import geopandas as gpd
 
                 # Ensure same CRS
-                if community_map_data.crs != city_boundaries.crs:
-                    city_boundaries = city_boundaries.to_crs(community_map_data.crs)
-                # Clip community areas to city boundary
-                community_map_data = gpd.clip(community_map_data, city_boundaries)
-                logger.info("Clipped community data to Chicago city boundaries")
+                if tract_map_data.crs != city_boundaries.crs:
+                    city_boundaries = city_boundaries.to_crs(tract_map_data.crs)
+                # Clip tracts to city boundary
+                tract_map_data = gpd.clip(tract_map_data, city_boundaries)
 
             # Create choropleth
-            community_map_data.plot(
-                column="avg_rental_price",
+            tract_map_data.plot(
+                column="point_density",
                 ax=axes[1],
                 legend=True,
-                cmap="RdYlGn_r",  # Red (expensive) to Green (affordable)
+                cmap="Blues",  # Light to dark blue gradient
                 edgecolor="black",
-                linewidth=0.5,
+                linewidth=0.1,
                 missing_kwds={"color": "lightgrey", "label": "No Data"},
                 legend_kwds={
-                    "label": "Average Rental Price ($)",
+                    "label": "Airbnb Density (listings per km²)",
                     "orientation": "horizontal",
                     "shrink": 0.8,
                     "pad": 0.05,
@@ -180,22 +184,21 @@ class RentalMapVisualizer(Visualizer):
             )
 
             axes[1].set_title(
-                f"Community Area Level (n={community_data['avg_rental_price'].notna().sum()})",
+                f"Airbnb Density Distribution (n={tract_data['point_density'].notna().sum()})",
                 fontsize=16,
             )
             axes[1].axis("off")
 
-            # Set common bounds if available
-            if common_bounds is not None:
-                axes[1].set_xlim(common_bounds[0], common_bounds[2])
-                axes[1].set_ylim(common_bounds[1], common_bounds[3])
+            # Set common bounds
+            axes[1].set_xlim(common_bounds[0], common_bounds[2])
+            axes[1].set_ylim(common_bounds[1], common_bounds[3])
 
             # Add statistics text
-            community_prices = community_data["avg_rental_price"].dropna()
+            airbnb_density = tract_data["point_density"].dropna()
             stats_text = (
-                f"Min: ${community_prices.min():.0f}\n"
-                f"Median: ${community_prices.median():.0f}\n"
-                f"Max: ${community_prices.max():.0f}"
+                f"Min: {airbnb_density.min():.1f}\n"
+                f"Median: {airbnb_density.median():.1f}\n"
+                f"Max: {airbnb_density.max():.1f}"
             )
             axes[1].text(
                 0.02,
@@ -211,11 +214,11 @@ class RentalMapVisualizer(Visualizer):
         plt.subplots_adjust(top=0.85)  # Increase space for title
 
         # Save the plot
-        output_path = Path(self.output_dir) / "rental_price_maps.png"
+        output_path = Path(self.output_dir) / "airbnb_analysis_maps.png"
         output_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
         logger.info("Saved map visualization to: %s", output_path)
 
         plt.close()
 
-        return {"rental_map_plot": str(output_path)}
+        return {"airbnb_map_plot": str(output_path)}

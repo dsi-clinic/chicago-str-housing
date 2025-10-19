@@ -217,13 +217,11 @@ The pipeline handles this automatically!
 ```python
 from pipeline import Pipeline
 from pipeline.config import PipelineConfig
-from housing.components import (
-    AirbnbDataLoader,
-    TractBoundariesLoader,
-    CommunityBoundariesLoader,
-    AirbnbToTractProcessor,
-    TractToCommunityProcessor
-)
+from housing.components.loaders.airbnb_data import AirbnbDataLoader
+from housing.components.loaders.tract_boundaries import TractBoundariesLoader
+from housing.components.loaders.community_boundaries import CommunityBoundariesLoader
+from housing.components.processors.points_to_tract import PointsToTractProcessor
+from housing.components.processors.tract_to_community import TractToCommunityProcessor
 
 config = PipelineConfig()
 pipeline = Pipeline("Airbnb Analysis", config=config)
@@ -235,7 +233,7 @@ pipeline.register_component(TractBoundariesLoader())
 pipeline.register_component(CommunityBoundariesLoader())
 
 # Two-step aggregation
-pipeline.register_component(AirbnbToTractProcessor())
+pipeline.register_component(PointsToTractProcessor("airbnb_data", "airbnb_tract_data"))
 pipeline.register_component(TractToCommunityProcessor())
 
 # Execute
@@ -250,7 +248,7 @@ community_data = pipeline.context["community_airbnb_data"]
 
 | Processor | Input | Output |
 |-----------|-------|--------|
-| `AirbnbToTractProcessor` | Airbnb points → | Tract aggregation with density |
+| `PointsToTractProcessor` | Airbnb points → | Tract aggregation with density |
 | `ZipToTractProcessor` | ZIP polygons → | Tract aggregation (rental prices) |
 | `TractToCommunityProcessor` | Tract data → | Community aggregation |
 

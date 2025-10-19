@@ -30,21 +30,22 @@
 #### Processors
 - `ZipToTractProcessor` - ZIP → Tract spatial join (includes KNN interpolation)
 - `TractToCommunityProcessor` - Tract → Community aggregation
-- `AirbnbToTractProcessor` - Airbnb → Tract aggregation
+- `PointsToTractProcessor` - Point data → Tract aggregation
 
 #### Analyzers
 - `RentalCorrelationAnalyzer` - Community-level rental correlation analysis
 - `RentalTractAnalyzer` - Tract-level rental analysis
-- `AirbnbRentalAnalyzer` - Airbnb vs rental price analysis
 - `STRProhibitionAnalyzer` - STR prohibition density analysis
-- `STRTemporalAnalyzer` - Temporal pattern analysis
 
 #### Visualizers
 - `RentalCorrelationVisualizer` - Rental correlation plots
+- `RentalDistributionVisualizer` - Rental price distribution plots
+- `RentalMapVisualizer` - Rental price spatial maps
+- `AirbnbDistributionVisualizer` - Airbnb distribution plots
 - `AirbnbMapVisualizer` - Airbnb spatial maps
-- `STRProhibitionVisualizer` - STR prohibition charts
-- `STRDensityMapVisualizer` - STR density maps
-- `STRTemporalVisualizer` - Temporal analysis plots
+- `STRDistributionVisualizer` - STR prohibition distribution plots
+- `STRMapVisualizer` - STR prohibition spatial maps
+- `STRProhibitionVisualizer` - STR prohibition correlation charts
 
 ---
 
@@ -112,26 +113,16 @@ class MyComponent(DataLoader):
         return {"my_data": df}
 ```
 
-### Step 3: Register Your Component
+### Step 3: Use Direct Imports
+
+The project uses direct imports - no need to manage `__init__.py` files!
 
 ```python
-# 1. Add to the specific __init__.py
-# In src/housing/components/loaders/__init__.py
+# In your pipeline script - direct imports
 from housing.components.loaders.my_component import MyComponent
 
-__all__ = [
-    # ... existing components
-    "MyComponent",
-]
-
-# 2. Add to the main __init__.py
-# In src/housing/components/__init__.py  
-from housing.components.loaders import MyComponent
-
-__all__ = [
-    # ... existing components
-    "MyComponent",
-]
+# Or import from main housing package (if added to housing/__init__.py)
+from housing import MyComponent
 ```
 
 ### Step 4: Use in a Pipeline
@@ -139,7 +130,7 @@ __all__ = [
 ```python
 from pipeline import Pipeline
 from pipeline.config import PipelineConfig
-from housing.components import MyComponent
+from housing.components.loaders.my_component import MyComponent
 
 config = PipelineConfig()
 pipeline = Pipeline("My Analysis", config=config)
@@ -162,9 +153,10 @@ my_data = pipeline.context["my_data"]
 # ❌ Wrong
 from components.loaders import MyLoader
 
-# ✅ Correct
-from housing.components.loaders import MyLoader
-# or
+# ✅ Correct - direct import
+from housing.components.loaders.my_loader import MyLoader
+
+# ✅ Also correct - from main package
 from housing import MyLoader
 ```
 
@@ -206,7 +198,7 @@ def execute(self, context):
 ```python
 # In tests/test_my_component.py
 import pytest
-from housing.components import MyComponent
+from housing.components.loaders.my_component import MyComponent
 
 def test_my_component():
     # Arrange
@@ -285,7 +277,7 @@ When creating a new component:
 - [ ] Used config for file paths (not hardcoded)
 - [ ] Checked context keys before accessing
 - [ ] Returned results in a clear dict
-- [ ] Registered in both `__init__.py` files
+- [ ] Used direct imports in pipeline scripts
 - [ ] Wrote at least one unit test
 - [ ] Ran `ruff check` and `ruff format`
 

@@ -51,6 +51,7 @@ class RentalDistributionVisualizer(Visualizer):
             "Chicago Rental Price Distribution: Tract vs Community Area",
             fontsize=18,
             fontweight="bold",
+            y=0.98,  # Move title higher
         )
 
         # 1. Tract-level rental price distribution
@@ -167,6 +168,7 @@ class RentalDistributionVisualizer(Visualizer):
         )
 
         plt.tight_layout()
+        plt.subplots_adjust(top=0.85)  # Increase space for title
 
         # Save the plot
         output_path = Path(self.output_dir) / "rental_distribution_analysis.png"

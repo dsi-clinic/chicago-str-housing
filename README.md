@@ -8,13 +8,14 @@ and advanced analytics, including model development, forecasting, and pattern de
 to strengthen decision-making, improve service delivery, and build more accessible,
 resident-centered digital tools.
 
-This project will investigate the relationship between affordable housing, short-term rental (STR) restrictions, and foreclosure activity in Chicago. Using publicly available datasets from the City of Chicago and supplemental socioeconomic indicators, the project will analyze how housing pressures vary across community areas.
+This project investigates the relationship between affordable housing, short-term rental (STR) restrictions, Airbnb activity, and foreclosure activity in Chicago. Using publicly available datasets from the City of Chicago and supplemental socioeconomic indicators, the project analyzes how housing pressures vary across community areas and census tracts.
 
-The analysis will emphasize data wrangling, exploratory analysis, clustering, and predictive modeling, with visualization used to support insights rather than as a standalone deliverable.
+The analysis emphasizes data wrangling, exploratory analysis, spatial correlation analysis, and comprehensive visualization of housing market dynamics across Chicago neighborhoods.
 
 Key questions include:
 - Do neighborhoods with high STR restrictions differ systematically from those without restrictions in terms of affordability and foreclosure activity?
-- Can clustering techniques reveal distinct “neighborhood types” based on housing and socioeconomic conditions?
+- How do Airbnb listings correlate with rental prices and STR prohibition density across census tracts?
+- Can clustering techniques reveal distinct "neighborhood types" based on housing and socioeconomic conditions?
 - Can predictive modeling estimate the likelihood of a community area experiencing housing pressure—defined as an increased risk of affordability challenges due to overlapping factors such as STR restrictions, foreclosure rates, and limited affordable housing?
 
 
@@ -44,6 +45,7 @@ Key questions include:
 ### Primary Datasets
 - [Chicago's Affordable Rental Housing Developments](https://data.cityofchicago.org/Community-Economic-Development/Affordable-Rental-Housing-Developments/s6ha-ppgi/about_data): Thousands of affordable units that are supported by City of Chicago programs to maintain affordability in local neighborhoods. Includes location data, management companies, and number of units
 - [House Share Prohibited Buildings List](https://data.cityofchicago.org/Buildings/House-Share-Prohibited-Buildings-List/7bzs-jsyj/about_data): A list of buildings excluded from short-term rental activity under the Shared Housing Ordinance. Includes location data, number of units, and dates.
+- [Airbnb Listings](https://insideairbnb.com/get-the-data/): Short-term rental listings data including prices, locations, and property characteristics (processed and cleaned for analysis)
 - [Foreclosed Rental Properties dataset](https://data.cityofchicago.org/Community-Economic-Development/Foreclosed-Rental-Property/yhcw-iu53/about_data): Foreclosed rental properties registered with the Chicago Department of Housing under the Keep Chicago Renting ordinance. Includes owner information, address, date, previous notices, and management names.
 - [Zillow Observed Rent Index (ZORI)](https://www.zillow.com/research/data/): Available by ZIP code
 - [American Community Survey Data](https://www.census.gov/programs-surveys/acs/data.html): Census demographic and socioeconomic data
@@ -137,8 +139,11 @@ cp .env.example .env
 **Required: Rental Price Data**
 - Download ZORI data and place in `data/Zip_zori_uc_sfrcondomfr_sm_month.csv`
 
+**Required: Airbnb Data**
+- Download Airbnb listings data and place in `data/listings.csv`
+
 **Automatic: Boundary APIs**
-- Community and ZIP boundaries are fetched automatically from Chicago Data Portal
+- Community, ZIP, and city boundaries are fetched automatically from Chicago Data Portal
 - Cached to `data/.cache/` on first run for faster subsequent runs
 - No manual download needed!
 
@@ -197,11 +202,35 @@ make run-generic-pipeline
 uv run python src/pipeline/scripts/pipeline_usage.py
 ```
 
-The housing pipeline generates:
-- Processed data with spatial joins at multiple geographic levels
-- Correlation analysis results
-- Visualization plots
-- Summary reports
+The housing pipeline generates comprehensive analysis including:
+- **Spatial Analysis**: Census tract-level aggregation of rental prices, STR prohibitions, and Airbnb listings
+- **Correlation Analysis**: Statistical relationships between housing market indicators
+- **Distribution Visualizations**: Price and density distributions across geographic areas
+- **Choropleth Maps**: Spatial visualization of housing patterns clipped to Chicago boundaries
+- **Summary Reports**: Key findings and statistical summaries
+
+### Analysis Outputs
+
+The pipeline generates the following visualizations in the `output/` directory:
+
+**Rental Market Analysis:**
+- `rental_distribution_analysis.png` - Rental price distributions by tract and community area
+- `rental_price_maps.png` - Choropleth maps of rental prices across Chicago
+
+**STR Prohibition Analysis:**
+- `str_distribution_analysis.png` - STR prohibition density and unit distributions
+- `str_density_maps.png` - Spatial maps of STR prohibition patterns
+- `str_correlation_analysis.png` - Correlation analysis between STR prohibitions, rental prices, and Airbnb activity
+
+**Airbnb Market Analysis:**
+- `airbnb_distribution_analysis.png` - Airbnb price and density distributions
+- `airbnb_analysis_maps.png` - Spatial maps of Airbnb pricing and density patterns
+
+**Key Findings:**
+- STR prohibition density shows moderate positive correlation with rental prices (r=0.407)
+- Prohibited units correlate strongly with rental prices (r=0.447)
+- Airbnb density shows weak correlation with STR prohibition density (r=0.281)
+- Lakefront areas show highest concentrations of both STR prohibitions and Airbnb listings
 
 ### 5. Explore the Notebook
 
@@ -254,14 +283,16 @@ See `docs/PIPELINE_GUIDE.md` for configuration details and `config/pipeline_conf
 data/
 ├── .cache/                                  # Auto-generated API caches
 │   ├── community_boundaries.json           # Community areas (2.1 MB)
-│   └── zip_boundaries.json                 # ZIP codes (1.5 MB)
+│   ├── zip_boundaries.json                 # ZIP codes (1.5 MB)
+│   └── city_boundaries.json                # Chicago city boundary
 ├── tl_2023_17_tract/                       # Census tract shapefiles
 │   ├── tl_2023_17_tract.shp               # Main shapefile
 │   ├── tl_2023_17_tract.shx               # Shape index
 │   ├── tl_2023_17_tract.dbf               # Attributes
 │   ├── tl_2023_17_tract.prj               # Projection
 │   └── tl_2023_17_tract.cpg               # Character encoding
-└── Zip_zori_uc_sfrcondomfr_sm_month.csv   # Rental price data
+├── Zip_zori_uc_sfrcondomfr_sm_month.csv   # Rental price data
+└── listings.csv                            # Airbnb listings data
 ```
 
 **Cache Management**:
