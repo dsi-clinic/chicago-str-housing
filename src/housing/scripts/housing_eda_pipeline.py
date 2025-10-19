@@ -7,13 +7,10 @@ This script demonstrates the full Chicago housing data analysis workflow:
 4. Statistical analysis at multiple geographic levels
 5. STR prohibition analysis and correlations
 6. Airbnb data integration and density maps
-
-This is the complete housing analysis pipeline that students will use.
 """
 
 import logging
 
-from housing.components.analyzers.rental_correlation import RentalCorrelationAnalyzer
 from housing.components.analyzers.rental_tract import RentalTractAnalyzer
 from housing.components.analyzers.str_prohibition import STRProhibitionAnalyzer
 from housing.components.loaders.airbnb_data import AirbnbDataLoader
@@ -107,7 +104,6 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     # Step 6: Analyze at both levels
     pipeline.register_component(RentalTractAnalyzer())
-    pipeline.register_component(RentalCorrelationAnalyzer())
     pipeline.register_component(STRProhibitionAnalyzer())
 
     # Step 7: Visualize rental distributions, STR analysis, and density maps
@@ -132,26 +128,3 @@ if __name__ == "__main__":
 
     logger.info("\n" + "=" * 70)
     logger.info("Demo complete! Check the output/ directory for visualizations.")
-    logger.info("STR prohibition analysis results:")
-
-    # Display STR analysis results
-    if "str_summary" in pipeline.context:
-        summary = pipeline.context["str_summary"]
-        logger.info(
-            "  Total STR prohibition buildings: %d", summary.get("total_buildings", 0)
-        )
-        logger.info(
-            "  Tracts with prohibitions: %d", summary.get("tracts_with_prohibitions", 0)
-        )
-
-    if "str_correlations" in pipeline.context:
-        correlations = pipeline.context["str_correlations"]
-        logger.info("  Key correlations:")
-        for name, corr in correlations.items():
-            logger.info("    %s: %.3f", name, corr)
-
-    logger.info("\nGenerated visualizations:")
-    logger.info("  - rental_distribution_analysis.png")
-    logger.info("  - rental_price_maps.png")
-    logger.info("  - str_correlation_analysis.png")
-    logger.info("  - str_density_maps.png")

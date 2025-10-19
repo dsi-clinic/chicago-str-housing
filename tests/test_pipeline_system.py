@@ -13,7 +13,6 @@ import pytest
 
 from housing import (
     CommunityBoundariesLoader,
-    RentalCorrelationAnalyzer,
     RentalDataLoader,
     ZipBoundariesLoader,
 )
@@ -75,44 +74,6 @@ class TestPipelineComponents:
         assert len(community_gdf) > 0
         assert "community_name" in community_gdf.columns  # Actual column name
         assert community_gdf.geometry is not None
-
-    def test_rental_correlation_analyzer_success(self) -> None:
-        """Test RentalCorrelationAnalyzer with valid input data."""
-        # Arrange
-        analyzer = RentalCorrelationAnalyzer()
-
-        # Create mock community data as GeoDataFrame with all required columns
-        community_data = gpd.GeoDataFrame(
-            {
-                "community_name": ["Community A", "Community B", "Community C"],
-                "avg_rental_price": [2000, 2500, 1800],
-                "area_weighted_avg_rent": [2000, 2500, 1800],  # Add required columns
-                "min_rental_price": [1800, 2200, 1600],
-                "max_rental_price": [2200, 2800, 2000],
-                "zip_count": [2, 3, 1],
-                "geometry": [
-                    "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))",
-                    "POLYGON((1 0, 2 0, 2 1, 1 1, 1 0))",
-                    "POLYGON((2 0, 3 0, 3 1, 2 1, 2 0))",
-                ],
-            }
-        )
-        community_data["geometry"] = gpd.GeoSeries.from_wkt(community_data["geometry"])
-        community_data = community_data.set_geometry("geometry").set_crs("EPSG:4326")
-
-        context = {"community_rental_data": community_data}
-
-        # Act
-        result = analyzer.execute(context)
-
-        # Assert
-        assert isinstance(result, dict)
-        assert "correlation_matrix" in result  # Actual return key
-        assert "analysis_data" in result
-        assert "summary_stats" in result
-        correlations = result["summary_stats"]
-        assert isinstance(correlations, dict)
-        assert "total_communities" in correlations
 
 
 class TestPipelineIntegration:
