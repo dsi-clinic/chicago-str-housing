@@ -13,11 +13,11 @@ import logging
 
 from housing import (
     CommunityBoundariesLoader,
-    CorrelationAnalyzer,
+    RentalCorrelationAnalyzer,
     RentalDataLoader,
     RentalDistributionVisualizer,
     RentalMapVisualizer,
-    TractAnalyzer,
+    RentalTractAnalyzer,
     TractBoundariesLoader,
     TractToCommunityProcessor,
     ZipBoundariesLoader,
@@ -63,8 +63,8 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     )
 
     # Step 4: Analyze at both levels
-    pipeline.register_component(TractAnalyzer())
-    pipeline.register_component(CorrelationAnalyzer())
+    pipeline.register_component(RentalTractAnalyzer())
+    pipeline.register_component(RentalCorrelationAnalyzer())
 
     # Step 5: Visualize rental distributions at both levels
     pipeline.register_component(RentalDistributionVisualizer())

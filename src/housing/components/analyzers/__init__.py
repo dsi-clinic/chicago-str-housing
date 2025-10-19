@@ -1,9 +1,9 @@
 """Analyzers for housing data."""
 
-from housing.components.analyzers.correlation import CorrelationAnalyzer
-from housing.components.analyzers.tract import TractAnalyzer
+from housing.components.analyzers.rental_correlation import RentalCorrelationAnalyzer
+from housing.components.analyzers.rental_tract import RentalTractAnalyzer
 
 __all__ = [
-    "CorrelationAnalyzer",
-    "TractAnalyzer",
+    "RentalCorrelationAnalyzer",
+    "RentalTractAnalyzer",
 ]

@@ -28,12 +28,12 @@ src/housing/
 │   │
 │   ├── analyzers/                       # ANALYZERS
 │   │   ├── __init__.py
-│   │   ├── correlation.py               # CorrelationAnalyzer
-│   │   └── tract.py                     # TractAnalyzer
+│   │   ├── rental_correlation.py       # RentalCorrelationAnalyzer
+│   │   └── rental_tract.py             # RentalTractAnalyzer
 │   │
 │   └── visualizers/                     # VISUALIZERS
 │       ├── __init__.py
-│       └── correlation.py               # CorrelationVisualizer
+│       └── rental_correlation.py       # RentalCorrelationVisualizer
 │
 └── scripts/
     ├── __init__.py
@@ -89,6 +89,6 @@ class RentalDataLoader(DataLoader):
 from pipeline.base import Analyzer
 from housing.components.constants import CORRELATION_STRONG_THRESHOLD
 
-class CorrelationAnalyzer(Analyzer):
+class RentalCorrelationAnalyzer(Analyzer):
     ...
 ```
