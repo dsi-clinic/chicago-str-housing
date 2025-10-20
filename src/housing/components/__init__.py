@@ -13,6 +13,7 @@ from housing.components.analyzers import CorrelationAnalyzer, TractAnalyzer
 from housing.components.loaders import (
     CommunityBoundariesLoader,
     RentalDataLoader,
+    STRDataLoader,
     TractBoundariesLoader,
     ZipBoundariesLoader,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "ZipBoundariesLoader",
     "CommunityBoundariesLoader",
     "TractBoundariesLoader",
+    "STRDataLoader",
     # Processors
     "ZipToTractProcessor",
     "TractToCommunityProcessor",
