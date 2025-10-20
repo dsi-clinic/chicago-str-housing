@@ -9,8 +9,14 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 
+from housing.components.utils import (
+    add_statistical_summary_to_plot,
+    calculate_pairwise_correlation_matrix,
+    create_correlation_heatmap,
+    create_scatter_with_trend,
+    setup_figure_and_save,
+)
 from pipeline.base import Visualizer
 
 logger = logging.getLogger(__name__)
@@ -50,37 +56,31 @@ class STRProhibitionVisualizer(Visualizer):
         fig = plt.figure(figsize=(16, 10))
         gs = fig.add_gridspec(2, 2, hspace=0.3, wspace=0.3)
 
-        fig.suptitle(
-            "Chicago Short-Term Rental Prohibition Correlation Analysis",
-            fontsize=16,
-            fontweight="bold",
-        )
-
         # 1. STR Density vs Rental Price
         ax1 = fig.add_subplot(gs[0, 0])
         if (
             "str_prohibition_density" in str_tract_analysis.columns
             and "avg_rental_price" in str_tract_analysis.columns
         ):
-            data_clean = str_tract_analysis[
-                ["str_prohibition_density", "avg_rental_price"]
-            ].dropna()
-            if len(data_clean) > 0:
-                # Cap extreme values at 99th percentile for readability
-                x = data_clean["str_prohibition_density"].to_numpy()
-                y = data_clean["avg_rental_price"].to_numpy()
-                x_cap = np.percentile(x, 99)
-                y_cap = np.percentile(y, 99)
-                x_clipped = np.minimum(x, x_cap)
-                y_clipped = np.minimum(y, y_cap)
+            # Cap extreme values at 99th percentile for readability
+            x_data = str_tract_analysis["str_prohibition_density"].dropna()
+            y_data = str_tract_analysis["avg_rental_price"].dropna()
 
-                ax1.scatter(x_clipped, y_clipped, alpha=0.6, s=20)
-                ax1.set_xlabel("STR Units Density (per km²)")
-                ax1.set_ylabel("Average Rental Price ($)")
-                title = "STR Units Density vs Rental Price"
-                ax1.set_title(title)
-                ax1.grid(True, alpha=0.3)
-                # Removed clipped annotation per request
+            if len(x_data) > 0 and len(y_data) > 0:
+                x_cap = np.percentile(x_data, 99)
+                y_cap = np.percentile(y_data, 99)
+                x_clipped = x_data.clip(upper=x_cap)
+                y_clipped = y_data.clip(upper=y_cap)
+
+                create_scatter_with_trend(
+                    ax1,
+                    x_clipped,
+                    y_clipped,
+                    "STR Units Density vs Rental Price",
+                    "STR Units Density (per km²)",
+                    "Average Rental Price ($)",
+                    color="purple",
+                )
 
         # 2. STR Density vs Airbnb Density
         ax2 = fig.add_subplot(gs[0, 1])
@@ -88,27 +88,29 @@ class STRProhibitionVisualizer(Visualizer):
             "str_prohibition_density" in str_tract_analysis.columns
             and "airbnb_density" in str_tract_analysis.columns
         ):
-            data_clean = str_tract_analysis[
-                ["str_prohibition_density", "airbnb_density"]
-            ].dropna()
-            if len(data_clean) > 0:
-                # Cap extreme values at 99th percentile for readability
-                x = data_clean["str_prohibition_density"].to_numpy()
-                y = data_clean["airbnb_density"].to_numpy()
-                x_cap = np.percentile(x, 99)
-                y_cap = np.percentile(y, 99)
-                x_clipped = np.minimum(x, x_cap)
-                y_clipped = np.minimum(y, y_cap)
+            # Cap extreme values at 99th percentile for readability
+            x_data = str_tract_analysis["str_prohibition_density"].dropna()
+            y_data = str_tract_analysis["airbnb_density"].dropna()
 
-                ax2.scatter(x_clipped, y_clipped, alpha=0.6, s=20, color="green")
-                ax2.set_xlabel("STR Units Density (per km²)")
-                ax2.set_ylabel("Airbnb Units Density (per km²)")
-                ax2.set_title("STR Units Density vs Airbnb Units Density")
-                ax2.grid(True, alpha=0.3)
+            if len(x_data) > 0 and len(y_data) > 0:
+                x_cap = np.percentile(x_data, 99)
+                y_cap = np.percentile(y_data, 99)
+                x_clipped = x_data.clip(upper=x_cap)
+                y_clipped = y_data.clip(upper=y_cap)
+
+                create_scatter_with_trend(
+                    ax2,
+                    x_clipped,
+                    y_clipped,
+                    "STR Units Density vs Airbnb Units Density",
+                    "STR Units Density (per km²)",
+                    "Airbnb Units Density (per km²)",
+                    color="green",
+                )
 
         # 3. Comprehensive Correlation Matrix
         ax3 = fig.add_subplot(gs[1, 0])
-        # Build correlation matrix including density metrics only
+        # Build correlation matrix using pairwise correlations (same logic as analyzer)
         corr_cols = []
         corr_labels = []
 
@@ -127,36 +129,18 @@ class STRProhibitionVisualizer(Visualizer):
         min_data_points = 10  # Minimum data points for reliable correlations
 
         if len(corr_cols) >= min_corr_vars:
-            # Calculate correlation matrix
-            corr_data = str_tract_analysis[corr_cols].dropna()
-            if len(corr_data) > min_data_points:
-                corr_matrix = corr_data.corr()
+            # Calculate pairwise correlation matrix to match analyzer logic
+            corr_matrix = calculate_pairwise_correlation_matrix(
+                str_tract_analysis, corr_cols, min_data_points
+            )
 
-                # Create heatmap with better formatting
-                sns.heatmap(
-                    corr_matrix,
-                    annot=True,
-                    fmt=".3f",
-                    cmap="RdBu_r",
-                    center=0,
-                    square=True,
-                    ax=ax3,
-                    cbar_kws={"shrink": 0.7, "label": "Correlation"},
-                    vmin=-1,
-                    vmax=1,
-                    linewidths=0.5,
-                    linecolor="white",
-                )
-
-                # Use custom labels for better readability
-                ax3.set_xticklabels(corr_labels, rotation=45, ha="right")
-                ax3.set_yticklabels(corr_labels, rotation=0)
-                ax3.set_title(
-                    "Correlation Matrix: STR, Airbnb & Rental", fontsize=11, pad=10
-                )
-            else:
-                ax3.text(0.5, 0.5, "Insufficient data", ha="center", va="center")
-                ax3.set_title("Correlation Matrix")
+            # Create correlation heatmap using utility function
+            create_correlation_heatmap(
+                ax3,
+                corr_matrix,
+                corr_labels,
+                "Correlation Matrix: STR, Airbnb & Rental",
+            )
         else:
             ax3.text(
                 0.5,
@@ -171,53 +155,66 @@ class STRProhibitionVisualizer(Visualizer):
 
         # 4. Summary statistics
         ax4 = fig.add_subplot(gs[1, 1])
-        ax4.axis("off")
 
-        stats_lines = ["Statistical Summary\n"]
-        stats_lines.append(
-            f"Total Buildings: {str_summary.get('total_buildings', 'N/A')}"
-        )
-        stats_lines.append(
-            f"Tracts with Prohibitions: {str_summary.get('tracts_with_prohibitions', 'N/A')}"
-        )
-        stats_lines.append("")
+        data_sections = [
+            {
+                "section_title": "OVERVIEW",
+                "stats": [
+                    ("Total Buildings", str_summary.get("total_buildings", "N/A")),
+                    (
+                        "Tracts with Prohibitions",
+                        str_summary.get("tracts_with_prohibitions", "N/A"),
+                    ),
+                ],
+            }
+        ]
 
         if "avg_rent_with_prohibitions" in str_summary:
-            stats_lines.append("Average Rent Comparison:")
-            stats_lines.append(
-                f"  With Prohibitions: ${str_summary['avg_rent_with_prohibitions']:,.0f}"
+            data_sections.append(
+                {
+                    "section_title": "AVERAGE RENT COMPARISON",
+                    "stats": [
+                        (
+                            "With Prohibitions",
+                            f"${str_summary['avg_rent_with_prohibitions']:,.0f}",
+                        ),
+                        (
+                            "Without Prohibitions",
+                            f"${str_summary['avg_rent_without_prohibitions']:,.0f}",
+                        ),
+                        ("Difference", f"${str_summary['rent_difference']:,.0f}"),
+                    ],
+                }
             )
-            stats_lines.append(
-                f"  Without Prohibitions: ${str_summary['avg_rent_without_prohibitions']:,.0f}"
-            )
-            stats_lines.append(f"  Difference: ${str_summary['rent_difference']:,.0f}")
-            stats_lines.append("")
 
         if str_correlations:
-            stats_lines.append("Key Correlations (Density Metrics):")
+            correlation_stats = []
             for name, corr in str_correlations.items():
                 if "Density" in name:
-                    stats_lines.append(f"  {name}: {corr:.3f}")
+                    correlation_stats.append((name, f"{corr:.3f}"))
 
-        stats_text = "\n".join(stats_lines)
+            if correlation_stats:
+                data_sections.append(
+                    {
+                        "section_title": "KEY CORRELATIONS (DENSITY METRICS)",
+                        "stats": correlation_stats,
+                    }
+                )
 
-        ax4.text(
-            0.05,
-            0.95,
-            stats_text,
-            transform=ax4.transAxes,
-            fontsize=10,
-            verticalalignment="top",
-            fontfamily="monospace",
-            bbox={"boxstyle": "round,pad=0.5", "facecolor": "lightgray", "alpha": 0.8},
+        add_statistical_summary_to_plot(
+            ax4,
+            "Statistical Summary",
+            data_sections,
+            bgcolor="lightgray",
         )
 
         # Save the plot
         output_path = Path(self.output_dir) / "str_correlation_analysis.png"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(output_path, dpi=300, bbox_inches="tight")
-        logger.info("Saved STR visualization to: %s", output_path)
-
-        plt.close()
+        setup_figure_and_save(
+            fig,
+            output_path,
+            "Chicago Short-Term Rental Prohibition Correlation Analysis",
+            logger=logger,
+        )
 
         return {"str_visualization_path": str(output_path)}

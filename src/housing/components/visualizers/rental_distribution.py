@@ -10,6 +10,11 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 
+from housing.components.utils import (
+    add_statistical_summary_to_plot,
+    create_histogram_with_median,
+    setup_figure_and_save,
+)
 from pipeline.base import Visualizer
 
 logger = logging.getLogger(__name__)
@@ -47,62 +52,31 @@ class RentalDistributionVisualizer(Visualizer):
 
         # Create figure with subplots
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-        fig.suptitle(
-            "Chicago Rental Price Distribution: Tract vs Community Area",
-            fontsize=18,
-            fontweight="bold",
-            y=0.98,  # Move title higher
-        )
 
         # 1. Tract-level rental price distribution
         if tract_data is not None:
-            tract_prices = tract_data["avg_rental_price"].dropna()
-            axes[0, 0].hist(
-                tract_prices,
-                bins=30,
-                alpha=0.7,
+            create_histogram_with_median(
+                axes[0, 0],
+                tract_data["avg_rental_price"],
+                "Census Tract Level",
+                "Average Rental Price ($)",
+                "Number of Census Tracts",
                 color="steelblue",
-                edgecolor="black",
+                median_format="${:.0f}",
             )
-            axes[0, 0].axvline(
-                tract_prices.median(),
-                color="red",
-                linestyle="--",
-                linewidth=2,
-                label=f"Median: ${tract_prices.median():.0f}",
-            )
-            axes[0, 0].set_xlabel("Average Rental Price ($)", fontsize=12)
-            axes[0, 0].set_ylabel("Number of Census Tracts", fontsize=12)
-            axes[0, 0].set_title(
-                f"Census Tract Level (n={len(tract_prices)})", fontsize=14
-            )
-            axes[0, 0].grid(True, alpha=0.3)
-            axes[0, 0].legend()
 
         # 2. Community-level rental price distribution
         if community_data is not None:
-            community_prices = community_data["avg_rental_price"].dropna()
-            axes[0, 1].hist(
-                community_prices,
-                bins=20,
-                alpha=0.7,
+            create_histogram_with_median(
+                axes[0, 1],
+                community_data["avg_rental_price"],
+                "Community Area Level",
+                "Average Rental Price ($)",
+                "Number of Community Areas",
                 color="forestgreen",
-                edgecolor="black",
+                bins=20,
+                median_format="${:.0f}",
             )
-            axes[0, 1].axvline(
-                community_prices.median(),
-                color="red",
-                linestyle="--",
-                linewidth=2,
-                label=f"Median: ${community_prices.median():.0f}",
-            )
-            axes[0, 1].set_xlabel("Average Rental Price ($)", fontsize=12)
-            axes[0, 1].set_ylabel("Number of Community Areas", fontsize=12)
-            axes[0, 1].set_title(
-                f"Community Area Level (n={len(community_prices)})", fontsize=14
-            )
-            axes[0, 1].grid(True, alpha=0.3)
-            axes[0, 1].legend()
 
         # 3. Box plots for comparison
         if tract_data is not None and community_data is not None:
@@ -126,56 +100,58 @@ class RentalDistributionVisualizer(Visualizer):
             axes[1, 0].grid(True, alpha=0.3, axis="y")
 
         # 4. Statistical summary
-        axes[1, 1].axis("off")
-        stats_lines = ["Rental Price Statistics\n" + "=" * 40 + "\n"]
+        data_sections = []
 
         if tract_data is not None:
             tract_prices = tract_data["avg_rental_price"].dropna()
-            stats_lines.append("CENSUS TRACT LEVEL:")
-            stats_lines.append(f"  Count: {len(tract_prices)}")
-            stats_lines.append(f"  Mean: ${tract_prices.mean():.2f}")
-            stats_lines.append(f"  Median: ${tract_prices.median():.2f}")
-            stats_lines.append(f"  Std Dev: ${tract_prices.std():.2f}")
-            stats_lines.append(f"  Min: ${tract_prices.min():.2f}")
-            stats_lines.append(f"  Max: ${tract_prices.max():.2f}")
-            stats_lines.append(f"  Q1: ${tract_prices.quantile(0.25):.2f}")
-            stats_lines.append(f"  Q3: ${tract_prices.quantile(0.75):.2f}")
-            stats_lines.append("")
+            data_sections.append(
+                {
+                    "section_title": "CENSUS TRACT LEVEL",
+                    "stats": [
+                        ("Count", len(tract_prices)),
+                        ("Mean", f"${tract_prices.mean():.2f}"),
+                        ("Median", f"${tract_prices.median():.2f}"),
+                        ("Std Dev", f"${tract_prices.std():.2f}"),
+                        ("Min", f"${tract_prices.min():.2f}"),
+                        ("Max", f"${tract_prices.max():.2f}"),
+                        ("Q1", f"${tract_prices.quantile(0.25):.2f}"),
+                        ("Q3", f"${tract_prices.quantile(0.75):.2f}"),
+                    ],
+                }
+            )
 
         if community_data is not None:
             community_prices = community_data["avg_rental_price"].dropna()
-            stats_lines.append("COMMUNITY AREA LEVEL:")
-            stats_lines.append(f"  Count: {len(community_prices)}")
-            stats_lines.append(f"  Mean: ${community_prices.mean():.2f}")
-            stats_lines.append(f"  Median: ${community_prices.median():.2f}")
-            stats_lines.append(f"  Std Dev: ${community_prices.std():.2f}")
-            stats_lines.append(f"  Min: ${community_prices.min():.2f}")
-            stats_lines.append(f"  Max: ${community_prices.max():.2f}")
-            stats_lines.append(f"  Q1: ${community_prices.quantile(0.25):.2f}")
-            stats_lines.append(f"  Q3: ${community_prices.quantile(0.75):.2f}")
+            data_sections.append(
+                {
+                    "section_title": "COMMUNITY AREA LEVEL",
+                    "stats": [
+                        ("Count", len(community_prices)),
+                        ("Mean", f"${community_prices.mean():.2f}"),
+                        ("Median", f"${community_prices.median():.2f}"),
+                        ("Std Dev", f"${community_prices.std():.2f}"),
+                        ("Min", f"${community_prices.min():.2f}"),
+                        ("Max", f"${community_prices.max():.2f}"),
+                        ("Q1", f"${community_prices.quantile(0.25):.2f}"),
+                        ("Q3", f"${community_prices.quantile(0.75):.2f}"),
+                    ],
+                }
+            )
 
-        stats_text = "\n".join(stats_lines)
-
-        axes[1, 1].text(
-            0.05,
-            0.95,
-            stats_text,
-            transform=axes[1, 1].transAxes,
-            fontsize=11,
-            verticalalignment="top",
-            fontfamily="monospace",
-            bbox={"boxstyle": "round,pad=0.8", "facecolor": "lightgray", "alpha": 0.8},
+        add_statistical_summary_to_plot(
+            axes[1, 1],
+            "Rental Price Statistics",
+            data_sections,
+            bgcolor="lightgray",
         )
-
-        plt.tight_layout()
-        plt.subplots_adjust(top=0.85)  # Increase space for title
 
         # Save the plot
         output_path = Path(self.output_dir) / "rental_distribution_analysis.png"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(output_path, dpi=300, bbox_inches="tight")
-        logger.info("Saved visualization to: %s", output_path)
-
-        plt.close()
+        setup_figure_and_save(
+            fig,
+            output_path,
+            "Chicago Rental Price Distribution: Tract vs Community Area",
+            logger=logger,
+        )
 
         return {"rental_distribution_plot": str(output_path)}

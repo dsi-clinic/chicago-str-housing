@@ -10,6 +10,7 @@ from typing import Any
 import geopandas as gpd
 import pandas as pd
 
+from housing.components.utils import calculate_pairwise_correlations
 from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
@@ -235,7 +236,6 @@ class STRProhibitionAnalyzer(Analyzer):
 
     def _calculate_correlations(self, df: pd.DataFrame) -> dict[str, float]:
         """Calculate key correlations between STR prohibitions and other factors."""
-        correlations = {}
         min_sample_size = 10  # Minimum samples needed for correlation
 
         # Define correlation pairs - use density metrics for better normalization
@@ -257,15 +257,7 @@ class STRProhibitionAnalyzer(Analyzer):
             ),
         ]
 
-        for col1, col2, label in pairs:
-            if col1 in df.columns and col2 in df.columns:
-                # Filter to rows with both values
-                subset = df[[col1, col2]].dropna()
-                if len(subset) > min_sample_size:
-                    corr = subset[col1].corr(subset[col2])
-                    correlations[label] = corr
-
-        return correlations
+        return calculate_pairwise_correlations(df, pairs, min_sample_size)
 
     def _generate_summary(
         self, analysis_df: pd.DataFrame, str_data: pd.DataFrame
