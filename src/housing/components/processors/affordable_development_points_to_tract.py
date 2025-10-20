@@ -29,4 +29,8 @@ class AffordableTractDensityProcessor(DataProcessor):
                     tract_data["unit_density"].max(),
                 )
         
+        logger.info("Filling NaN Values with 0 ...")
+
+        tract_data["unit_density"] = tract_data["unit_density"].fillna(0)
+        
         return {"affordable_development_tract_data": tract_data}

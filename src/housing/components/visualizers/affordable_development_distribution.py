@@ -73,7 +73,7 @@ class AffordableDistributionVisualizer(Visualizer):
             axes[0, 0].set_xlabel("Tract Unit Density (Units/km2)", fontsize=12)
             axes[0, 0].set_ylabel("Number of Census Tracts", fontsize=12)
             axes[0, 0].set_title(
-                f"Census Tract Level (n={len(tract_unit_density)})", fontsize=14
+                f"Unit Density by Census Tract (n={len(tract_unit_density)})", fontsize=14
             )
             axes[0, 0].grid(True, alpha=0.3)
             axes[0, 0].legend()
@@ -98,7 +98,7 @@ class AffordableDistributionVisualizer(Visualizer):
             axes[0, 1].set_xlabel("Number of Affordable Units", fontsize=12)
             axes[0, 1].set_ylabel("Number of Tracts", fontsize=12)
             axes[0, 1].set_title(
-                f"Census Tract Level (n={len(tract_units)})", fontsize=14
+                f"Number of Units by Census Tract (n={len(tract_units)})", fontsize=14
             )
             axes[0, 1].grid(True, alpha=0.3)
             axes[0, 1].legend()
