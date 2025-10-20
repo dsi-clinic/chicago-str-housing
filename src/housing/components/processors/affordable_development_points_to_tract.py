@@ -7,7 +7,7 @@ from housing import PointsToTractProcessor
 logger = logging.getLogger(__name__)
 
 
-class AirbnbToTractProcessor(PointsToTractProcessor):
+class AffordableToTractProcessor(PointsToTractProcessor):
     """Convenience class for affordable developments → tracts aggregation."""
 
     def __init__(
