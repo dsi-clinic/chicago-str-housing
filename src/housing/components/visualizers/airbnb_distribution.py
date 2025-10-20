@@ -78,7 +78,7 @@ class AirbnbDistributionVisualizer(Visualizer):
             axes[0, 0].grid(True, alpha=0.3)
             axes[0, 0].legend()
 
-        # 2. Airbnb density distribution
+        # 2. Airbnb units density distribution
         if tract_data is not None and "point_density" in tract_data.columns:
             tract_density = tract_data["point_density"].dropna()
             axes[0, 1].hist(
@@ -93,17 +93,18 @@ class AirbnbDistributionVisualizer(Visualizer):
                 color="blue",
                 linestyle="--",
                 linewidth=2,
-                label=f"Median: {tract_density.median():.1f} listings/km²",
+                label=f"Median: {tract_density.median():.1f} units/km²",
             )
-            axes[0, 1].set_xlabel("Airbnb Density (listings per km²)", fontsize=12)
+            axes[0, 1].set_xlabel("Airbnb Units Density (per km²)", fontsize=12)
             axes[0, 1].set_ylabel("Number of Census Tracts", fontsize=12)
             axes[0, 1].set_title(
-                f"Airbnb Density Distribution (n={len(tract_density)})", fontsize=14
+                f"Airbnb Units Density Distribution (n={len(tract_density)})",
+                fontsize=14,
             )
             axes[0, 1].grid(True, alpha=0.3)
             axes[0, 1].legend()
 
-        # 3. Price vs Density scatter plot
+        # 3. Price vs Units Density scatter plot
         if (
             tract_data is not None
             and "price_numeric_mean" in tract_data.columns
@@ -125,9 +126,9 @@ class AirbnbDistributionVisualizer(Visualizer):
                     color="purple",
                     s=20,
                 )
-                axes[1, 0].set_xlabel("Airbnb Density (listings per km²)", fontsize=12)
+                axes[1, 0].set_xlabel("Airbnb Units Density (per km²)", fontsize=12)
                 axes[1, 0].set_ylabel("Average Airbnb Price ($)", fontsize=12)
-                axes[1, 0].set_title("Price vs Density Relationship", fontsize=14)
+                axes[1, 0].set_title("Price vs Units Density Relationship", fontsize=14)
                 axes[1, 0].grid(True, alpha=0.3)
 
         # 4. Statistical summary
@@ -150,10 +151,8 @@ class AirbnbDistributionVisualizer(Visualizer):
                 tract_density = tract_data["point_density"].dropna()
                 stats_lines.append("AIRBNB DENSITY ANALYSIS:")
                 stats_lines.append(f"  Count: {len(tract_density)}")
-                stats_lines.append(f"  Mean: {tract_density.mean():.2f} listings/km²")
-                stats_lines.append(
-                    f"  Median: {tract_density.median():.2f} listings/km²"
-                )
+                stats_lines.append(f"  Mean: {tract_density.mean():.2f} units/km²")
+                stats_lines.append(f"  Median: {tract_density.median():.2f} units/km²")
                 stats_lines.append(f"  Std Dev: {tract_density.std():.2f}")
                 stats_lines.append(f"  Min: {tract_density.min():.2f}")
                 stats_lines.append(f"  Max: {tract_density.max():.2f}")

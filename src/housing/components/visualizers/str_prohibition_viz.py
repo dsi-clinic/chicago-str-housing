@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 
 from pipeline.base import Visualizer
@@ -65,16 +66,21 @@ class STRProhibitionVisualizer(Visualizer):
                 ["str_prohibition_density", "avg_rental_price"]
             ].dropna()
             if len(data_clean) > 0:
-                ax1.scatter(
-                    data_clean["str_prohibition_density"],
-                    data_clean["avg_rental_price"],
-                    alpha=0.6,
-                    s=20,
-                )
-                ax1.set_xlabel("STR Prohibition Density (per km²)")
+                # Cap extreme values at 99th percentile for readability
+                x = data_clean["str_prohibition_density"].to_numpy()
+                y = data_clean["avg_rental_price"].to_numpy()
+                x_cap = np.percentile(x, 99)
+                y_cap = np.percentile(y, 99)
+                x_clipped = np.minimum(x, x_cap)
+                y_clipped = np.minimum(y, y_cap)
+
+                ax1.scatter(x_clipped, y_clipped, alpha=0.6, s=20)
+                ax1.set_xlabel("STR Units Density (per km²)")
                 ax1.set_ylabel("Average Rental Price ($)")
-                ax1.set_title("STR Density vs Rental Prices")
+                title = "STR Units Density vs Rental Price"
+                ax1.set_title(title)
                 ax1.grid(True, alpha=0.3)
+                # Removed clipped annotation per request
 
         # 2. STR Density vs Airbnb Density
         ax2 = fig.add_subplot(gs[0, 1])
@@ -86,16 +92,18 @@ class STRProhibitionVisualizer(Visualizer):
                 ["str_prohibition_density", "airbnb_density"]
             ].dropna()
             if len(data_clean) > 0:
-                ax2.scatter(
-                    data_clean["str_prohibition_density"],
-                    data_clean["airbnb_density"],
-                    alpha=0.6,
-                    s=20,
-                    color="green",
-                )
-                ax2.set_xlabel("STR Prohibition Density (per km²)")
-                ax2.set_ylabel("Airbnb Density (per km²)")
-                ax2.set_title("STR Density vs Airbnb Density")
+                # Cap extreme values at 99th percentile for readability
+                x = data_clean["str_prohibition_density"].to_numpy()
+                y = data_clean["airbnb_density"].to_numpy()
+                x_cap = np.percentile(x, 99)
+                y_cap = np.percentile(y, 99)
+                x_clipped = np.minimum(x, x_cap)
+                y_clipped = np.minimum(y, y_cap)
+
+                ax2.scatter(x_clipped, y_clipped, alpha=0.6, s=20, color="green")
+                ax2.set_xlabel("STR Units Density (per km²)")
+                ax2.set_ylabel("Airbnb Units Density (per km²)")
+                ax2.set_title("STR Units Density vs Airbnb Units Density")
                 ax2.grid(True, alpha=0.3)
 
         # 3. Comprehensive Correlation Matrix
@@ -107,13 +115,13 @@ class STRProhibitionVisualizer(Visualizer):
         # Select available columns for correlation matrix - density metrics only
         if "str_prohibition_density" in str_tract_analysis.columns:
             corr_cols.append("str_prohibition_density")
-            corr_labels.append("STR\nDensity")
+            corr_labels.append("STR Units\nDensity")
         if "avg_rental_price" in str_tract_analysis.columns:
             corr_cols.append("avg_rental_price")
             corr_labels.append("Rental\nPrice")
         if "airbnb_density" in str_tract_analysis.columns:
             corr_cols.append("airbnb_density")
-            corr_labels.append("Airbnb\nDensity")
+            corr_labels.append("Airbnb Units\nDensity")
 
         min_corr_vars = 2  # Minimum variables for correlation matrix
         min_data_points = 10  # Minimum data points for reliable correlations
@@ -187,9 +195,8 @@ class STRProhibitionVisualizer(Visualizer):
 
         if str_correlations:
             stats_lines.append("Key Correlations (Density Metrics):")
-            # Only show density-based correlations
             for name, corr in str_correlations.items():
-                if "Density" in name and "Count" not in name and "Units" not in name:
+                if "Density" in name:
                     stats_lines.append(f"  {name}: {corr:.3f}")
 
         stats_text = "\n".join(stats_lines)

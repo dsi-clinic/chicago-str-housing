@@ -14,7 +14,7 @@ The analysis emphasizes data wrangling, exploratory analysis, spatial correlatio
 
 Key questions include:
 - Do neighborhoods with high STR restrictions differ systematically from those without restrictions in terms of affordability and foreclosure activity?
-- How do Airbnb listings correlate with rental prices and STR prohibition density across census tracts?
+- How do Airbnb listings correlate with rental prices and STR units density across census tracts?
 - Can clustering techniques reveal distinct "neighborhood types" based on housing and socioeconomic conditions?
 - Can predictive modeling estimate the likelihood of a community area experiencing housing pressure—defined as an increased risk of affordability challenges due to overlapping factors such as STR restrictions, foreclosure rates, and limited affordable housing?
 
@@ -218,19 +218,23 @@ The pipeline generates the following visualizations in the `output/` directory:
 - `rental_price_maps.png` - Choropleth maps of rental prices across Chicago
 
 **STR Prohibition Analysis:**
-- `str_distribution_analysis.png` - STR prohibition density and unit distributions
-- `str_density_maps.png` - Spatial maps of STR prohibition patterns
-- `str_correlation_analysis.png` - Correlation analysis between STR prohibitions, rental prices, and Airbnb activity
+- `str_distribution_analysis.png` - STR units density and prohibited units distributions
+- `str_density_maps.png` - Spatial maps: STR units density and STR buildings density (per km²)
+- `str_correlation_analysis.png` - Correlation analysis between STR units density, rental prices, and Airbnb units density
 
 **Airbnb Market Analysis:**
 - `airbnb_distribution_analysis.png` - Airbnb price and density distributions
 - `airbnb_analysis_maps.png` - Spatial maps of Airbnb pricing and density patterns
 
 **Key Findings:**
-- STR prohibition density shows moderate positive correlation with rental prices (r=0.407)
+- STR units density shows moderate positive correlation with rental prices (r=0.409)
 - Prohibited units correlate strongly with rental prices (r=0.447)
-- Airbnb density shows weak correlation with STR prohibition density (r=0.281)
+- Airbnb units density shows weak correlation with STR units density (r=0.226)
 - Lakefront areas show highest concentrations of both STR prohibitions and Airbnb listings
+
+### Methodology notes
+- STR Units Density is computed as total prohibited units per tract divided by tract area (km²).
+- To prevent extreme leverage from very small tracts with large buildings, STR Units Density is winsorized upstream at the 99th percentile before visualization and correlations. The original uncapped series is preserved internally as `str_prohibition_density_raw` for audit and debugging.
 
 ### 5. Explore the Notebook
 

@@ -128,5 +128,6 @@ pipeline.register_component(TractToCommunityProcessor())
 pipeline.register_component(STRProhibitionDataLoader())
 pipeline.register_component(TractBoundariesLoader())
 pipeline.register_component(PointsToTractProcessor("str_prohibition_data", "str_tract_data"))
+# STR units density (units per km²) is computed in the analyzer
 pipeline.register_component(TractToCommunityProcessor())
 ```

@@ -141,7 +141,7 @@ class AirbnbMapVisualizer(Visualizer):
                 bbox={"boxstyle": "round,pad=0.5", "facecolor": "white", "alpha": 0.8},
             )
 
-        # 2. Airbnb Density Choropleth
+        # 2. Airbnb Units Density Choropleth
         if "point_density" in tract_data.columns:
             # Merge tract data with boundaries for plotting
             tract_map_data = tract_boundaries.merge(
@@ -176,7 +176,7 @@ class AirbnbMapVisualizer(Visualizer):
                 linewidth=0.1,
                 missing_kwds={"color": "lightgrey", "label": "No Data"},
                 legend_kwds={
-                    "label": "Airbnb Density (listings per km²)",
+                    "label": "Airbnb Units Density (per km²)",
                     "orientation": "horizontal",
                     "shrink": 0.8,
                     "pad": 0.05,
@@ -184,7 +184,7 @@ class AirbnbMapVisualizer(Visualizer):
             )
 
             axes[1].set_title(
-                f"Airbnb Density Distribution (n={tract_data['point_density'].notna().sum()})",
+                f"Airbnb Units Density Distribution (n={tract_data['point_density'].notna().sum()})",
                 fontsize=16,
             )
             axes[1].axis("off")
@@ -196,9 +196,9 @@ class AirbnbMapVisualizer(Visualizer):
             # Add statistics text
             airbnb_density = tract_data["point_density"].dropna()
             stats_text = (
-                f"Min: {airbnb_density.min():.1f}\n"
-                f"Median: {airbnb_density.median():.1f}\n"
-                f"Max: {airbnb_density.max():.1f}"
+                f"Min: {airbnb_density.min():.1f} units/km²\n"
+                f"Median: {airbnb_density.median():.1f} units/km²\n"
+                f"Max: {airbnb_density.max():.1f} units/km²"
             )
             axes[1].text(
                 0.02,

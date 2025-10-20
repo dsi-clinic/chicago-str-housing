@@ -50,7 +50,7 @@ context.update(result)
 |------|---------|---------|
 | **DataLoader** | Load data from files/APIs | `RentalDataLoader`, `AirbnbDataLoader` |
 | **DataProcessor** | Transform/aggregate data | `ZipToTractProcessor`, `PointsToTractProcessor` |
-| **Analyzer** | Statistical analysis | `RentalCorrelationAnalyzer`, `STRProhibitionAnalyzer` |
+| **Analyzer** | Statistical analysis | `STRProhibitionAnalyzer` |
 | **Visualizer** | Create plots/maps | `RentalMapVisualizer`, `AirbnbDistributionVisualizer` |
 
 ## Available Components
@@ -72,7 +72,7 @@ context.update(result)
 ### Analyzers
 - `RentalCorrelationAnalyzer` - Community-level rental correlations
 - `RentalTractAnalyzer` - Tract-level rental analysis
-- `STRProhibitionAnalyzer` - STR prohibition density analysis
+- `STRProhibitionAnalyzer` - STR units density and correlations (units per km²)
 
 ### Visualizers
 - `RentalMapVisualizer` - Rental price spatial maps
