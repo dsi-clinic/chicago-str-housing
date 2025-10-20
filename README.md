@@ -71,20 +71,6 @@ The pipeline uses three levels of geographic boundaries for spatial analysis:
 **Note**: API responses are automatically cached locally after the first fetch, making subsequent pipeline runs much faster and reducing load on the Chicago Data Portal servers.
 
 
-## Pipeline Overview
-
-This pipeline performs spatial analysis at the **census tract level** for fine-grained neighborhood analysis. Census tracts (~1,300 in Cook County) provide standardized, census-aligned boundaries that are ideal for detecting neighborhood patterns and joining with demographic data.
-
-The pipeline transforms data through a spatial hierarchy:
-1. **ZIP codes** (postal boundaries) → **Census tracts** (statistical boundaries)
-2. **Census tracts** → **Community areas** (Chicago neighborhoods)
-
-This enables both fine-grained tract-level analysis and aggregated community-level insights.
-
-**For detailed technical information**, see:
-- `docs/CENSUS_TRACT_GUIDE.md` - Spatial aggregation methodology
-- `docs/TRACT_TO_COMMUNITY_GUIDE.md` - Tract to community area aggregation
-- `docs/PIPELINE_GUIDE.md` - Pipeline architecture and components
 
 ## Architecture
 
@@ -172,34 +158,21 @@ make devcontainer
 **Best for**: Scripts, testing, and automated workflows
 
 ```bash
-# Install pre-commit hooks
+# Interactive development
 make run-interactive
-# Inside container:
-pre-commit install
-exit
 
-# Test your setup
-make test
-```
-
-### 4. Run the Pipeline Demos
-
-**Housing EDA Pipeline** (Complete spatial analysis):
-```bash
-# Outside the container
+# Run the EDA pipeline
 make run-eda-pipeline
 
-# Inside the container 
-uv run python src/housing/scripts/housing_eda_pipeline.py
+# Clean up Docker artifacts
+make clean
 ```
 
-**Generic Pipeline Demo** (Framework examples):
-```bash
-# Outside the container
-make run-generic-pipeline
+### 4. Run the Pipeline
 
-# Inside the container
-uv run python src/pipeline/scripts/pipeline_usage.py
+```bash
+# Run the housing EDA pipeline
+make run-eda-pipeline
 ```
 
 The housing pipeline generates comprehensive analysis including:
@@ -207,7 +180,6 @@ The housing pipeline generates comprehensive analysis including:
 - **Correlation Analysis**: Statistical relationships between housing market indicators
 - **Distribution Visualizations**: Price and density distributions across geographic areas
 - **Choropleth Maps**: Spatial visualization of housing patterns clipped to Chicago boundaries
-- **Summary Reports**: Key findings and statistical summaries
 
 ### Analysis Outputs
 
@@ -226,38 +198,9 @@ The pipeline generates the following visualizations in the `output/` directory:
 - `airbnb_distribution_analysis.png` - Airbnb price and density distributions
 - `airbnb_analysis_maps.png` - Spatial maps of Airbnb pricing and density patterns
 
-**Key Findings:**
-- STR units density shows moderate positive correlation with rental prices (r=0.409)
-- Prohibited units correlate strongly with rental prices (r=0.447)
-- Airbnb units density shows weak correlation with STR units density (r=0.226)
-- Lakefront areas show highest concentrations of both STR prohibitions and Airbnb listings
 
-### Methodology notes
-- STR Units Density is computed as total prohibited units per tract divided by tract area (km²).
-- To prevent extreme leverage from very small tracts with large buildings, STR Units Density is winsorized upstream at the 99th percentile before visualization and correlations. The original uncapped series is preserved internally as `str_prohibition_density_raw` for audit and debugging.
-
-### 5. Explore the Notebook
-
-Open `notebooks/tract_analysis_demo.ipynb` to see the complete tract-level analysis workflow:
-- Zip code to census tract spatial joins
-- Area-weighted aggregation
-- Crosswalk creation
-- Tract-level statistical analysis
-
-**For detailed instructions on obtaining tract data**, see `docs/CENSUS_TRACT_GUIDE.md`
 
 ## Development
-
-**All code must run inside the Docker container** to ensure consistent environments. Prefix Python commands with `uv run`:
-
-```bash
-# Run analysis pipelines
-uv run python src/housing/scripts/housing_eda_pipeline.py
-uv run python src/pipeline/scripts/pipeline_usage.py
-
-# Run tests
-uv run pytest tests/
-```
 
 ### Creating New Components
 
@@ -280,29 +223,7 @@ See `docs/PIPELINE_GUIDE.md` for configuration details and `config/pipeline_conf
 - Set `DATA_DIR` in your `.env` file to specify where data lives on your host
 - This directory is mounted to `/project/data` inside the container
 - Keep data separate from code to avoid repository bloat and enable easy data sharing
-- The pipeline automatically validates data file existence
-
-**Data Directory Structure**:
-```
-data/
-├── .cache/                                  # Auto-generated API caches
-│   ├── community_boundaries.json           # Community areas (2.1 MB)
-│   ├── zip_boundaries.json                 # ZIP codes (1.5 MB)
-│   └── city_boundaries.json                # Chicago city boundary
-├── tl_2023_17_tract/                       # Census tract shapefiles
-│   ├── tl_2023_17_tract.shp               # Main shapefile
-│   ├── tl_2023_17_tract.shx               # Shape index
-│   ├── tl_2023_17_tract.dbf               # Attributes
-│   ├── tl_2023_17_tract.prj               # Projection
-│   └── tl_2023_17_tract.cpg               # Character encoding
-├── Zip_zori_uc_sfrcondomfr_sm_month.csv   # Rental price data
-└── listings.csv                            # Airbnb listings data
-```
-
-**Cache Management**:
-- API responses are automatically cached after first fetch
-- To refresh cached data: `rm -rf data/.cache/`
-- Cache files are gitignored (inside `data/`) 
+- The pipeline automatically validates data file existence 
 
 
 ### Make Commands
@@ -335,3 +256,4 @@ ruff format
 - **docs/PIPELINE_GUIDE.md** - Pipeline architecture and available components
 - **docs/SPATIAL_AGGREGATION_GUIDE.md** - Spatial data aggregation (points→tracts→communities)
 - **docs/STUDENT_GUIDE.md** - Quick start guide for creating new components
+- **docs/METHODOLOGY.md** - Analysis methodology and statistical notes
