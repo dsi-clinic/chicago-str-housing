@@ -8,15 +8,10 @@ import logging
 from pathlib import Path
 from typing import Any
 
-import matplotlib.pyplot as plt
-
+from housing.components.utils import setup_figure_and_save
 from pipeline.base import Visualizer
 
 logger = logging.getLogger(__name__)
-
-# Minimum land area in square meters to exclude water-only tracts
-# 10,000 sq meters = ~2.5 acres
-MIN_LAND_AREA_SQ_METERS = 10000
 
 
 class RentalMapVisualizer(Visualizer):
@@ -52,94 +47,41 @@ class RentalMapVisualizer(Visualizer):
             logger.warning("No rental data available for mapping")
             return {}
 
-        # Create figure with subplots
+        # Create figure with 2 subplots for tract and community level maps
+        import matplotlib.pyplot as plt
+
         fig, axes = plt.subplots(1, 2, figsize=(20, 10))
         fig.suptitle(
-            "Chicago Average Rental Prices by Geography",
-            fontsize=20,
-            fontweight="bold",
-            y=0.98,  # Move title higher
+            "Chicago Average Rental Prices", fontsize=20, fontweight="bold", y=0.98
         )
 
-        # Get common bounds from community boundaries for consistent zoom
-        common_bounds = None
-        if community_boundaries is not None:
-            common_bounds = (
-                community_boundaries.total_bounds
-            )  # [minx, miny, maxx, maxy]
+        # Get common bounds for consistent zoom
+        if city_boundaries is not None:
+            common_bounds = city_boundaries.total_bounds
+        else:
+            common_bounds = None
 
         # 1. Census Tract Level Map
         if tract_data is not None and tract_boundaries is not None:
-            # Merge tract data with boundaries for plotting
-            tract_map_data = tract_boundaries.merge(
-                tract_data[["tract_geoid", "avg_rental_price"]],
-                on="tract_geoid",
-                how="left",
+            from housing.components.utils import create_choropleth_map, prepare_map_data
+
+            map_data = prepare_map_data(
+                tract_data,
+                tract_boundaries,
+                ["avg_rental_price"],
+                city_boundaries,
+                logger=logger,
             )
-
-            # Filter out Lake Michigan and other water-only tracts
-            # ALAND = land area in square meters; water tracts have ALAND = 0 or very small
-            if "ALAND" in tract_map_data.columns:
-                # Only keep tracts with significant land area
-                tract_map_data = tract_map_data[
-                    tract_map_data["ALAND"] > MIN_LAND_AREA_SQ_METERS
-                ].copy()
-                logger.info("Filtered to %d tracts with land area", len(tract_map_data))
-
-            # Clip to city boundaries if available
-            if city_boundaries is not None:
-                import geopandas as gpd
-
-                # Ensure same CRS
-                if tract_map_data.crs != city_boundaries.crs:
-                    city_boundaries = city_boundaries.to_crs(tract_map_data.crs)
-                # Clip tracts to city boundary
-                tract_map_data = gpd.clip(tract_map_data, city_boundaries)
-                logger.info("Clipped tract data to Chicago city boundaries")
-
-            # Create choropleth
-            tract_map_data.plot(
-                column="avg_rental_price",
-                ax=axes[0],
-                legend=True,
-                cmap="RdYlGn_r",  # Red (expensive) to Green (affordable)
-                edgecolor="black",
-                linewidth=0.1,
-                missing_kwds={"color": "lightgrey", "label": "No Data"},
-                legend_kwds={
-                    "label": "Average Rental Price ($)",
-                    "orientation": "horizontal",
-                    "shrink": 0.8,
-                    "pad": 0.05,
-                },
-            )
-
-            axes[0].set_title(
-                f"Census Tract Level (n={tract_data['avg_rental_price'].notna().sum()})",
-                fontsize=16,
-            )
-            axes[0].axis("off")
-
-            # Set common bounds if available
-            if common_bounds is not None:
-                axes[0].set_xlim(common_bounds[0], common_bounds[2])
-                axes[0].set_ylim(common_bounds[1], common_bounds[3])
-
-            # Add statistics text
-            tract_prices = tract_data["avg_rental_price"].dropna()
-            stats_text = (
-                f"Min: ${tract_prices.min():.0f}\n"
-                f"Median: ${tract_prices.median():.0f}\n"
-                f"Max: ${tract_prices.max():.0f}"
-            )
-            axes[0].text(
-                0.02,
-                0.98,
-                stats_text,
-                transform=axes[0].transAxes,
-                fontsize=12,
-                verticalalignment="top",
-                bbox={"boxstyle": "round,pad=0.5", "facecolor": "white", "alpha": 0.8},
+            create_choropleth_map(
+                axes[0],
+                map_data,
+                "avg_rental_price",
+                "Census Tract Level",
+                "Average Rental Price ($)",
+                cmap="RdYlGn_r",
+                bounds=common_bounds,
+                stats_format="${:.0f}",
+                logger=logger,
             )
 
         # 2. Community Area Level Map
@@ -207,15 +149,13 @@ class RentalMapVisualizer(Visualizer):
                 bbox={"boxstyle": "round,pad=0.5", "facecolor": "white", "alpha": 0.8},
             )
 
-        plt.tight_layout()
-        plt.subplots_adjust(top=0.85)  # Increase space for title
-
         # Save the plot
         output_path = Path(self.output_dir) / "rental_price_maps.png"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(output_path, dpi=300, bbox_inches="tight")
-        logger.info("Saved map visualization to: %s", output_path)
-
-        plt.close()
+        setup_figure_and_save(
+            fig,
+            output_path,
+            title="Chicago Average Rental Prices by Census Tract and Community Area",
+            logger=logger,
+        )
 
         return {"rental_map_plot": str(output_path)}
