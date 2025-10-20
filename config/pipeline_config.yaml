@@ -6,7 +6,10 @@ data:
   rental_data_path: /project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv
   tract_boundaries_path: /project/data/tl_2023_17_tract/tl_2023_17_tract.shp
   zip_boundaries_path: https://data.cityofchicago.org/resource/unjd-c2ca.json
-description: Analyze rental prices and house share prohibitions in Chicago
+  city_boundaries_path: https://data.cityofchicago.org/resource/igwz-8jzy.json
+  str_prohibition_data_path: https://data.cityofchicago.org/resource/7bzs-jsyj.json
+  airbnb_data_path: /project/data/listings.csv
+description: Analyze house share prohibitions in Chicago
 execution_order: []
 metadata: {}
 name: Chicago Housing Analysis
