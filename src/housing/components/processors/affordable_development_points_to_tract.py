@@ -30,7 +30,7 @@ class AirbnbToTractProcessor(PointsToTractProcessor):
             output_key=output_key,
             id_column=id_column,
             aggregate_columns={
-                unit_column: ["sum", "mean"],
+                unit_column: ["sum"],
             },
             calculate_density=True,
         )
