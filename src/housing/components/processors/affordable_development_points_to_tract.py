@@ -1,36 +1,32 @@
 """Class that aggregates tract-level data for the affordable housing dataset through a spatial join"""
 
 import logging
+from typing import Any
 
-from housing import PointsToTractProcessor
+from pipeline.base import DataProcessor
 
 logger = logging.getLogger(__name__)
 
 
-class AffordableToTractProcessor(PointsToTractProcessor):
-    """Convenience class for affordable developments → tracts aggregation."""
-
-    def __init__(
-        self,
-        input_key: str = "affordable_developments_data",
-        output_key: str = "affordable_developments_tract_data",
-        id_column: str = "property_name",
-        unit_column: str = "units",
-    ) -> None:
-        """Initialize affordable development to tract processor.
-
-        Args:
-            input_key: Context key for Airbnb point data
-            output_key: Context key for output tract data
-            id_column: Column with property IDs or names
-            unit_column: Column with property affordable unit count
-        """
+class AffordableTractDensityProcessor(DataProcessor):
+    """Adds Unit Density Column to Affordable Developments Tract-Level Data"""
+    def __init__(self) -> None:
+        """Initialize the affordable developments unit density processor."""
         super().__init__(
-            input_key=input_key,
-            output_key=output_key,
-            id_column=id_column,
-            aggregate_columns={
-                unit_column: ["sum"],
-            },
-            calculate_density=True,
+            "affordable_development_tract_data", "Adds unit density column to affordable tract data"
         )
+
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Add unit density column to affordable tract data."""
+
+        tract_data = context["affordable_developments_tract_data"]
+
+        tract_data["unit_density"] = (tract_data["units_sum"] / tract_data["area_km2"])
+        
+        logger.info(
+                    "Density range: %.2f - %.2f units/km²",
+                    tract_data["unit_density"].min(),
+                    tract_data["unit_density"].max(),
+                )
+        
+        return {"affordable_development_tract_data": tract_data}

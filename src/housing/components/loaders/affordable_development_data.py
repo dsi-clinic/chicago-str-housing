@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 import pandas as pd
+import geopandas as gpd
 
 from pipeline.base import DataLoader
 
@@ -40,14 +41,31 @@ class AffordableDataLoader(DataLoader):
 
         logger.info("Cleaning affordable development data")
 
-        affordable_df["Property Type"] = affordable_df["Property Type"].map(
+        def convert_to_snake_case(column_name: str) -> str:
+            """Helper function to convert column names to snake case"""
+            column_name = column_name.lower()
+            column_name = column_name.split(" ")
+            return "_".join(column_name)
+        
+        affordable_df = affordable_df.rename(columns=convert_to_snake_case)
+
+        affordable_df["property_type"] = affordable_df["property_type"].map(
             {"Multfamily": "Multifamily", "Mutifamily": "Multifamily"}
         )
 
         logger.info(
             "Loaded %d affordable housing developments with %d with coordinates",
             len(affordable_df),
-            sum(affordable_df["Units"]),
+            sum(affordable_df["units"]),
         )
 
-        return {"affordable_developments_data": affordable_df}
+        logger.info("Converting to geoDataFrame ...")
+
+        tract_boundaries = context["tract_boundaries"]
+
+        geo_affordable_df = gpd.GeoDataFrame(affordable_df,
+                                             geometry=gpd.points_from_xy(affordable_df["longitude"],
+                                                                         affordable_df["latitude"]),
+                                             crs=tract_boundaries.crs)
+
+        return {"affordable_developments_data": geo_affordable_df}
