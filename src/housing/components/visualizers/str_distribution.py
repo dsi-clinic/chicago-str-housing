@@ -38,7 +38,7 @@ class STRDistributionVisualizer(Visualizer):
         """Create STR distribution visualizations."""
         logger.info("Creating STR distribution visualizations...")
 
-        tract_data = context.get("str_tract_data")
+        tract_data = context.get("str_tract_analysis")
 
         if tract_data is None:
             logger.warning("No STR tract data available for visualization")
@@ -54,8 +54,8 @@ class STRDistributionVisualizer(Visualizer):
         )
 
         # 1. STR prohibition density distribution
-        if "point_density" in tract_data.columns:
-            tract_density = tract_data["point_density"].dropna()
+        if "str_prohibition_density" in tract_data.columns:
+            tract_density = tract_data["str_prohibition_density"].dropna()
             axes[0, 0].hist(
                 tract_density,
                 bins=30,
@@ -68,20 +68,21 @@ class STRDistributionVisualizer(Visualizer):
                 color="red",
                 linestyle="--",
                 linewidth=2,
-                label=f"Median: {tract_density.median():.1f} prohibitions/km²",
+                label=f"Median: {tract_density.median():.1f} units/km²",
             )
-            axes[0, 0].set_xlabel("STR Prohibition Density (per km²)", fontsize=12)
+            axes[0, 0].set_xlabel("STR Units Density (per km²)", fontsize=12)
             axes[0, 0].set_ylabel("Number of Census Tracts", fontsize=12)
             axes[0, 0].set_title(
-                f"STR Prohibition Density Distribution (n={len(tract_density)})",
+                f"STR Units Density Distribution (n={len(tract_density)})",
                 fontsize=14,
             )
             axes[0, 0].grid(True, alpha=0.3)
             axes[0, 0].legend()
 
         # 2. Prohibited units distribution
-        if "number_of_units_sum" in tract_data.columns:
-            tract_units = tract_data["number_of_units_sum"].dropna()
+        # Use analyzer-provided total_units_prohibited for consistency
+        if "total_units_prohibited" in tract_data.columns:
+            tract_units = tract_data["total_units_prohibited"].dropna()
             axes[0, 1].hist(
                 tract_units,
                 bins=30,
@@ -106,22 +107,22 @@ class STRDistributionVisualizer(Visualizer):
 
         # 3. Density vs Units scatter plot
         if (
-            "point_density" in tract_data.columns
-            and "number_of_units_sum" in tract_data.columns
+            "str_prohibition_density" in tract_data.columns
+            and "total_units_prohibited" in tract_data.columns
         ):
             density_units_data = tract_data[
-                ["point_density", "number_of_units_sum"]
+                ["str_prohibition_density", "total_units_prohibited"]
             ].dropna()
 
             if len(density_units_data) > 0:
                 axes[1, 0].scatter(
-                    density_units_data["point_density"],
-                    density_units_data["number_of_units_sum"],
+                    density_units_data["str_prohibition_density"],
+                    density_units_data["total_units_prohibited"],
                     alpha=0.6,
                     color="darkorange",
                     s=20,
                 )
-                axes[1, 0].set_xlabel("STR Prohibition Density (per km²)", fontsize=12)
+                axes[1, 0].set_xlabel("STR Units Density (per km²)", fontsize=12)
                 axes[1, 0].set_ylabel("Total Prohibited Units", fontsize=12)
                 axes[1, 0].set_title("Density vs Units Relationship", fontsize=14)
                 axes[1, 0].grid(True, alpha=0.3)
@@ -131,8 +132,8 @@ class STRDistributionVisualizer(Visualizer):
         stats_lines = ["STR Prohibition Analysis Statistics\n" + "=" * 50 + "\n"]
 
         if tract_data is not None:
-            if "point_density" in tract_data.columns:
-                tract_density = tract_data["point_density"].dropna()
+            if "str_prohibition_density" in tract_data.columns:
+                tract_density = tract_data["str_prohibition_density"].dropna()
                 stats_lines.append("STR PROHIBITION DENSITY:")
                 stats_lines.append(f"  Count: {len(tract_density)}")
                 stats_lines.append(
@@ -146,8 +147,8 @@ class STRDistributionVisualizer(Visualizer):
                 stats_lines.append(f"  Max: {tract_density.max():.2f}")
                 stats_lines.append("")
 
-            if "number_of_units_sum" in tract_data.columns:
-                tract_units = tract_data["number_of_units_sum"].dropna()
+            if "total_units_prohibited" in tract_data.columns:
+                tract_units = tract_data["total_units_prohibited"].dropna()
                 stats_lines.append("PROHIBITED UNITS:")
                 stats_lines.append(f"  Count: {len(tract_units)}")
                 stats_lines.append(f"  Mean: {tract_units.mean():.0f} units")

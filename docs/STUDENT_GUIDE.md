@@ -32,7 +32,7 @@ This generates:
 
 ### Analyzers
 - `RentalTractAnalyzer` - Tract-level analysis
-- `STRProhibitionAnalyzer` - STR prohibition density analysis
+- `STRProhibitionAnalyzer` - STR units density analysis (units per km²)
 
 ### Visualizers
 - `RentalMapVisualizer`, `RentalDistributionVisualizer` - Rental analysis

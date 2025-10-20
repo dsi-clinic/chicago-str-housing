@@ -26,6 +26,8 @@ class STRProhibitionAnalyzer(Analyzer):
         filter_outliers: bool = True,
         max_units_per_building: int = 500,
         max_units_per_tract: int = 5000,
+        winsorize_density: bool = True,
+        winsor_quantile: float = 0.99,
     ) -> None:
         """Initialize the STR prohibition analyzer.
 
@@ -33,6 +35,8 @@ class STRProhibitionAnalyzer(Analyzer):
             filter_outliers: Whether to filter out outlier buildings/tracts
             max_units_per_building: Maximum units per building (default: 500)
             max_units_per_tract: Maximum units per tract (default: 5000)
+            winsorize_density: If True, cap STR units density at the given quantile upstream
+            winsor_quantile: Quantile for winsorization cap (e.g., 0.99 for 99th percentile)
         """
         super().__init__(
             "str_prohibition_analysis",
@@ -41,6 +45,8 @@ class STRProhibitionAnalyzer(Analyzer):
         self.filter_outliers = filter_outliers
         self.max_units_per_building = max_units_per_building
         self.max_units_per_tract = max_units_per_tract
+        self.winsorize_density = winsorize_density
+        self.winsor_quantile = winsor_quantile
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Perform STR prohibition density analysis."""
@@ -124,6 +130,16 @@ class STRProhibitionAnalyzer(Analyzer):
                 }
             )
 
+        # Upstream winsorization so all downstream visuals use capped density
+        if self.winsorize_density and "str_prohibition_density" in analysis_df.columns:
+            analysis_df["str_prohibition_density_raw"] = analysis_df[
+                "str_prohibition_density"
+            ]
+            cap = analysis_df["str_prohibition_density"].quantile(self.winsor_quantile)
+            analysis_df["str_prohibition_density"] = analysis_df[
+                "str_prohibition_density"
+            ].clip(upper=cap)
+
         # Calculate correlations
         correlations = self._calculate_correlations(analysis_df)
 
@@ -204,9 +220,16 @@ class STRProhibitionAnalyzer(Analyzer):
                 on="tract_geoid",
                 how="left",
             )
-            tract_agg["str_prohibition_density"] = (
-                tract_agg["str_prohibition_count"] / tract_agg["area_km2"]
-            )
+            # Calculate STR prohibition density as units per km² (not buildings per km²)
+            if "total_units_prohibited" in tract_agg.columns:
+                tract_agg["str_prohibition_density"] = (
+                    tract_agg["total_units_prohibited"] / tract_agg["area_km2"]
+                )
+            else:
+                # Fallback to building density if units not available
+                tract_agg["str_prohibition_density"] = (
+                    tract_agg["str_prohibition_count"] / tract_agg["area_km2"]
+                )
 
         return tract_agg
 
@@ -220,7 +243,7 @@ class STRProhibitionAnalyzer(Analyzer):
             (
                 "str_prohibition_density",
                 "avg_rental_price",
-                "STR Density vs Rental Price",
+                "STR Units Density vs Rental Price",
             ),
             (
                 "total_units_prohibited",
@@ -229,18 +252,8 @@ class STRProhibitionAnalyzer(Analyzer):
             ),
             (
                 "str_prohibition_density",
-                "airbnb_count",
-                "STR Density vs Airbnb Count",
-            ),
-            (
-                "str_prohibition_density",
                 "airbnb_density",
-                "STR Density vs Airbnb Density",
-            ),
-            (
-                "total_units_prohibited",
-                "airbnb_count",
-                "Prohibited Units vs Airbnb Count",
+                "STR Units Density vs Airbnb Units Density",
             ),
         ]
 
