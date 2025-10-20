@@ -9,7 +9,11 @@ This package contains all housing-specific components organized by type:
 - constants: Shared constants
 """
 
-from housing.components.analyzers import CorrelationAnalyzer, TractAnalyzer
+from housing.components.analyzers import (
+    ACSTractAnalyzer,
+    CorrelationAnalyzer,
+    TractAnalyzer,
+)
 from housing.components.loaders import (
     ACSLoader,
     CommunityBoundariesLoader,
@@ -26,6 +30,9 @@ from housing.components.processors import (
 )
 from housing.components.utils import summary_reporter
 from housing.components.visualizers import (
+    ACSCorrelationVisualizer,
+    ACSIncomeVisualizer,
+    ACSMapVisualizer,
     CorrelationVisualizer,
     RentalDistributionVisualizer,
     RentalMapVisualizer,
@@ -45,9 +52,13 @@ __all__ = [
     "PointsToTractProcessor",
     "AirbnbToTractProcessor",
     # Analyzers
+    "ACSTractAnalyzer", 
     "CorrelationAnalyzer",
     "TractAnalyzer",
     # Visualizers
+    "ACSMapVisualizer",
+    "ACSIncomeVisualizer", 
+    "ACSCorrelationVisualizer", 
     "CorrelationVisualizer",
     "RentalDistributionVisualizer",
     "RentalMapVisualizer",

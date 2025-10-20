@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 # 10,000 sq meters = ~2.5 acres
 MIN_LAND_AREA_SQ_METERS = 10000
 
-
 class RentalMapVisualizer(Visualizer):
     """Create choropleth maps for rental prices.
 

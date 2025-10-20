@@ -26,7 +26,7 @@ class ACSToTractProcessor(DataProcessor):
     def __init__(
         self,
         input_key: str = "acs_data",
-        output_key: str = "acs_tract_aggregated_data",
+        output_key: str = "acs_tract_data",
         id_column: str | None = None,
         aggregate_columns: dict[str, str | list[str]] | None = None,
         calculate_density: bool = True,
@@ -42,8 +42,8 @@ class ACSToTractProcessor(DataProcessor):
         self.calculate_density = calculate_density
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Perform spatial join and aggregation."""
-        logger.info("Aggregating %s with tract boundaries...", self.input_key)
+        """Perform traditional join and aggregation."""
+        logger.info("Merging %s with tract boundaries...", self.input_key)
         logger.info("Performing attributed join: acs data -> acs data with boundaries")
 
         # Get the data from context
@@ -60,9 +60,6 @@ class ACSToTractProcessor(DataProcessor):
             acs_data, on="GEOID", how="inner"
         )
 
-        logger.info("\n%s", acs_with_tract.head())
-        logger.info("Column Names: %s", acs_with_tract.columns.to_list())
-        logger.info("Column Names: %s", len(acs_with_tract.loc[:, "GEOID"].unique()))
         logger.info("Load %d census tract with ACS data", len(acs_with_tract))
 
         # Step 2: Calculate density if requested
@@ -88,7 +85,6 @@ class ACSToTractProcessor(DataProcessor):
             # Copy calculated area_km2 back to original CRS
             acs_with_tract["area_km2"] = tract_projected["area_km2"].to_numpy()
 
-            logger.info("\n%s", acs_with_tract.head())
             logger.info("Column Names: %s", acs_with_tract.columns.to_list())
         # Step 3: Convert to GeoDataFrame
         logger.info("Step 2: Calculating point density per km²...")

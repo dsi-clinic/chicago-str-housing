@@ -3,25 +3,20 @@
 Loading Population and socioeconomic indicators using API
 """
 
-import json
+import csv
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
-import geopandas as gpd
+import numpy as np
 import pandas as pd
-from shapely import wkt
+import requests
+from dotenv import load_dotenv
 
 from pipeline.base import DataLoader
 
 logger = logging.getLogger(__name__)
-
-import csv
-import os
-
-import pandas as pd
-import requests
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -60,18 +55,6 @@ FULL_URL = (
     f"{BASE_URL}?get={indicators}&for=tract:*&in=state:17+county:031&key={API_KEY}"
 )
 
-# response = httpx.get(FULL_URL)
-# response.raise_for_status()
-
-# acs_data = response.json()
-
-# acs_df = pd.DataFrame(acs_data[1:], columns=acs_data[0])
-
-# print(len(acs_df))
-# print(acs_df.head())
-
-# acs_df.to_csv("/project/data/ACS5_data.csv", index=False)
-
 
 class ACSLoader(DataLoader):
     """Load ACS Data data from API.
@@ -102,7 +85,7 @@ class ACSLoader(DataLoader):
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Load ACS Data."""
         # not showing whole cache due to API Keys
-        logger.info("Loading ACS Data from: %s...", self._original_source[:50]) 
+        logger.info("Loading ACS Data from: %s...", self._original_source[:50])
 
         # Check if loading from URL or file
         if self._original_source.startswith(
@@ -155,12 +138,18 @@ class ACSLoader(DataLoader):
             }
         )
 
+        # Clean DataFrame
+        acs_data["median_house_income"] = acs_data["median_house_income"].replace(
+            -666666666, np.nan
+        )
+
         # Create GEOID for Spatial Join
         acs_data["GEOID"] = (
             acs_data["state"].astype(str)
             + acs_data["county"].astype(str).str.zfill(3)
             + acs_data["tract"].astype(str).str.zfill(6)
         )
-        logger.info("\n%s", acs_data.head())
+
         logger.info("Load %d ACS data", len(acs_data))
+        logger.info("=" * 45)
         return {"acs_data": acs_data}
