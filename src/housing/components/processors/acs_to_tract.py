@@ -31,6 +31,16 @@ class ACSToTractProcessor(DataProcessor):
         aggregate_columns: dict[str, str | list[str]] | None = None,
         calculate_density: bool = True,
     ) -> None:
+        """Initialize the cs to tract processor.
+
+        Args:
+            input_key: Context key for input point data (GeoDataFrame)
+            output_key: Context key for output tract data
+            id_column: Column to count (if None, counts all rows)
+            aggregate_columns: Dict of {column: aggregation} for additional stats
+                              e.g., {"price": "mean"} or {"price": ["mean", "median"]}
+            calculate_density: Whether to calculate points per km²
+        """
         super().__init__(
             "acs_to_tract",
             "merge acs data with tract boundaries",
