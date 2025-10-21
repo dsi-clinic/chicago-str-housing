@@ -25,20 +25,6 @@ from pipeline.config import PipelineConfig
 
 logger = logging.getLogger(__name__)
 
-affordable_points_to_tract = PointsToTractProcessor(
-    input_key="affordable_developments_data",
-    output_key="affordable_developments_tract_data",
-    id_column="property_name",
-    aggregate_columns={"units": ["sum"]},
-)
-
-affordable_points_to_tract = PointsToTractProcessor(
-    input_key="affordable_developments_data",
-    output_key="affordable_developments_tract_data",
-    id_column="property_name",
-    aggregate_columns={"units": ["sum"]},
-)
-
 
 def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     """Affordable Housing EDA analysis."""
@@ -55,7 +41,6 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(AffordableDataLoader())
 
     # Step 2: Tract-level data aggregation
-    pipeline.register_component(affordable_points_to_tract)
     pipeline.register_component(AffordableToTractProcessor())
 
     # Step 3: Community aggregation (ability to add later if useful)
