@@ -59,7 +59,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(CityBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(AirbnbDataLoader())
-    pipeline.register_component(ACSLoader()) # ACS Data
+    pipeline.register_component(ACSLoader())  # ACS Data
 
     # Step 2: Zip → Tract aggregation
     pipeline.register_component(ZipToTractProcessor())
