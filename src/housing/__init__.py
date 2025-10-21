@@ -16,6 +16,7 @@ from housing.components import (
     CorrelationAnalyzer,
     CorrelationVisualizer,
     ForeclosedDataLoader,
+    ForeclosedMapVisualizer,
     PointsToTractProcessor,
     RentalDataLoader,
     RentalDistributionVisualizer,
@@ -44,4 +45,5 @@ __all__ = [
     "RentalMapVisualizer",
     "ForeclosedDataLoader",
     "summary_reporter",
+    "ForeclosedMapVisualizer",
 ]

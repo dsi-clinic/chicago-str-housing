@@ -5,9 +5,11 @@ from housing.components.visualizers.rental_distribution import (
     RentalDistributionVisualizer,
 )
 from housing.components.visualizers.rental_map import RentalMapVisualizer
+from housing.components.visualizers.foreclosed_map import ForeclosedMapVisualizer
 
 __all__ = [
     "CorrelationVisualizer",
     "RentalDistributionVisualizer",
     "RentalMapVisualizer",
+    "ForeclosedMapVisualizer",
 ]

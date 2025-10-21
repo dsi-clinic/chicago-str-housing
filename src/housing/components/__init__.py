@@ -28,6 +28,7 @@ from housing.components.visualizers import (
     CorrelationVisualizer,
     RentalDistributionVisualizer,
     RentalMapVisualizer,
+    ForeclosedMapVisualizer,
 )
 
 __all__ = [
@@ -49,6 +50,7 @@ __all__ = [
     "CorrelationVisualizer",
     "RentalDistributionVisualizer",
     "RentalMapVisualizer",
+    "ForeclosedMapVisualizer",
     # Utils
     "summary_reporter",
 ]

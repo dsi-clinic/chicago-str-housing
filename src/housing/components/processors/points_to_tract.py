@@ -110,6 +110,8 @@ class PointsToTractProcessor(DataProcessor):
         # Perform aggregation
         tract_agg = points_with_tract.groupby("tract_geoid").agg(agg_dict).reset_index()
 
+        print(tract_agg)
+
         # Flatten MultiIndex columns if they exist
         if isinstance(tract_agg.columns, pd.MultiIndex):
             tract_agg.columns = [

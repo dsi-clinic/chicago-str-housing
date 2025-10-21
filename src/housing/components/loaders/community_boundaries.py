@@ -113,7 +113,5 @@ class CommunityBoundariesLoader(DataLoader):
                 gdf["community_area"].min(),
                 gdf["community_area"].max(),
             )
-        
-        print(gdf.head())
 
         return {"community_boundaries": gdf}

@@ -33,7 +33,7 @@ class ForeclosedDataLoader(DataLoader):
             "Load foreclosed rental property data from Chicago data portal",
         )
 
-    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+    def execute(self, context: dict[str, Any], reduce_cols=True) -> dict[str, Any]:
         """Load and clean foreclosed rental property data."""
         logger.info("Loading foreclosed data from: %s", self.file_path)
 
@@ -44,7 +44,10 @@ class ForeclosedDataLoader(DataLoader):
         foreclosed_df["LOCATION"] = foreclosed_df["LOCATION"].apply(wkt.loads)
         foreclosed_gdf = gpd.GeoDataFrame(foreclosed_df, geometry="LOCATION", crs=GEOGRAPHIC_CRS)
 
-        print(foreclosed_gdf.head())
+        # Keep only the necessary columns
+        if reduce_cols:
+            cols = ["ID", "PROPERTY ADDRESS", "SUBMISSION DATE", "OWNER NAME", "OWNER DATE", "OWNER CITY", "LOCATION"]
+            foreclosed_gdf = foreclosed_gdf[cols]
 
         return {"foreclosed_data": foreclosed_gdf}
 
