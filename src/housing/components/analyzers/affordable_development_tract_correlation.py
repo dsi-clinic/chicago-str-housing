@@ -1,6 +1,8 @@
-"""Community-level correlation analyzer.
+"""Tract-density correlation analyzer.
 
-This module performs statistical correlation analysis on community-level rental data.
+This module performs statistical correlation analysis on tract-level data for 
+
+affordable developments, STR restrictions, and Airbnb listings.
 """
 
 import logging
