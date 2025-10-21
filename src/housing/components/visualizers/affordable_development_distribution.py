@@ -39,7 +39,7 @@ class AffordableDistributionVisualizer(Visualizer):
         logger.info("Creating rental distribution visualizations...")
 
         tract_data = context.get("affordable_developments_tract_data")
-        #community_data = context.get("affordable_developments_community_data")
+        # community_data = context.get("affordable_developments_community_data")
 
         if tract_data is None:
             logger.warning("No tract level data available for visualization")
@@ -73,7 +73,8 @@ class AffordableDistributionVisualizer(Visualizer):
             axes[0, 0].set_xlabel("Tract Unit Density (Units/km2)", fontsize=12)
             axes[0, 0].set_ylabel("Number of Census Tracts", fontsize=12)
             axes[0, 0].set_title(
-                f"Unit Density by Census Tract (n={len(tract_unit_density)})", fontsize=14
+                f"Unit Density by Census Tract (n={len(tract_unit_density)})",
+                fontsize=14,
             )
             axes[0, 0].grid(True, alpha=0.3)
             axes[0, 0].legend()
@@ -105,8 +106,7 @@ class AffordableDistributionVisualizer(Visualizer):
 
         # 3. Box plots for comparison
         if tract_data is not None:
-
-            ax = axes[1,0]
+            ax = axes[1, 0]
             # First boxplot (left y-axis)
             bp1 = ax.boxplot(
                 [tract_unit_density],
@@ -115,7 +115,7 @@ class AffordableDistributionVisualizer(Visualizer):
                 patch_artist=True,
                 showmeans=True,
                 meanline=True,
-                labels=["Unit Density"]
+                labels=["Unit Density"],
             )
             ax.set_ylabel("Unit Density")
 
@@ -128,14 +128,16 @@ class AffordableDistributionVisualizer(Visualizer):
                 patch_artist=True,
                 showmeans=True,
                 meanline=True,
-                labels=["Number of Units"]
+                labels=["Number of Units"],
             )
             ax2.set_ylabel("Number of Units")
             # Color the boxes
             bp1["boxes"][0].set_facecolor("steelblue")
             bp2["boxes"][0].set_facecolor("forestgreen")
 
-            axes[1, 0].set_title("Units & Unit Density Distribution Comparison", fontsize=14)
+            axes[1, 0].set_title(
+                "Units & Unit Density Distribution Comparison", fontsize=14
+            )
             axes[1, 0].grid(True, alpha=0.3, axis="y")
 
         # 4. Statistical summary
@@ -180,7 +182,9 @@ class AffordableDistributionVisualizer(Visualizer):
         plt.tight_layout()
 
         # Save the plot
-        output_path = Path(self.output_dir) / "affordable_development_distribution_analysis.png"
+        output_path = (
+            Path(self.output_dir) / "affordable_development_distribution_analysis.png"
+        )
         output_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
         logger.info("Saved visualization to: %s", output_path)

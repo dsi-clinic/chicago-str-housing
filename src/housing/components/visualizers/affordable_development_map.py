@@ -114,7 +114,7 @@ class AffordableMapVisualizer(Visualizer):
                 bbox={"boxstyle": "round,pad=0.5", "facecolor": "white", "alpha": 0.8},
             )
 
-        # 2. Unit Density Level Map
+            # 2. Unit Density Level Map
 
             # Create choropleth
             tract_map_data.plot(
@@ -134,7 +134,7 @@ class AffordableMapVisualizer(Visualizer):
             )
 
             axes[1].set_title(
-                f"Unit Density (n={tract_data["unit_density"].notna().sum()})",
+                f"Unit Density (n={tract_data['unit_density'].notna().sum()})",
                 fontsize=16,
             )
             axes[1].axis("off")

@@ -3,8 +3,8 @@
 import logging
 from typing import Any
 
-import pandas as pd
 import geopandas as gpd
+import pandas as pd
 
 from pipeline.base import DataLoader
 
@@ -46,7 +46,7 @@ class AffordableDataLoader(DataLoader):
             column_name = column_name.lower()
             column_name = column_name.split(" ")
             return "_".join(column_name)
-        
+
         affordable_df = affordable_df.rename(columns=convert_to_snake_case)
 
         affordable_df["property_type"] = affordable_df["property_type"].map(
@@ -63,9 +63,12 @@ class AffordableDataLoader(DataLoader):
 
         tract_boundaries = context["tract_boundaries"]
 
-        geo_affordable_df = gpd.GeoDataFrame(affordable_df,
-                                             geometry=gpd.points_from_xy(affordable_df["longitude"],
-                                                                         affordable_df["latitude"]),
-                                             crs=tract_boundaries.crs)
+        geo_affordable_df = gpd.GeoDataFrame(
+            affordable_df,
+            geometry=gpd.points_from_xy(
+                affordable_df["longitude"], affordable_df["latitude"]
+            ),
+            crs=tract_boundaries.crs,
+        )
 
         return {"affordable_developments_data": geo_affordable_df}

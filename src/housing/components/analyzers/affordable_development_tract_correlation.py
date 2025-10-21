@@ -18,14 +18,15 @@ logger = logging.getLogger(__name__)
 
 class AffordableCorrelationAnalyzer(Analyzer):
     """Analyze correlations between the tract-level data for affordable developments,
-    
+
     STR restrictions, and Airbnb listings
     """
 
     def __init__(self) -> None:
         """Initialize the correlation analyzer."""
         super().__init__(
-            "correlation_analysis", "Analyze correlations between affordable development and other tract-level data"
+            "correlation_analysis",
+            "Analyze correlations between affordable development and other tract-level data",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
@@ -33,13 +34,24 @@ class AffordableCorrelationAnalyzer(Analyzer):
         logger.info("Collecting and merging tract-level data sets...")
 
         data = context["airbnb_tract_data"].rename(
-            {"point_count": "airbnb_count", "point_density": "airbnb_density"}, axis=1)
-        data = data.merge(context["affordable_developments_tract_data"].rename(
-            {"point_count": "development_count",
-            "point_density": "development_density"}, axis=1), on=["tract_geoid", "geometry"])
-        data = data.merge(context["str_tract_data"].rename(
-            {"point_count": "str_count", 
-             "point_density": "str_density"}, axis=1), on=["tract_geoid", "geometry"]) 
+            {"point_count": "airbnb_count", "point_density": "airbnb_density"}, axis=1
+        )
+        data = data.merge(
+            context["affordable_developments_tract_data"].rename(
+                {
+                    "point_count": "development_count",
+                    "point_density": "development_density",
+                },
+                axis=1,
+            ),
+            on=["tract_geoid", "geometry"],
+        )
+        data = data.merge(
+            context["str_tract_data"].rename(
+                {"point_count": "str_count", "point_density": "str_density"}, axis=1
+            ),
+            on=["tract_geoid", "geometry"],
+        )
 
         logger.info("Performing correlation analysis...")
 
@@ -68,9 +80,7 @@ class AffordableCorrelationAnalyzer(Analyzer):
         # Remove rows with missing data
         analysis_data = data[numeric_cols].dropna()
 
-        logger.info(
-            "Analyzing %d census tracts with complete data", len(analysis_data)
-        )
+        logger.info("Analyzing %d census tracts with complete data", len(analysis_data))
 
         # Calculate correlation matrix
         correlation_matrix = analysis_data.corr()
