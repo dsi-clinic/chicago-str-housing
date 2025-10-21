@@ -61,7 +61,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     # Step 2: Zip → Tract aggregation
     pipeline.register_component(ZipToTractProcessor())
 
-    # Step 3: STR Prohibition → Tract aggregation (using existing processor)
+    # Step 3: STR Prohibition → Tract aggregation (using improved processor)
     pipeline.register_component(
         PointsToTractProcessor(
             input_key="str_prohibition_data",
@@ -71,10 +71,11 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
                 "number_of_units": ["sum", "mean", "median"],
             },
             calculate_density=True,
+            data_source_name="str_prohibition",
         )
     )
 
-    # Step 4: Airbnb → Tract aggregation (using existing processor)
+    # Step 4: Airbnb → Tract aggregation (using improved processor)
     pipeline.register_component(
         PointsToTractProcessor(
             input_key="airbnb_data",
@@ -84,6 +85,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
                 "price_numeric": ["mean", "median", "min", "max"],
             },
             calculate_density=True,
+            data_source_name="airbnb",
         )
     )
 

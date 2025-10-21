@@ -98,7 +98,11 @@ results = pipeline.execute()
 # For Airbnb or STR data
 pipeline.register_component(AirbnbDataLoader())
 pipeline.register_component(TractBoundariesLoader())
-pipeline.register_component(PointsToTractProcessor("airbnb_data", "airbnb_tract_data"))
+pipeline.register_component(PointsToTractProcessor(
+    input_key="airbnb_data", 
+    output_key="airbnb_tract_data",
+    data_source_name="airbnb"
+))
 pipeline.register_component(TractToCommunityProcessor())
 ```
 
@@ -126,7 +130,11 @@ pipeline.register_component(MyDataLoader())
 ```python
 # If it's point data, aggregate to tracts
 if is_point_data:
-    pipeline.register_component(PointsToTractProcessor("my_data", "my_tract_data"))
+    pipeline.register_component(PointsToTractProcessor(
+        input_key="my_data", 
+        output_key="my_tract_data",
+        data_source_name="my_data"
+    ))
 ```
 
 ## Testing

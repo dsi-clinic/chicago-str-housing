@@ -38,6 +38,7 @@ class PointsToTractProcessor(DataProcessor):
         id_column: str | None = None,
         aggregate_columns: dict[str, str | list[str]] | None = None,
         calculate_density: bool = True,
+        data_source_name: str | None = None,
     ) -> None:
         """Initialize the points to tract processor.
 
@@ -48,6 +49,7 @@ class PointsToTractProcessor(DataProcessor):
             aggregate_columns: Dict of {column: aggregation} for additional stats
                               e.g., {"price": "mean"} or {"price": ["mean", "median"]}
             calculate_density: Whether to calculate points per km²
+            data_source_name: Prefix for column names (e.g., "airbnb", "str_prohibition")
         """
         super().__init__(
             f"points_to_tract_{input_key}",
@@ -58,6 +60,13 @@ class PointsToTractProcessor(DataProcessor):
         self.id_column = id_column
         self.aggregate_columns = aggregate_columns or {}
         self.calculate_density = calculate_density
+
+        # Set data source name - use input_key if not provided
+        if data_source_name is None:
+            # Extract meaningful name from input_key (e.g., "airbnb_data" -> "airbnb")
+            self.data_source_name = input_key.replace("_data", "").replace("_", "_")
+        else:
+            self.data_source_name = data_source_name
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Perform spatial join and aggregation."""
@@ -117,14 +126,16 @@ class PointsToTractProcessor(DataProcessor):
                 for col in tract_agg.columns.to_numpy()
             ]
 
-        # Rename count column (after flattening, it will have "_count" suffix)
+        # Rename count column with data source prefix
         count_col = self.id_column or points_with_tract.columns[0]
         count_col_name = (
             f"{count_col}_count"
             if f"{count_col}_count" in tract_agg.columns
             else count_col
         )
-        tract_agg = tract_agg.rename(columns={count_col_name: "point_count"})
+        tract_agg = tract_agg.rename(
+            columns={count_col_name: f"{self.data_source_name}_count"}
+        )
 
         logger.info("Aggregated to %d census tracts", len(tract_agg))
 
@@ -135,7 +146,8 @@ class PointsToTractProcessor(DataProcessor):
         )
 
         # Fill NaN counts with 0 (tracts with no points)
-        tract_data["point_count"] = tract_data["point_count"].fillna(0)
+        count_column_name = f"{self.data_source_name}_count"
+        tract_data[count_column_name] = tract_data[count_column_name].fillna(0)
 
         # Step 5: Calculate density if requested
         if self.calculate_density:
@@ -146,18 +158,21 @@ class PointsToTractProcessor(DataProcessor):
             tract_projected["area_km2"] = tract_projected.geometry.area / 1_000_000
 
             # Calculate density
-            tract_projected["point_density"] = (
-                tract_projected["point_count"] / tract_projected["area_km2"]
+            density_column_name = f"{self.data_source_name}_density"
+            tract_projected[density_column_name] = (
+                tract_projected[count_column_name] / tract_projected["area_km2"]
             )
 
             # Copy calculated columns back to original CRS
             tract_data["area_km2"] = tract_projected["area_km2"].to_numpy()
-            tract_data["point_density"] = tract_projected["point_density"].to_numpy()
+            tract_data[density_column_name] = tract_projected[
+                density_column_name
+            ].to_numpy()
 
             logger.info(
                 "Density range: %.2f - %.2f points/km²",
-                tract_data["point_density"].min(),
-                tract_data["point_density"].max(),
+                tract_data[density_column_name].min(),
+                tract_data[density_column_name].max(),
             )
 
         # Convert to GeoDataFrame
@@ -169,8 +184,8 @@ class PointsToTractProcessor(DataProcessor):
         logger.info(
             "Summary: %d tracts total, %d with points (%.1f%%)",
             len(tract_data),
-            (tract_data["point_count"] > 0).sum(),
-            100 * (tract_data["point_count"] > 0).sum() / len(tract_data)
+            (tract_data[count_column_name] > 0).sum(),
+            100 * (tract_data[count_column_name] > 0).sum() / len(tract_data)
             if len(tract_data) > 0
             else 0,
         )
@@ -179,10 +194,10 @@ class PointsToTractProcessor(DataProcessor):
             self.output_key: tract_data,
             f"{self.output_key}_summary": {
                 "total_tracts": len(tract_data),
-                "tracts_with_points": (tract_data["point_count"] > 0).sum(),
-                "total_points": int(tract_data["point_count"].sum()),
-                "avg_points_per_tract": float(tract_data["point_count"].mean()),
-                "max_points_per_tract": int(tract_data["point_count"].max()),
+                "tracts_with_points": (tract_data[count_column_name] > 0).sum(),
+                "total_points": int(tract_data[count_column_name].sum()),
+                "avg_points_per_tract": float(tract_data[count_column_name].mean()),
+                "max_points_per_tract": int(tract_data[count_column_name].max()),
             },
         }
 
@@ -213,4 +228,5 @@ class AirbnbToTractProcessor(PointsToTractProcessor):
                 price_column: ["mean", "median", "min", "max"],
             },
             calculate_density=True,
+            data_source_name="airbnb",
         )
