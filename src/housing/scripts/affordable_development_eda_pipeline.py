@@ -11,7 +11,7 @@ from housing.components.loaders.community_boundaries import CommunityBoundariesL
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.processors.affordable_development_points_to_tract import (
-    AffordableTractDensityProcessor,
+    AffordableToTractProcessor,
 )
 from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.visualizers.affordable_development_distribution import (
@@ -56,7 +56,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     # Step 2: Tract-level data aggregation
     pipeline.register_component(affordable_points_to_tract)
-    pipeline.register_component(AffordableTractDensityProcessor())
+    pipeline.register_component(AffordableToTractProcessor())
 
     # Step 3: Community aggregation (ability to add later if useful)
     # pipeline.register_component(AffordableCommunityDensityProcessor())
