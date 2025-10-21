@@ -2,7 +2,7 @@
 
 import logging
 
-from housing import CommunityBoundariesLoader, ForeclosedDataLoader, PointsToTractProcessor, TractBoundariesLoader, TractToCommunityProcessor, ZipBoundariesLoader, ZipToTractProcessor, RentalDataLoader
+from housing import CommunityBoundariesLoader, ForeclosedDataLoader, PointsToTractProcessor, TractBoundariesLoader, TractToCommunityProcessor, ZipBoundariesLoader, ZipToTractProcessor, RentalDataLoader, ForeclosedMapVisualizer
 from pipeline import Pipeline, PipelineResult
 from pipeline.config import PipelineConfig
 
@@ -36,11 +36,16 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     )
 
     pipeline.register_component(processor)
+    print("PIPELINE COMPONENTS:", pipeline.components)
+    print(pipeline.components["points_to_tract_foreclosed_data"])
 
     pipeline.register_component(ZipToTractProcessor())
 
     # Step 3: Tract → Community aggregation
     pipeline.register_component(TractToCommunityProcessor())
+
+    # Step 4: Foreclosed visualizer
+    pipeline.register_component(ForeclosedMapVisualizer())
 
     results = pipeline.execute()
 
@@ -51,6 +56,12 @@ if __name__ == "__main__":
     logger.info("=" * 50)
 
     pipeline, results = run_full_analysis()
+
+    for r in results:
+        if "community_rental_data" in r.data:
+            gdf = r.data["community_rental_data"]
+            logger.info("Head of community-level GeoDataFrame:\n%s", gdf.head())
+            break
 
     logger.info("\n" + "=" * 50)
     logger.info("Demo complete! Check the output/ directory for visualizations.")
