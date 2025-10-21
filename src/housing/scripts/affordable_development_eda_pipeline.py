@@ -7,11 +7,22 @@ from housing.components.processors.affordable_development_points_to_tract import
 from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.visualizers.affordable_development_distribution import AffordableDistributionVisualizer
 from housing.components.visualizers.affordable_development_map import AffordableMapVisualizer
+from housing.components.loaders.airbnb_data import AirbnbDataLoader
+from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
+from housing.components.analyzers.affordable_development_tract_correlation import AffordableCorrelationAnalyzer
+
 
 from pipeline import Pipeline, PipelineResult
 from pipeline.config import PipelineConfig
 
 logger = logging.getLogger(__name__)
+
+affordable_points_to_tract = PointsToTractProcessor(
+    input_key="affordable_developments_data",
+    output_key="affordable_developments_tract_data", 
+    id_column="property_name",
+    aggregate_columns={"units": ["sum"]}
+)
 
 affordable_points_to_tract = PointsToTractProcessor(
     input_key="affordable_developments_data",
@@ -42,7 +53,35 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     # Step 3: Community aggregation (ability to add later if useful)
     #pipeline.register_component(AffordableCommunityDensityProcessor())
 
-    # Step 4: Correlation analysis with other data
+    # Step 4: Load in and get correlation analysis with other data
+    pipeline.register_component(AirbnbDataLoader())
+    pipeline.register_component(STRProhibitionDataLoader())
+
+    pipeline.register_component(
+        PointsToTractProcessor(
+            input_key="str_prohibition_data",
+            output_key="str_tract_data",
+            id_column="application_id",
+            aggregate_columns={
+                "number_of_units": ["sum", "mean", "median"],
+            },
+            calculate_density=True,
+        )
+    )
+
+    pipeline.register_component(
+        PointsToTractProcessor(
+            input_key="airbnb_data",
+            output_key="airbnb_tract_data",
+            id_column="id",
+            aggregate_columns={
+                "price_numeric": ["mean", "median", "min", "max"],
+            },
+            calculate_density=True,
+        )
+    )
+
+    pipeline.register_component(AffordableCorrelationAnalyzer())
 
 
     # Step 5: Visualize rental distributions at both levels
@@ -60,7 +99,3 @@ if __name__ == "__main__":
     logger.info("=" * 50)
 
     pipeline, results = run_full_analysis()
-
-    print(pipeline.context["affordable_developments_tract_data"][["unit_density", "point_density"]].head())
-
-    

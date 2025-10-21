@@ -51,7 +51,7 @@ class AffordableMapVisualizer(Visualizer):
         # Create figure with subplots
         fig, axes = plt.subplots(1, 2, figsize=(20, 10))
         fig.suptitle(
-            "Chicago Average Rental Prices by Geography",
+            "Chicago Affordable Development Density by Geography",
             fontsize=20,
             fontweight="bold",
         )
