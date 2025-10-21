@@ -105,7 +105,7 @@ class STRProhibitionAnalyzer(Analyzer):
         if airbnb_data is not None:
             logger.info("Merging with Airbnb data...")
             # The PointsToTractProcessor creates generic column names
-            airbnb_columns = ["tract_geoid", "point_count", "point_density"]
+            airbnb_columns = ["tract_geoid", "airbnb_count", "airbnb_density"]
             # Add price columns if they exist
             if "price_numeric_mean" in airbnb_data.columns:
                 airbnb_columns.extend(
@@ -122,14 +122,8 @@ class STRProhibitionAnalyzer(Analyzer):
                 on="tract_geoid",
                 how="left",
             )
-            # Rename columns for consistency with visualization expectations
-            analysis_df = analysis_df.rename(
-                columns={
-                    "point_count": "airbnb_count",
-                    "point_density": "airbnb_density",
-                    "price_numeric_mean": "airbnb_price_mean",
-                }
-            )
+            # Columns are already properly named by the improved PointsToTractProcessor
+            # No need to rename anymore
 
         # Upstream winsorization so all downstream visuals use capped density
         if self.winsorize_density and "str_prohibition_density" in analysis_df.columns:

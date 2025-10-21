@@ -79,8 +79,8 @@ class AirbnbDistributionVisualizer(Visualizer):
             axes[0, 0].legend()
 
         # 2. Airbnb units density distribution
-        if tract_data is not None and "point_density" in tract_data.columns:
-            tract_density = tract_data["point_density"].dropna()
+        if tract_data is not None and "airbnb_density" in tract_data.columns:
+            tract_density = tract_data["airbnb_density"].dropna()
             axes[0, 1].hist(
                 tract_density,
                 bins=30,
@@ -108,19 +108,19 @@ class AirbnbDistributionVisualizer(Visualizer):
         if (
             tract_data is not None
             and "price_numeric_mean" in tract_data.columns
-            and "point_density" in tract_data.columns
+            and "airbnb_density" in tract_data.columns
         ):
             tract_prices = tract_data["price_numeric_mean"].dropna()
-            tract_density = tract_data["point_density"].dropna()
+            tract_density = tract_data["airbnb_density"].dropna()
 
             # Merge on tract_geoid to align data
             price_density_data = tract_data[
-                ["tract_geoid", "price_numeric_mean", "point_density"]
+                ["tract_geoid", "price_numeric_mean", "airbnb_density"]
             ].dropna()
 
             if len(price_density_data) > 0:
                 axes[1, 0].scatter(
-                    price_density_data["point_density"],
+                    price_density_data["airbnb_density"],
                     price_density_data["price_numeric_mean"],
                     alpha=0.6,
                     color="purple",
@@ -147,8 +147,8 @@ class AirbnbDistributionVisualizer(Visualizer):
                 stats_lines.append(f"  Max: ${tract_prices.max():.2f}")
                 stats_lines.append("")
 
-            if "point_density" in tract_data.columns:
-                tract_density = tract_data["point_density"].dropna()
+            if "airbnb_density" in tract_data.columns:
+                tract_density = tract_data["airbnb_density"].dropna()
                 stats_lines.append("AIRBNB DENSITY ANALYSIS:")
                 stats_lines.append(f"  Count: {len(tract_density)}")
                 stats_lines.append(f"  Mean: {tract_density.mean():.2f} units/km²")
@@ -158,8 +158,8 @@ class AirbnbDistributionVisualizer(Visualizer):
                 stats_lines.append(f"  Max: {tract_density.max():.2f}")
                 stats_lines.append("")
 
-            if "point_count" in tract_data.columns:
-                tract_count = tract_data["point_count"].dropna()
+            if "airbnb_count" in tract_data.columns:
+                tract_count = tract_data["airbnb_count"].dropna()
                 stats_lines.append("AIRBNB LISTING COUNTS:")
                 stats_lines.append(f"  Total tracts with listings: {len(tract_count)}")
                 stats_lines.append(f"  Total listings: {tract_count.sum():.0f}")

@@ -39,13 +39,15 @@ pipeline.register_component(processor)
 | `id_column` | `None` | Column to count (None = count rows) |
 | `aggregate_columns` | `{}` | Dict of {column: aggregation} for additional stats |
 | `calculate_density` | `True` | Whether to calculate points per km² |
+| `data_source_name` | `None` | Prefix for column names (e.g., "airbnb", "str_prohibition") |
 
 ### What It Does
 
 1. **Spatial Join**: Matches each point to its census tract
 2. **Aggregation**: Counts points and calculates mean prices per tract
 3. **Density Calculation**: Computes points per km²
-4. **Geometry Join**: Adds tract geometries to results
+4. **Column Naming**: Creates descriptive column names (e.g., `airbnb_count`, `airbnb_density`)
+5. **Geometry Join**: Adds tract geometries to results
 
 ## Tract to Community Aggregation
 
@@ -88,7 +90,11 @@ For point data analysis, use both processors:
 
 ```python
 # Step 1: Points → Tracts
-pipeline.register_component(PointsToTractProcessor("airbnb_data", "airbnb_tract_data"))
+pipeline.register_component(PointsToTractProcessor(
+    input_key="airbnb_data", 
+    output_key="airbnb_tract_data",
+    data_source_name="airbnb"
+))
 
 # Step 2: Tracts → Communities  
 pipeline.register_component(TractToCommunityProcessor())
@@ -111,12 +117,13 @@ pipeline.register_component(TractToCommunityProcessor())
 ```python
 pipeline.register_component(AirbnbDataLoader())
 pipeline.register_component(TractBoundariesLoader())
-# Option 1: Use base processor with manual aggregation
+# Use base processor with improved column naming
 pipeline.register_component(PointsToTractProcessor(
-    "airbnb_data", 
-    "airbnb_tract_data",
+    input_key="airbnb_data", 
+    output_key="airbnb_tract_data",
     id_column="id",
-    aggregate_columns={"price": ["mean", "median", "min", "max"]}
+    aggregate_columns={"price_numeric": ["mean", "median", "min", "max"]},
+    data_source_name="airbnb"
 ))
 # Option 2: Use convenience class (if available)
 # pipeline.register_component(AirbnbToTractProcessor())
@@ -127,7 +134,13 @@ pipeline.register_component(TractToCommunityProcessor())
 ```python
 pipeline.register_component(STRProhibitionDataLoader())
 pipeline.register_component(TractBoundariesLoader())
-pipeline.register_component(PointsToTractProcessor("str_prohibition_data", "str_tract_data"))
+pipeline.register_component(PointsToTractProcessor(
+    input_key="str_prohibition_data", 
+    output_key="str_tract_data",
+    id_column="application_id",
+    aggregate_columns={"number_of_units": ["sum", "mean", "median"]},
+    data_source_name="str_prohibition"
+))
 # STR units density (units per km²) is computed in the analyzer
 pipeline.register_component(TractToCommunityProcessor())
 ```

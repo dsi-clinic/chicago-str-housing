@@ -62,10 +62,10 @@ class AirbnbMapVisualizer(Visualizer):
                 }
             )
 
-        if "point_density" in tract_data.columns:
+        if "airbnb_density" in tract_data.columns:
             map_configs.append(
                 {
-                    "column": "point_density",
+                    "column": "airbnb_density",
                     "title": "Airbnb Units Density Distribution",
                     "legend_label": "Airbnb Units Density (per km²)",
                     "cmap": "Blues",
