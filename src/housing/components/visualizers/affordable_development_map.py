@@ -40,13 +40,14 @@ class AffordableMapVisualizer(Visualizer):
         """Create rental price map visualizations."""
         logger.info("Creating rental price map visualizations...")
 
-        tract_data = context.get("affordable_development_tract_data")
-        tract_data = tract_data.loc[tract_data.point_density > 0]
+        tract_data = context.get("affordable_developments_tract_data")
         tract_boundaries = context.get("tract_boundaries")
 
         if tract_data is None:
             logger.warning("No tract level data available for mapping")
             return {}
+            
+        tract_data = tract_data.loc[tract_data.point_density > 0]
 
         # Create figure with subplots
         fig, axes = plt.subplots(1, 2, figsize=(20, 10))
