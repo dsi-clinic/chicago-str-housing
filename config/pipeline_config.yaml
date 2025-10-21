@@ -9,6 +9,7 @@ data:
   city_boundaries_path: https://data.cityofchicago.org/resource/igwz-8jzy.json
   str_prohibition_data_path: https://data.cityofchicago.org/resource/7bzs-jsyj.json
   airbnb_data_path: /project/data/listings.csv
+  affordable_development_data_path: https://data.cityofchicago.org/resource/s6ha-ppgi.json
 description: Analyze house share prohibitions in Chicago
 execution_order: []
 metadata: {}
