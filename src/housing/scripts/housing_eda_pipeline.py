@@ -13,6 +13,7 @@ import logging
 
 from housing.components.analyzers.rental_tract import RentalTractAnalyzer
 from housing.components.analyzers.str_prohibition import STRProhibitionAnalyzer
+from housing.components.loaders.acs_data import ACSLoader
 from housing.components.loaders.airbnb_data import AirbnbDataLoader
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.community_boundaries import CommunityBoundariesLoader
@@ -20,6 +21,7 @@ from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
+from housing.components.processors.acs_to_tract import ACSToTractProcessor
 from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.processors.tract_to_community import TractToCommunityProcessor
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
@@ -57,6 +59,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(CityBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(AirbnbDataLoader())
+    pipeline.register_component(ACSLoader()) # ACS Data
 
     # Step 2: Zip → Tract aggregation
     pipeline.register_component(ZipToTractProcessor())
@@ -99,6 +102,15 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
                 "max_rental_price": "max",
             },
             area_weighted_columns=["avg_rental_price"],
+        )
+    )
+
+    # ACS Data with Geometry
+    pipeline.register_component(
+        ACSToTractProcessor(
+            input_key="acs_data",
+            output_key="acs_tract_data",
+            calculate_density=True,
         )
     )
 
