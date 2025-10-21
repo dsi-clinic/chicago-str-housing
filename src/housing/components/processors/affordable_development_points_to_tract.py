@@ -1,6 +1,7 @@
 """Class that aggregates tract-level data for the affordable housing dataset through a spatial join"""
 
 import logging
+from typing import Any
 
 from housing import PointsToTractProcessor
 
@@ -34,3 +35,30 @@ class AffordableToTractProcessor(PointsToTractProcessor):
             },
             calculate_density=True,
         )
+        self.unit_column = unit_column
+
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Execute the base processor and add unit density calculation."""
+        # Call parent execute method
+        result = super().execute(context)
+        
+        # Get the tract data from the result
+        tract_data = result[self.output_key]
+        
+        # Debug: Log what columns we actually have
+        logger.info("Available columns after base processing: %s", list(tract_data.columns))
+        
+        # Calculate unit density if we have units_sum column
+        if f"{self.unit_column}_sum" in tract_data.columns:
+            tract_data["unit_density"] = (
+                tract_data[f"{self.unit_column}_sum"] / tract_data["area_km2"]
+            )
+            logger.info(
+                "Calculated unit density range: %.2f - %.2f units/km²",
+                tract_data["unit_density"].min(),
+                tract_data["unit_density"].max(),
+            )
+        else:
+            logger.warning("Column %s not found in tract data", f"{self.unit_column}_sum")
+        
+        return result
