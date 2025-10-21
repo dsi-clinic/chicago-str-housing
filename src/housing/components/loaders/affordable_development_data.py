@@ -53,11 +53,11 @@ class AffordableDataLoader(DataLoader):
             {"Multfamily": "Multifamily", "Mutifamily": "Multifamily"}
         )
 
-        logger.info(
-            "Loaded %d affordable housing developments with %d with coordinates",
-            len(affordable_df),
-            sum(affordable_df["units"]),
-        )
+        # logger.info(
+        #     "Loaded %d affordable housing developments with %d with coordinates",
+        #     len(affordable_df),
+        #     sum(affordable_df["units"]),
+        # )
 
         logger.info("Converting to geoDataFrame ...")
 
