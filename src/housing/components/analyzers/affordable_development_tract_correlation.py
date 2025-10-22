@@ -1,6 +1,6 @@
 """Tract-density correlation analyzer.
 
-This module performs statistical correlation analysis on tract-level data for 
+This module performs statistical correlation analysis on tract-level data for
 
 affordable developments, STR restrictions, and Airbnb listings.
 """

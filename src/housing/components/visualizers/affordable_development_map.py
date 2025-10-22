@@ -46,7 +46,7 @@ class AffordableMapVisualizer(Visualizer):
         if tract_data is None:
             logger.warning("No tract level data available for mapping")
             return {}
-            
+
         tract_data = tract_data.loc[tract_data.point_density > 0]
 
         # Create figure with subplots
