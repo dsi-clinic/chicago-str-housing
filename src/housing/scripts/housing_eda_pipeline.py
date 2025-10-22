@@ -20,6 +20,7 @@ from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
+from housing.components.processors.outlier_removal import DensityOutlierRemovalProcessor
 from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.processors.tract_to_community import TractToCommunityProcessor
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
@@ -101,6 +102,27 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
                 "max_rental_price": "max",
             },
             area_weighted_columns=["avg_rental_price"],
+        )
+    )
+
+    # Step 5.5: Winsorize density outliers before analysis (preserve all tracts)
+    pipeline.register_component(
+        DensityOutlierRemovalProcessor(
+            input_key="str_tract_data",
+            output_key="str_tract_data",
+            density_columns=["str_prohibition_density"],
+            method="winsorize",
+            percentile_threshold=0.99,
+        )
+    )
+
+    pipeline.register_component(
+        DensityOutlierRemovalProcessor(
+            input_key="airbnb_tract_data",
+            output_key="airbnb_tract_data",
+            density_columns=["airbnb_density"],
+            method="winsorize",
+            percentile_threshold=0.99,
         )
     )
 
