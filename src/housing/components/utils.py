@@ -5,7 +5,7 @@ This module contains helper functions and utilities used across housing componen
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import geopandas as gpd
 import matplotlib.axes
@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_pairwise_correlations(
@@ -595,3 +597,111 @@ def create_dual_choropleth_maps(
         )
 
     return fig, axes
+
+
+# =============================================================================
+# OUTLIER REMOVAL UTILITIES
+# =============================================================================
+
+
+def remove_density_outliers(
+    tract_data: pd.DataFrame,
+    density_column: str,
+    method: Literal["iqr", "percentile", "zscore", "winsorize"] = "iqr",
+    threshold: float = 1.5,
+    percentile_threshold: float = 0.99,
+    zscore_threshold: float = 3.0,
+) -> pd.DataFrame:
+    """Remove tracts with extreme density values.
+
+    Args:
+        tract_data: Tract-level data with density columns
+        density_column: Name of density column to filter on
+        method: Outlier detection method
+        threshold: IQR multiplier or z-score threshold
+        percentile_threshold: Percentile threshold (0.99 = remove top 1%)
+        zscore_threshold: Z-score threshold for outlier detection
+
+    Returns:
+        Filtered tract data with outliers removed
+    """
+    if density_column not in tract_data.columns:
+        logger.warning(
+            "Density column '%s' not found, skipping outlier removal", density_column
+        )
+        return tract_data
+
+    if method == "iqr":
+        q1 = tract_data[density_column].quantile(0.25)
+        q3 = tract_data[density_column].quantile(0.75)
+        iqr = q3 - q1
+        upper_bound = q3 + (threshold * iqr)
+
+    elif method == "percentile":
+        upper_bound = tract_data[density_column].quantile(percentile_threshold)
+
+    elif method == "zscore":
+        mean_density = tract_data[density_column].mean()
+        std_density = tract_data[density_column].std()
+        upper_bound = mean_density + (zscore_threshold * std_density)
+
+    elif method == "winsorize":
+        upper_bound = tract_data[density_column].quantile(percentile_threshold)
+        # For winsorization, we cap values instead of removing them
+        filtered = tract_data.copy()
+        filtered[density_column] = tract_data[density_column].clip(upper=upper_bound)
+
+        capped_count = (tract_data[density_column] > upper_bound).sum()
+        if capped_count > 0:
+            logger.info(
+                "Winsorized %d tracts with extreme %s (capped at %.2f)",
+                capped_count,
+                density_column,
+                upper_bound,
+            )
+
+        return filtered
+
+    else:
+        raise ValueError(f"Unknown outlier method: {method}")
+
+    outliers = tract_data[tract_data[density_column] > upper_bound]
+    filtered = tract_data[tract_data[density_column] <= upper_bound].copy()
+
+    if len(outliers) > 0:
+        logger.info(
+            "Removed %d tracts with extreme %s (threshold: %.2f)",
+            len(outliers),
+            density_column,
+            upper_bound,
+        )
+
+    return filtered
+
+
+def remove_multiple_density_outliers(
+    tract_data: pd.DataFrame,
+    density_columns: list[str],
+    method: Literal["iqr", "percentile", "zscore"] = "iqr",
+    threshold: float = 1.5,
+) -> pd.DataFrame:
+    """Remove outliers from multiple density columns.
+
+    Args:
+        tract_data: Tract-level data
+        density_columns: List of density columns to filter
+        method: Outlier detection method
+        threshold: Threshold parameter
+
+    Returns:
+        Filtered tract data
+    """
+    filtered_data = tract_data.copy()
+
+    for density_col in density_columns:
+        if density_col in filtered_data.columns:
+            filtered_data = remove_density_outliers(
+                filtered_data, density_col, method=method, threshold=threshold
+            )
+
+    return filtered_data
