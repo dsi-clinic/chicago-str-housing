@@ -29,7 +29,9 @@ class AffordableDataLoader(DataLoader):
             "Load affordable housing development data from City of Chicago API URL",
         )
 
-        self._original_source = api_url or "https://data.cityofchicago.org/resource/s6ha-ppgi.json"
+        self._original_source = (
+            api_url or "https://data.cityofchicago.org/resource/s6ha-ppgi.json"
+        )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Execute the component logic. Load in and clean the data.
@@ -40,7 +42,9 @@ class AffordableDataLoader(DataLoader):
         Returns:
             Dictionary with results to add to context
         """
-        logger.info("Loading affordable development data from: %s", self._original_source)
+        logger.info(
+            "Loading affordable development data from: %s", self._original_source
+        )
 
         cache_dir = Path("/project/data/.cache")
         cache_file = cache_dir / "affordable_rental_housing_developments.json"
