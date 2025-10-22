@@ -34,6 +34,7 @@ class AffordableToTractProcessor(PointsToTractProcessor):
                 unit_column: ["sum", "mean"],
             },
             calculate_density=True,
+            data_source_name="affordable_development",
         )
         self.unit_column = unit_column
 
@@ -41,13 +42,15 @@ class AffordableToTractProcessor(PointsToTractProcessor):
         """Execute the base processor and add unit density calculation."""
         # Call parent execute method
         result = super().execute(context)
-        
+
         # Get the tract data from the result
         tract_data = result[self.output_key]
-        
+
         # Debug: Log what columns we actually have
-        logger.info("Available columns after base processing: %s", list(tract_data.columns))
-        
+        logger.info(
+            "Available columns after base processing: %s", list(tract_data.columns)
+        )
+
         # Calculate unit density if we have units_sum column
         if f"{self.unit_column}_sum" in tract_data.columns:
             tract_data["unit_density"] = (
@@ -59,6 +62,8 @@ class AffordableToTractProcessor(PointsToTractProcessor):
                 tract_data["unit_density"].max(),
             )
         else:
-            logger.warning("Column %s not found in tract data", f"{self.unit_column}_sum")
-        
+            logger.warning(
+                "Column %s not found in tract data", f"{self.unit_column}_sum"
+            )
+
         return result
