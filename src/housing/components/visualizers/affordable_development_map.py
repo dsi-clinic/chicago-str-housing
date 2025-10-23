@@ -37,8 +37,8 @@ class AffordableMapVisualizer(Visualizer):
         self.output_dir = output_dir or "/project/output"
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Create rental price map visualizations."""
-        logger.info("Creating rental price map visualizations...")
+        """Create affordable development density map visualizations."""
+        logger.info("Creating affordable development density map visualizations...")
 
         tract_data = context.get("affordable_developments_tract_data")
         tract_boundaries = context.get("tract_boundaries")
@@ -47,10 +47,10 @@ class AffordableMapVisualizer(Visualizer):
             logger.warning("No tract level data available for mapping")
             return {}
 
-        tract_data = tract_data.loc[tract_data.point_density > 0]
+        tract_data = tract_data.loc[tract_data["affordable_development_density"] > 0]
 
         # Create figure with subplots
-        fig, axes = plt.subplots(1, 2, figsize=(20, 10))
+        fig, axes = plt.subplots(1, 2, figsize=(16, 10))
         fig.suptitle(
             "Chicago Affordable Development Density by Geography",
             fontsize=20,
@@ -61,7 +61,7 @@ class AffordableMapVisualizer(Visualizer):
         if tract_data is not None and tract_boundaries is not None:
             # Merge tract data with boundaries for plotting
             tract_map_data = tract_boundaries.merge(
-                tract_data[["tract_geoid", "point_density", "unit_density"]],
+                tract_data[["tract_geoid", "affordable_development_density", "unit_density"]],
                 on="tract_geoid",
                 how="left",
             )
@@ -77,10 +77,10 @@ class AffordableMapVisualizer(Visualizer):
 
             # Create choropleth
             tract_map_data.plot(
-                column="point_density",
+                column="affordable_development_density",
                 ax=axes[0],
                 legend=True,
-                cmap="RdYlGn",  # Red (expensive) to Green (affordable)
+                cmap="viridis",
                 edgecolor="black",
                 linewidth=0.1,
                 missing_kwds={"color": "lightgrey", "label": "No Data"},
@@ -93,17 +93,17 @@ class AffordableMapVisualizer(Visualizer):
             )
 
             axes[0].set_title(
-                f"Building Density (n={tract_data['point_density'].notna().sum()})",
+                f"Building Density (n={tract_data["affordable_development_density"].notna().sum()})",
                 fontsize=16,
             )
             axes[0].axis("off")
 
             # Add statistics text
-            point_density = tract_data["point_density"].dropna()
+            point_density = tract_data["affordable_development_density"].dropna()
             stats_text = (
-                f"Min: ${point_density.min():.0f}\n"
-                f"Median: ${point_density.median():.0f}\n"
-                f"Max: ${point_density.max():.0f}"
+                f"Min: {point_density.min():.0f}\n"
+                f"Median: {point_density.median():.0f}\n"
+                f"Max: {point_density.max():.0f}"
             )
             axes[0].text(
                 0.02,
@@ -122,7 +122,7 @@ class AffordableMapVisualizer(Visualizer):
                 column="unit_density",
                 ax=axes[1],
                 legend=True,
-                cmap="RdYlGn",  # Red (expensive) to Green (affordable)
+                cmap="viridis",  # Red (expensive) to Green (affordable)
                 edgecolor="black",
                 linewidth=0.1,
                 missing_kwds={"color": "lightgrey", "label": "No Data"},
@@ -143,15 +143,15 @@ class AffordableMapVisualizer(Visualizer):
             # Add statistics text
             unit_density = tract_data["unit_density"].dropna()
             stats_text = (
-                f"Min: ${unit_density.min():.0f}\n"
-                f"Median: ${unit_density.median():.0f}\n"
-                f"Max: ${unit_density.max():.0f}"
+                f"Min: {unit_density.min():.0f}\n"
+                f"Median: {unit_density.median():.0f}\n"
+                f"Max: {unit_density.max():.0f}"
             )
             axes[1].text(
                 0.02,
                 0.98,
                 stats_text,
-                transform=axes[0].transAxes,
+                transform=axes[1].transAxes,
                 fontsize=12,
                 verticalalignment="top",
                 bbox={"boxstyle": "round,pad=0.5", "facecolor": "white", "alpha": 0.8},

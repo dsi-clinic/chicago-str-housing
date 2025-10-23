@@ -29,14 +29,14 @@ class AffordableDistributionVisualizer(Visualizer):
             output_dir: Optional output directory for visualizations
         """
         super().__init__(
-            "rental_distribution_visualization",
-            "Create visualizations for rental price distributions",
+            "affordable_distribution_visualization",
+            "Create visualizations for affordable development unit count & density distributions by tract",
         )
         self.output_dir = output_dir or "/project/output"
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Create rental distribution visualizations."""
-        logger.info("Creating rental distribution visualizations...")
+        """Create affordable development distribution visualizations."""
+        logger.info("Creating affordable development distribution visualizations...")
 
         tract_data = context.get("affordable_developments_tract_data")
         # community_data = context.get("affordable_developments_community_data")
@@ -73,7 +73,7 @@ class AffordableDistributionVisualizer(Visualizer):
             axes[0, 0].set_xlabel("Tract Unit Density (Units/km2)", fontsize=12)
             axes[0, 0].set_ylabel("Number of Census Tracts", fontsize=12)
             axes[0, 0].set_title(
-                f"Unit Density by Census Tract (n={len(tract_unit_density)})",
+                f"Unit Density by Census Tract (n={sum(tract_unit_density > 0)})",
                 fontsize=14,
             )
             axes[0, 0].grid(True, alpha=0.3)
@@ -99,7 +99,7 @@ class AffordableDistributionVisualizer(Visualizer):
             axes[0, 1].set_xlabel("Number of Affordable Units", fontsize=12)
             axes[0, 1].set_ylabel("Number of Tracts", fontsize=12)
             axes[0, 1].set_title(
-                f"Number of Units by Census Tract (n={len(tract_units)})", fontsize=14
+                f"Number of Units by Census Tract (n={sum(tract_units > 0)})", fontsize=14
             )
             axes[0, 1].grid(True, alpha=0.3)
             axes[0, 1].legend()
