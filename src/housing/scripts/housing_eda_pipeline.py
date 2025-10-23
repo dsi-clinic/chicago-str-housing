@@ -13,6 +13,7 @@ import logging
 
 from housing.components.analyzers.rental_tract import RentalTractAnalyzer
 from housing.components.analyzers.str_prohibition import STRProhibitionAnalyzer
+from housing.components.loaders.acs_data import ACSLoader
 from housing.components.loaders.airbnb_data import AirbnbDataLoader
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.community_boundaries import CommunityBoundariesLoader
@@ -20,12 +21,11 @@ from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
-from housing.components.loaders.acs_data import ACSLoader
+from housing.components.processors.acs_to_tract import ACSToTractProcessor
 from housing.components.processors.outlier_removal import DensityOutlierRemovalProcessor
 from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.processors.tract_to_community import TractToCommunityProcessor
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
-from housing.components.processors.acs_to_tract import ACSToTractProcessor
 from housing.components.visualizers.airbnb_distribution import (
     AirbnbDistributionVisualizer,
 )
