@@ -20,10 +20,12 @@ from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
+from housing.components.loaders.acs_data import ACSLoader
 from housing.components.processors.outlier_removal import DensityOutlierRemovalProcessor
 from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.processors.tract_to_community import TractToCommunityProcessor
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
+from housing.components.processors.acs_to_tract import ACSToTractProcessor
 from housing.components.visualizers.airbnb_distribution import (
     AirbnbDistributionVisualizer,
 )
@@ -58,6 +60,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(CityBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(AirbnbDataLoader())
+    pipeline.register_component(ACSLoader())  # ACS
 
     # Step 2: Zip → Tract aggregation
     pipeline.register_component(ZipToTractProcessor())
@@ -87,6 +90,16 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
             },
             calculate_density=True,
             data_source_name="airbnb",
+        )
+    )
+
+    # Step 4.1 ACS Data → ACS Data with Geometry
+    pipeline.register_component(
+        ACSToTractProcessor(
+            input_key="acs_data",
+            output_key="acs_tract_data",
+            calculate_density=True,
+            data_source_name="acs",
         )
     )
 
@@ -121,6 +134,17 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
             input_key="airbnb_tract_data",
             output_key="airbnb_tract_data",
             density_columns=["airbnb_density"],
+            method="winsorize",
+            percentile_threshold=0.99,
+        )
+    )
+
+    # ACS Data
+    pipeline.register_component(
+        DensityOutlierRemovalProcessor(
+            input_key="acs_tract_data",
+            output_key="acs_tract_data",
+            density_columns=["population_density"],
             method="winsorize",
             percentile_threshold=0.99,
         )
