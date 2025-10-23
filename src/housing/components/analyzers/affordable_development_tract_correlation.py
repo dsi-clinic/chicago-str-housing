@@ -35,23 +35,13 @@ class AffordableCorrelationAnalyzer(Analyzer):
         """Perform correlation analysis."""
         logger.info("Collecting and merging tract-level data sets...")
 
-        data = context["airbnb_tract_data"].rename(
-            {"point_count": "airbnb_count", "point_density": "airbnb_density"}, axis=1
-        )
+        data = context["airbnb_tract_data"]
         data = data.merge(
-            context["affordable_developments_tract_data"].rename(
-                {
-                    "point_count": "development_count",
-                    "point_density": "development_density",
-                },
-                axis=1,
-            ),
+            context["affordable_developments_tract_data"],
             on=["tract_geoid", "geometry"],
         )
         data = data.merge(
-            context["str_tract_data"].rename(
-                {"point_count": "str_count", "point_density": "str_density"}, axis=1
-            ),
+            context["str_tract_data"],
             on=["tract_geoid", "geometry"],
         )
 
@@ -63,14 +53,13 @@ class AffordableCorrelationAnalyzer(Analyzer):
         data["area_km2"] = data_projected.geometry.area / 1_000_000  # Convert to km²
 
         # Prepare numeric columns for analysis
-        # Use zip_count if available (from direct zip aggregation), otherwise tract_count (from tract aggregation)
 
         numeric_cols = [
-            "development_density",
+            "affordable_development_density",
             "unit_density",
             "airbnb_density",
             "units_sum",
-            "str_density",
+            "str_prohibition_density",
             "price_numeric_max",
             "price_numeric_min",
             "price_numeric_median",
@@ -93,20 +82,20 @@ class AffordableCorrelationAnalyzer(Analyzer):
                 "unit_density", "airbnb_density"
             ],
             "Affordable Development Density vs. Airbnb Density": correlation_matrix.loc[
-                "development_density", "airbnb_density"
+                "affordable_development_density", "airbnb_density"
             ],
             "Affordable Development Unit Density vs. STR Density": correlation_matrix.loc[
-                "unit_density", "str_density"
+                "unit_density", "str_prohibition_density"
             ],
             "Affordable Development Density vs. STR Density": correlation_matrix.loc[
-                "development_density", "str_density"
+                "affordable_development_density", "str_prohibition_density"
             ],
         }
 
         # Statistical summary
         summary_stats = {
             "total_tracts": len(data),
-            "tracts_with_developments": len(data.loc[data.development_count > 0]),
+            "tracts_with_developments": len(data.loc[data["affordable_development_count"] > 0]),
             "avg_development_unit_density": analysis_data["unit_density"].mean(),
             "development_unit_density_std": analysis_data["unit_density"].std(),
             "avg_area_km2": analysis_data["area_km2"].mean(),

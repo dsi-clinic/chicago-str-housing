@@ -59,6 +59,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
                 "number_of_units": ["sum", "mean", "median"],
             },
             calculate_density=True,
+            data_source_name="str_prohibition"
         )
     )
 
@@ -71,6 +72,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
                 "price_numeric": ["mean", "median", "min", "max"],
             },
             calculate_density=True,
+            data_source_name="airbnb"
         )
     )
 
