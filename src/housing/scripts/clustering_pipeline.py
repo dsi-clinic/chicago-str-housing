@@ -14,7 +14,6 @@ from typing import Any
 
 from dotenv import load_dotenv
 import geopandas as gpd
-import pandas as pd
 
 from housing.components.loaders.airbnb_data import AirbnbDataLoader
 from housing.components.loaders.census_data import CensusDataLoader
@@ -62,11 +61,45 @@ class TractDataMerger(PipelineComponent):
         merged_data = tract_boundaries.copy()
         merged_data["tract_id"] = merged_data["tract_geoid"]
         
-        # Merge rental data - SKIP FOR NOW DUE TO PANDAS ISSUE
-        logger.info("Skipping rental data merge due to pandas column selection issue")
-        # TODO: Fix rental data merge
+        # Merge rental data
+        if "tract_rental_data" in context:
+            rental_data = context["tract_rental_data"]
+            logger.info("Merging rental data: %d tracts", len(rental_data))
+            
+            # Select only the columns we want (exclude geometry and tract_geoid to avoid conflicts)
+            rental_cols = [col for col in rental_data.columns 
+                          if col not in ["geometry", "tract_geoid"]]
+            
+            # Simple merge - just merge the dataframe columns
+            merged_data = merged_data.merge(
+                rental_data[rental_cols + ["tract_geoid"]],
+                left_on="tract_id",
+                right_on="tract_geoid",
+                how="left"
+            )
+            
+            # Rename rental columns for clarity
+            # Use area-weighted as the primary metric (more accurate when tracts span multiple zips)
+            if "area_weighted_avg_rent" in merged_data.columns:
+                merged_data = merged_data.rename(columns={"area_weighted_avg_rent": "rental_price_mean"})
+            if "min_rental_price" in merged_data.columns:
+                merged_data = merged_data.rename(columns={"min_rental_price": "rental_price_min"})
+            if "max_rental_price" in merged_data.columns:
+                merged_data = merged_data.rename(columns={"max_rental_price": "rental_price_max"})
+            
+            # Drop the unweighted average as it's less accurate
+            if "avg_rental_price" in merged_data.columns:
+                merged_data = merged_data.drop(columns=["avg_rental_price"])
+            
+            # Drop duplicate tract_geoid from merge (we only need tract_id)
+            if "tract_geoid_y" in merged_data.columns:
+                merged_data = merged_data.drop(columns=["tract_geoid_y"])
+            elif "tract_geoid_rental" in merged_data.columns:
+                merged_data = merged_data.drop(columns=["tract_geoid_rental"])
+        else:
+            logger.warning("No rental data found, skipping rental merge")
         
-        # Merge Airbnb data - SIMPLIFIED APPROACH
+        # Merge Airbnb data
         if "airbnb_tract_data" in context:
             airbnb_data = context["airbnb_tract_data"]
             logger.info("Merging Airbnb data: %d tracts", len(airbnb_data))
@@ -187,6 +220,11 @@ class TractDataMerger(PipelineComponent):
             "geometry",  # Always keep geometry
             "tract_id",  # Keep one tract identifier
             
+            # Rental data
+            "rental_price_mean",  # Area-weighted average (most accurate)
+            "rental_price_min",
+            "rental_price_max",
+            
             # Airbnb data
             "airbnb_count",
             "airbnb_price_mean",
@@ -228,8 +266,7 @@ class TractDataMerger(PipelineComponent):
         # Log what was removed
         removed_cols = set(df.columns) - set(cleaned_df.columns)
         if removed_cols:
-            logger.info("Removed %d redundant columns: %s", len(removed_cols), 
-                       sorted(list(removed_cols))[:10])  # Show first 10
+            logger.info("Removed %d redundant columns", len(removed_cols))
         
         return cleaned_df
     
