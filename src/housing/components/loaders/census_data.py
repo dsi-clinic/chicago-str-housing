@@ -72,19 +72,18 @@ class CensusDataLoader(DataLoader):
             base_url = "https://api.census.gov/data/2023/acs/acs5"
             
             # Build geographic filter
-            geo_filter = f"state:{self.state_fips}"
-            if self.county_fips:
-                geo_filter += f"&in=county:{self.county_fips}"
-            
-            # Add tract level
-            geo_filter += "&for=tract:*"
-
-            # Make API request
+            # Census API expects separate 'for' and 'in' parameters
             params = {
                 "get": ",".join(variables),
-                "for": geo_filter,
-                "key": api_key,
+                "for": "tract:*",
+                "in": f"state:{self.state_fips}"
             }
+            
+            if self.county_fips:
+                params["in"] += f" county:{self.county_fips}"
+
+            # Add API key
+            params["key"] = api_key
 
             logger.info("Making Census API request for Illinois census tracts")
             response = requests.get(base_url, params=params, timeout=30)
@@ -133,11 +132,14 @@ class CensusDataLoader(DataLoader):
         for col in numeric_columns:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
+                # Replace Census API sentinel values with NaN
+                # -666666666 means data not available
+                df[col] = df[col].replace(-666666666, float('nan'))
 
         # Calculate percentage with bachelor's degree
         if "B15003_022E" in df.columns and "B15003_001E" in df.columns:
             df["pct_bachelor"] = (df["B15003_022E"] / df["B15003_001E"] * 100).round(2)
-            # Handle division by zero
+            # Handle division by zero and missing data
             df["pct_bachelor"] = df["pct_bachelor"].fillna(0)
 
         # Rename columns to more readable names
@@ -185,36 +187,50 @@ class CensusDataLoader(DataLoader):
             logger.info("  Average population per tract: %.0f", avg_pop)
 
         if "median_income" in df.columns:
-            income_stats = df["median_income"].describe()
-            logger.info(
-                "  Median income range: $%.0f - $%.0f",
-                income_stats["min"],
-                income_stats["max"],
-            )
+            income_valid = df["median_income"].dropna()
+            if len(income_valid) > 0:
+                logger.info(
+                    "  Median income range: $%.0f - $%.0f",
+                    income_valid.min(),
+                    income_valid.max(),
+                )
+            else:
+                logger.info("  Median income: No valid data")
 
         if "median_house_value" in df.columns:
-            house_value_stats = df["median_house_value"].describe()
-            logger.info(
-                "  Median house value range: $%.0f - $%.0f",
-                house_value_stats["min"],
-                house_value_stats["max"],
-            )
+            house_value_valid = df["median_house_value"].dropna()
+            if len(house_value_valid) > 0:
+                logger.info(
+                    "  Median house value range: $%.0f - $%.0f",
+                    house_value_valid.min(),
+                    house_value_valid.max(),
+                )
+            else:
+                logger.info("  Median house value: No valid data")
 
         if "median_age" in df.columns:
-            age_stats = df["median_age"].describe()
-            logger.info(
-                "  Median age range: %.1f - %.1f years",
-                age_stats["min"],
-                age_stats["max"],
-            )
+            age_valid = df["median_age"].dropna()
+            if len(age_valid) > 0:
+                logger.info(
+                    "  Median age range: %.1f - %.1f years",
+                    age_valid.min(),
+                    age_valid.max(),
+                )
+            else:
+                logger.info("  Median age: No valid data")
 
         if "pct_bachelor" in df.columns:
-            bachelor_stats = df["pct_bachelor"].describe()
-            logger.info(
-                "  Bachelor's degree % range: %.1f%% - %.1f%%",
-                bachelor_stats["min"],
-                bachelor_stats["max"],
-            )
+            pct_bachelor_valid = df["pct_bachelor"].dropna()
+            if len(pct_bachelor_valid) > 0:
+                pct_min = pct_bachelor_valid.min()
+                pct_max = pct_bachelor_valid.max()
+                logger.info(
+                    "  Bachelor's degree percent range: %.1f%% - %.1f%%",
+                    pct_min,
+                    pct_max,
+                )
+            else:
+                logger.info("  Bachelor's degree percent: No valid data")
 
     def _create_demo_data(self) -> dict[str, Any]:
         """Create demo census data for testing without API key."""

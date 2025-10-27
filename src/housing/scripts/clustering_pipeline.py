@@ -9,8 +9,10 @@ for clustering analysis. It combines:
 """
 
 import logging
+import os
 from typing import Any
 
+from dotenv import load_dotenv
 import geopandas as gpd
 import pandas as pd
 
@@ -28,6 +30,7 @@ from pipeline.config import PipelineConfig
 
 logger = logging.getLogger(__name__)
 
+load_dotenv()
 
 class TractDataMerger(PipelineComponent):
     """Merge all housing data at the census tract level for clustering analysis."""
@@ -158,16 +161,77 @@ class TractDataMerger(PipelineComponent):
         
         # Calculate population density (people per square km)
         if "census_population" in merged_data.columns:
+            # Reproject to a projected CRS (meters) for accurate area calculation
+            # Using Albers Equal Area Conic (EPSG:5070) which is good for US area calculations
+            geometry_projected = merged_data.geometry.to_crs("EPSG:5070")
             # Convert area from square meters to square kilometers
-            merged_data["area_sq_km"] = merged_data.geometry.area / 1_000_000
+            merged_data["area_sq_km"] = geometry_projected.area / 1_000_000
             merged_data["population_density"] = (
                 merged_data["census_population"] / merged_data["area_sq_km"]
             ).fillna(0)
+        
+        # Clean up redundant columns
+        merged_data = self._clean_columns(merged_data)
         
         # Log summary statistics
         self._log_merge_summary(merged_data)
         
         return {"clustering_data": merged_data}
+    
+    def _clean_columns(self, df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """Remove redundant columns and keep only essential data for clustering."""
+        logger.info("Cleaning up redundant columns")
+        
+        # Keep essential columns
+        keep_columns = [
+            "geometry",  # Always keep geometry
+            "tract_id",  # Keep one tract identifier
+            
+            # Airbnb data
+            "airbnb_count",
+            "airbnb_price_mean",
+            "airbnb_price_median",
+            "price_numeric_min",
+            "price_numeric_max",
+            "airbnb_density",
+            
+            # STR prohibition data
+            "str_prohibition_count",
+            "str_prohibition_units_total",
+            "str_prohibition_units_mean",
+            "number_of_units_median",
+            "str_prohibition_density",
+            
+            # Census data
+            "census_population",
+            "census_median_income",
+            "census_median_house_value",
+            "census_median_age",
+            "census_pct_bachelor",
+            
+            # Calculated fields
+            "area_sq_km",
+            "population_density",
+        ]
+        
+        # Filter to only columns that exist
+        available_columns = [col for col in keep_columns if col in df.columns]
+        
+        # Keep additional census columns if needed for reference
+        census_cols = ["GEOID", "NAME"]  # Keep original identifiers for reference
+        
+        # Combine and filter
+        cols_to_keep = available_columns + [col for col in census_cols if col in df.columns]
+        
+        cleaned_df = df[cols_to_keep].copy()
+        
+        # Log what was removed
+        removed_cols = set(df.columns) - set(cleaned_df.columns)
+        if removed_cols:
+            logger.info("Removed %d redundant columns: %s", len(removed_cols), 
+                       sorted(list(removed_cols))[:10])  # Show first 10
+        
+        return cleaned_df
     
     def _log_merge_summary(self, df: gpd.GeoDataFrame) -> None:
         """Log summary statistics of merged data."""
@@ -234,7 +298,7 @@ def run_clustering_pipeline() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(AirbnbDataLoader())
-    pipeline.register_component(CensusDataLoader())
+    pipeline.register_component(CensusDataLoader(api_key=os.getenv("CENSUS_API_KEY")))
     
     # Step 2: Aggregate zip-level rental data to tracts
     logger.info("Step 2: Aggregating rental data to tracts")
@@ -296,6 +360,17 @@ if __name__ == "__main__":
         clustering_data = pipeline.context["clustering_data"]
         logger.info("Successfully created clustering dataset with %d tracts", len(clustering_data))
         logger.info("Available columns: %s", list(clustering_data.columns))
+        
+        # Clean data types for GeoJSON export
+        # GeoJSON doesn't support nullable integer types or NaN values
+        for col in clustering_data.columns:
+            if col != "geometry":
+                # Convert nullable integer types to regular float
+                if clustering_data[col].dtype.name == "Int64":
+                    clustering_data[col] = clustering_data[col].astype("float64")
+                # Replace NaN with -9999 (standard no-data value) for float columns
+                if clustering_data[col].dtype.name == "float64":
+                    clustering_data[col] = clustering_data[col].fillna(-9999)
         
         # Save the merged data for further analysis
         output_path = "/project/output/clustering_data.geojson"
