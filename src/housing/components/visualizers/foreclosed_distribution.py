@@ -1,14 +1,13 @@
+"""Module for visualizing foreclosed property distributions."""
+
 import logging
 from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
 
+from housing.components.utils import setup_figure_and_save
 from pipeline.base import Visualizer
-from housing.components.utils import (
-    setup_figure_and_save,
-    add_statistical_summary_to_plot,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,9 @@ class ForeclosedDistributionVisualizer(Visualizer):
         community_data = context.get("foreclosed_community_data")
 
         if community_data is None or community_data.empty:
-            logger.warning("No community-level foreclosure data available for visualization.")
+            logger.warning(
+                "No community-level foreclosure data available for visualization."
+            )
             return {}
 
         # Sort and select top 10
@@ -51,7 +52,11 @@ class ForeclosedDistributionVisualizer(Visualizer):
         )
         ax.invert_yaxis()
 
-        ax.set_title("Top 10 Chicago Communities by Foreclosure Count", fontsize=16, weight="bold")
+        ax.set_title(
+            "Top 10 Chicago Communities by Foreclosure Count",
+            fontsize=16,
+            weight="bold",
+        )
         ax.set_xlabel("Foreclosed Property Count", fontsize=12)
         ax.set_ylabel("Community Area", fontsize=12)
         ax.grid(axis="x", alpha=0.3)
@@ -59,24 +64,12 @@ class ForeclosedDistributionVisualizer(Visualizer):
         # Add value labels on bars
         for bar in bars:
             width = bar.get_width()
-            ax.text(width + 1, bar.get_y() + bar.get_height() / 2, f"{int(width)}", va="center")
-
-        # --- Statistical Summary ---
-        stats = [
-            ("Total Communities", len(community_data)),
-            ("Total Foreclosures", int(community_data["foreclosed_count"].sum())),
-            ("Mean", f"{community_data['foreclosed_count'].mean():.2f}"),
-            ("Median", f"{community_data['foreclosed_count'].median():.2f}"),
-            ("Max", f"{community_data['foreclosed_count'].max():.0f}"),
-        ]
-        # add_statistical_summary_to_plot(
-        #     ax,
-        #     "Foreclosure Statistics",
-        #     [{"section_title": "COMMUNITY AREA LEVEL", "stats": stats}],
-        #     bgcolor="lightgray",
-        #     x=0.65,
-        #     y=0.05,
-        # )
+            ax.text(
+                width + 1,
+                bar.get_y() + bar.get_height() / 2,
+                f"{int(width)}",
+                va="center",
+            )
 
         # --- Save the figure ---
         output_path = Path(self.output_dir) / "foreclosed_top10_distribution.png"
