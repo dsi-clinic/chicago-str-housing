@@ -551,6 +551,9 @@ class TractDataMerger(PipelineComponent):
 
             # Remove tracts with missing clustering data
             cleaned_df = df[~missing_data_mask].copy()
+        else:
+            # No missing data, use the original dataframe
+            cleaned_df = df.copy()
 
         logger.info(
             "Final clustering dataset: %d tracts with complete data", len(cleaned_df)
