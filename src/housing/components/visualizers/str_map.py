@@ -36,7 +36,7 @@ class STRMapVisualizer(Visualizer):
         """Create STR prohibition map visualizations."""
         logger.info("Creating STR prohibition map visualizations...")
 
-        tract_data = context.get("str_tract_analysis")
+        tract_data = context.get("str_tract_data")
         tract_boundaries = context.get("tract_boundaries")
         city_boundaries = context.get("city_boundaries")
 
