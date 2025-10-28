@@ -16,6 +16,7 @@ from housing.components.analyzers.str_prohibition import STRProhibitionAnalyzer
 from housing.components.loaders.airbnb_data import AirbnbDataLoader
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.community_boundaries import CommunityBoundariesLoader
+from housing.components.loaders.foreclosed_data import ForeclosedDataLoader
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
@@ -58,6 +59,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(CityBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(AirbnbDataLoader())
+    pipeline.register_component(ForeclosedDataLoader())
 
     # Step 2: Zip → Tract aggregation
     pipeline.register_component(ZipToTractProcessor())
@@ -87,6 +89,18 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
             },
             calculate_density=True,
             data_source_name="airbnb",
+        )
+    )
+
+    # Step 4.5: Foreclosed → Tract aggregation (using improved processor)
+    pipeline.register_component(
+        PointsToTractProcessor(
+            input_key="foreclosed_data",
+            output_key="foreclosed_tract_data",
+            id_column="id",
+            aggregate_columns={},
+            calculate_density=True,
+            data_source_name="foreclosed",
         )
     )
 
