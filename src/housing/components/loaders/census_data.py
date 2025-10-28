@@ -13,6 +13,9 @@ import requests
 
 from pipeline.base import DataLoader
 
+# Constants
+MIN_API_RESPONSE_LENGTH = 2  # Header row + at least one data row
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,7 +55,9 @@ class CensusDataLoader(DataLoader):
         # Get API key from context or environment
         api_key = self.api_key or context.get("census_api_key")
         if not api_key:
-            logger.warning("No Census API key provided. Using demo mode with limited data.")
+            logger.warning(
+                "No Census API key provided. Using demo mode with limited data."
+            )
             # For demo purposes, we'll create sample data
             return self._create_demo_data()
 
@@ -64,21 +69,23 @@ class CensusDataLoader(DataLoader):
             "B15003_022E",  # Bachelor's degree (25+ years)
             "B15003_001E",  # Total population 25+ years
             "B01003_001E",  # Total population
-            "NAME",         # Geographic name
+            "B25003_001E",  # Total occupied housing units
+            "B25003_002E",  # Owner-occupied housing units
+            "NAME",  # Geographic name
         ]
 
         try:
             # Construct API URL
             base_url = "https://api.census.gov/data/2023/acs/acs5"
-            
+
             # Build geographic filter
             # Census API expects separate 'for' and 'in' parameters
             params = {
                 "get": ",".join(variables),
                 "for": "tract:*",
-                "in": f"state:{self.state_fips}"
+                "in": f"state:{self.state_fips}",
             }
-            
+
             if self.county_fips:
                 params["in"] += f" county:{self.county_fips}"
 
@@ -90,9 +97,9 @@ class CensusDataLoader(DataLoader):
             response.raise_for_status()
 
             data = response.json()
-            
+
             # Convert to DataFrame
-            if not data or len(data) < 2:
+            if not data or len(data) < MIN_API_RESPONSE_LENGTH:
                 logger.error("No data returned from Census API")
                 return {"census_data": pd.DataFrame()}
 
@@ -117,8 +124,6 @@ class CensusDataLoader(DataLoader):
 
     def _process_census_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Process and clean the census data."""
-        logger.info("Processing census data")
-
         # Convert numeric columns
         numeric_columns = [
             "B19013_001E",  # Median household income
@@ -127,6 +132,8 @@ class CensusDataLoader(DataLoader):
             "B15003_022E",  # Bachelor's degree count
             "B15003_001E",  # Total 25+ population
             "B01003_001E",  # Total population
+            "B25003_001E",  # Total occupied housing units
+            "B25003_002E",  # Owner-occupied housing units
         ]
 
         for col in numeric_columns:
@@ -134,13 +141,22 @@ class CensusDataLoader(DataLoader):
                 df[col] = pd.to_numeric(df[col], errors="coerce")
                 # Replace Census API sentinel values with NaN
                 # -666666666 means data not available
-                df[col] = df[col].replace(-666666666, float('nan'))
+                df[col] = df[col].replace(-666666666, float("nan"))
 
         # Calculate percentage with bachelor's degree
         if "B15003_022E" in df.columns and "B15003_001E" in df.columns:
             df["pct_bachelor"] = (df["B15003_022E"] / df["B15003_001E"] * 100).round(2)
             # Handle division by zero and missing data
             df["pct_bachelor"] = df["pct_bachelor"].fillna(0)
+
+        # Calculate percentage of rented households
+        if "B25003_001E" in df.columns and "B25003_002E" in df.columns:
+            # pct_rented = ((total occupied - owner occupied) / total occupied) * 100
+            df["pct_rented"] = (
+                (df["B25003_001E"] - df["B25003_002E"]) / df["B25003_001E"] * 100
+            ).round(2)
+            # Handle division by zero and missing data
+            df["pct_rented"] = df["pct_rented"].fillna(0)
 
         # Rename columns to more readable names
         column_mapping = {
@@ -156,24 +172,27 @@ class CensusDataLoader(DataLoader):
             "tract": "tract_fips",
         }
 
-        df = df.rename(columns=column_mapping)
+        census_df = df.rename(columns=column_mapping)
 
         # Create tract identifier
-        if all(col in df.columns for col in ["state_fips", "county_fips", "tract_fips"]):
-            df["tract_id"] = (
-                df["state_fips"].astype(str).str.zfill(2) +
-                df["county_fips"].astype(str).str.zfill(3) +
-                df["tract_fips"].astype(str).str.zfill(6)
+        if all(
+            col in census_df.columns
+            for col in ["state_fips", "county_fips", "tract_fips"]
+        ):
+            census_df["tract_id"] = (
+                census_df["state_fips"].astype(str).str.zfill(2)
+                + census_df["county_fips"].astype(str).str.zfill(3)
+                + census_df["tract_fips"].astype(str).str.zfill(6)
             )
 
         # Filter out tracts with missing key data
-        initial_count = len(df)
-        df = df.dropna(subset=["total_population", "median_income"])
+        initial_count = len(census_df)
+        census_df = census_df.dropna(subset=["total_population", "median_income"])
         logger.info(
-            "Removed %d tracts with missing key data", initial_count - len(df)
+            "Removed %d tracts with missing key data", initial_count - len(census_df)
         )
 
-        return df
+        return census_df
 
     def _log_summary_stats(self, df: pd.DataFrame) -> None:
         """Log summary statistics of the census data."""
@@ -186,61 +205,21 @@ class CensusDataLoader(DataLoader):
             logger.info("  Total population: %d", int(total_pop))
             logger.info("  Average population per tract: %.0f", avg_pop)
 
-        if "median_income" in df.columns:
-            income_valid = df["median_income"].dropna()
-            if len(income_valid) > 0:
-                logger.info(
-                    "  Median income range: $%.0f - $%.0f",
-                    income_valid.min(),
-                    income_valid.max(),
-                )
-            else:
-                logger.info("  Median income: No valid data")
-
-        if "median_house_value" in df.columns:
-            house_value_valid = df["median_house_value"].dropna()
-            if len(house_value_valid) > 0:
-                logger.info(
-                    "  Median house value range: $%.0f - $%.0f",
-                    house_value_valid.min(),
-                    house_value_valid.max(),
-                )
-            else:
-                logger.info("  Median house value: No valid data")
-
-        if "median_age" in df.columns:
-            age_valid = df["median_age"].dropna()
-            if len(age_valid) > 0:
-                logger.info(
-                    "  Median age range: %.1f - %.1f years",
-                    age_valid.min(),
-                    age_valid.max(),
-                )
-            else:
-                logger.info("  Median age: No valid data")
-
-        if "pct_bachelor" in df.columns:
-            pct_bachelor_valid = df["pct_bachelor"].dropna()
-            if len(pct_bachelor_valid) > 0:
-                pct_min = pct_bachelor_valid.min()
-                pct_max = pct_bachelor_valid.max()
-                logger.info(
-                    "  Bachelor's degree percent range: %.1f%% - %.1f%%",
-                    pct_min,
-                    pct_max,
-                )
-            else:
-                logger.info("  Bachelor's degree percent: No valid data")
-
     def _create_demo_data(self) -> dict[str, Any]:
         """Create demo census data for testing without API key."""
-        logger.info("Creating demo census data")
-
         # Create sample data for Chicago area tracts
         demo_data = {
             "tract_id": [
-                "17031000100", "17031000200", "17031000300", "17031000400", "17031000500",
-                "17031000600", "17031000700", "17031000800", "17031000900", "17031001000",
+                "17031000100",
+                "17031000200",
+                "17031000300",
+                "17031000400",
+                "17031000500",
+                "17031000600",
+                "17031000700",
+                "17031000800",
+                "17031000900",
+                "17031001000",
             ],
             "tract_name": [
                 "Census Tract 1, Cook County, Illinois",
@@ -254,11 +233,56 @@ class CensusDataLoader(DataLoader):
                 "Census Tract 9, Cook County, Illinois",
                 "Census Tract 10, Cook County, Illinois",
             ],
-            "total_population": [2500, 3200, 1800, 4100, 2900, 3600, 2200, 3800, 3100, 2700],
-            "median_income": [45000, 65000, 38000, 72000, 52000, 68000, 42000, 75000, 58000, 48000],
-            "median_house_value": [280000, 420000, 220000, 480000, 320000, 450000, 250000, 520000, 380000, 300000],
+            "total_population": [
+                2500,
+                3200,
+                1800,
+                4100,
+                2900,
+                3600,
+                2200,
+                3800,
+                3100,
+                2700,
+            ],
+            "median_income": [
+                45000,
+                65000,
+                38000,
+                72000,
+                52000,
+                68000,
+                42000,
+                75000,
+                58000,
+                48000,
+            ],
+            "median_house_value": [
+                280000,
+                420000,
+                220000,
+                480000,
+                320000,
+                450000,
+                250000,
+                520000,
+                380000,
+                300000,
+            ],
             "median_age": [35.2, 42.1, 28.5, 45.3, 38.7, 43.2, 31.8, 46.1, 40.2, 36.9],
-            "pct_bachelor": [25.3, 45.2, 18.7, 52.1, 38.9, 47.6, 22.4, 54.3, 42.1, 29.8],
+            "pct_bachelor": [
+                25.3,
+                45.2,
+                18.7,
+                52.1,
+                38.9,
+                47.6,
+                22.4,
+                54.3,
+                42.1,
+                29.8,
+            ],
+            "pct_rented": [45.2, 32.1, 58.3, 28.7, 38.9, 35.4, 62.1, 41.2, 33.8, 49.5],
             "state_fips": ["17"] * 10,
             "county_fips": ["031"] * 10,
             "tract_fips": [f"{i:06d}" for i in range(1, 11)],

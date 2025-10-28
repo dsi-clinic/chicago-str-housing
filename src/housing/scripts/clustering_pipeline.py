@@ -12,16 +12,19 @@ import logging
 import os
 from typing import Any
 
-from dotenv import load_dotenv
 import geopandas as gpd
+import numpy as np
+from dotenv import load_dotenv
 
 from housing.components.loaders.airbnb_data import AirbnbDataLoader
 from housing.components.loaders.census_data import CensusDataLoader
+from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
 from housing.components.processors.points_to_tract import PointsToTractProcessor
+from housing.components.processors.spatial_interpolator import SpatialInterpolator
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from pipeline import Pipeline, PipelineResult
 from pipeline.base import PipelineComponent
@@ -29,68 +32,149 @@ from pipeline.config import PipelineConfig
 
 logger = logging.getLogger(__name__)
 
+# Constants
+MIN_TRACT_AREA_KM2 = 0.01  # Minimum tract area in km² (10 hectares)
+NO_DATA_MARKER = -9999  # No-data marker from GeoJSON files
+
 load_dotenv()
+
 
 class TractDataMerger(PipelineComponent):
     """Merge all housing data at the census tract level for clustering analysis."""
-    
+
     def __init__(self) -> None:
         """Initialize the tract data merger."""
         super().__init__(
             name="tract_data_merger",
-            description="Merge all housing data at census tract level"
+            description="Merge all housing data at census tract level",
         )
         self.required_data = [
             "tract_boundaries",
-            "tract_rental_data", 
+            "tract_rental_data",
             "airbnb_tract_data",
             "str_tract_data",
-            "census_data"
+            "census_data",
         ]
         self.output_data = ["clustering_data"]
+
+    def _load_chicago_boundaries(self) -> gpd.GeoDataFrame | None:
+        """Load Chicago city boundaries for clipping."""
+        try:
+            loader = CityBoundariesLoader()
+            city_data = loader.execute({})
+            return city_data["city_boundaries"]
+        except Exception as e:
+            logger.warning(
+                "Could not load Chicago boundaries: %s. Skipping clipping.", e
+            )
+            return None
+
+    def _filter_non_residential_tracts(self, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """Filter out non-residential tracts like airports, industrial areas, etc."""
+        logger.info("Filtering out non-residential tracts")
+
+        # O'Hare Airport tract IDs
+        ohare_tract_ids = [
+            "17031980000",
+            "17031760801",
+            "17031760802",
+            "17031760803",
+        ]
+
+        initial_count = len(gdf)
+
+        # Filter out O'Hare airport tracts by ID
+        if "tract_geoid" in gdf.columns:
+            filtered_gdf = gdf[~gdf["tract_geoid"].isin(ohare_tract_ids)].copy()
+        elif "GEOID" in gdf.columns:
+            filtered_gdf = gdf[~gdf["GEOID"].isin(ohare_tract_ids)].copy()
+        else:
+            # If we can't find tract ID column, skip filtering
+            logger.warning("Could not find tract ID column for filtering")
+            filtered_gdf = gdf.copy()
+
+        removed_count = initial_count - len(filtered_gdf)
+        if removed_count > 0:
+            logger.info(
+                "Filtered out %d non-residential tracts (O'Hare airport area)",
+                removed_count,
+            )
+        else:
+            logger.info("No non-residential tracts found to filter")
+
+        return filtered_gdf
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Merge all tract-level data for clustering analysis."""
         logger.info("Merging all housing data at census tract level")
-        
+
         # Get tract boundaries as base
         tract_boundaries = context["tract_boundaries"]
         logger.info("Starting with %d census tracts", len(tract_boundaries))
-        
+
+        # Clip to Chicago boundaries
+        try:
+            city_boundaries = self._load_chicago_boundaries()
+            if city_boundaries is not None:
+                # Ensure same CRS
+                if tract_boundaries.crs != city_boundaries.crs:
+                    city_boundaries = city_boundaries.to_crs(tract_boundaries.crs)
+
+                # Clip tracts to Chicago boundaries
+                tract_boundaries = gpd.clip(tract_boundaries, city_boundaries)
+                logger.info(
+                    "Clipped to Chicago boundaries: %d tracts remaining",
+                    len(tract_boundaries),
+                )
+        except Exception as e:
+            logger.warning("Could not clip to Chicago boundaries: %s", e)
+
+        # Filter out non-residential areas (airports, etc.)
+        tract_boundaries = self._filter_non_residential_tracts(tract_boundaries)
+
         # Start with tract boundaries and add tract_id for merging
         merged_data = tract_boundaries.copy()
         merged_data["tract_id"] = merged_data["tract_geoid"]
-        
+
         # Merge rental data
         if "tract_rental_data" in context:
             rental_data = context["tract_rental_data"]
             logger.info("Merging rental data: %d tracts", len(rental_data))
-            
+
             # Select only the columns we want (exclude geometry and tract_geoid to avoid conflicts)
-            rental_cols = [col for col in rental_data.columns 
-                          if col not in ["geometry", "tract_geoid"]]
-            
+            rental_cols = [
+                col
+                for col in rental_data.columns
+                if col not in ["geometry", "tract_geoid"]
+            ]
+
             # Simple merge - just merge the dataframe columns
             merged_data = merged_data.merge(
                 rental_data[rental_cols + ["tract_geoid"]],
                 left_on="tract_id",
                 right_on="tract_geoid",
-                how="left"
+                how="left",
             )
-            
+
             # Rename rental columns for clarity
             # Use area-weighted as the primary metric (more accurate when tracts span multiple zips)
             if "area_weighted_avg_rent" in merged_data.columns:
-                merged_data = merged_data.rename(columns={"area_weighted_avg_rent": "rental_price_mean"})
+                merged_data = merged_data.rename(
+                    columns={"area_weighted_avg_rent": "rental_price_mean"}
+                )
             if "min_rental_price" in merged_data.columns:
-                merged_data = merged_data.rename(columns={"min_rental_price": "rental_price_min"})
+                merged_data = merged_data.rename(
+                    columns={"min_rental_price": "rental_price_min"}
+                )
             if "max_rental_price" in merged_data.columns:
-                merged_data = merged_data.rename(columns={"max_rental_price": "rental_price_max"})
-            
+                merged_data = merged_data.rename(
+                    columns={"max_rental_price": "rental_price_max"}
+                )
+
             # Drop the unweighted average as it's less accurate
             if "avg_rental_price" in merged_data.columns:
                 merged_data = merged_data.drop(columns=["avg_rental_price"])
-            
+
             # Drop duplicate tract_geoid from merge (we only need tract_id)
             if "tract_geoid_y" in merged_data.columns:
                 merged_data = merged_data.drop(columns=["tract_geoid_y"])
@@ -98,133 +182,261 @@ class TractDataMerger(PipelineComponent):
                 merged_data = merged_data.drop(columns=["tract_geoid_rental"])
         else:
             logger.warning("No rental data found, skipping rental merge")
-        
+
         # Merge Airbnb data
         if "airbnb_tract_data" in context:
             airbnb_data = context["airbnb_tract_data"]
             logger.info("Merging Airbnb data: %d tracts", len(airbnb_data))
-            
+
             # Simple merge - just merge the whole dataframe and rename later
             merged_data = merged_data.merge(
                 airbnb_data,
                 left_on="tract_id",
                 right_on="tract_geoid",
                 how="left",
-                suffixes=("", "_airbnb")
+                suffixes=("", "_airbnb"),
             )
-            
+
             # Rename Airbnb columns
             if "point_count" in merged_data.columns:
-                merged_data = merged_data.rename(columns={"point_count": "airbnb_count"})
+                merged_data = merged_data.rename(
+                    columns={"point_count": "airbnb_count"}
+                )
             if "point_density" in merged_data.columns:
-                merged_data = merged_data.rename(columns={"point_density": "airbnb_density"})
+                merged_data = merged_data.rename(
+                    columns={"point_density": "airbnb_density"}
+                )
             if "price_numeric_mean" in merged_data.columns:
-                merged_data = merged_data.rename(columns={"price_numeric_mean": "airbnb_price_mean"})
+                merged_data = merged_data.rename(
+                    columns={"price_numeric_mean": "airbnb_price_mean"}
+                )
             if "price_numeric_median" in merged_data.columns:
-                merged_data = merged_data.rename(columns={"price_numeric_median": "airbnb_price_median"})
-            
+                merged_data = merged_data.rename(
+                    columns={"price_numeric_median": "airbnb_price_median"}
+                )
+
             # Drop duplicate geometry column if it exists
             if "geometry_airbnb" in merged_data.columns:
                 merged_data = merged_data.drop(columns=["geometry_airbnb"])
         else:
             logger.warning("No Airbnb data found, skipping Airbnb merge")
-        
-        # Merge STR prohibition data - SIMPLIFIED APPROACH
+
+        # Merge STR prohibition data
         if "str_tract_data" in context:
             str_data = context["str_tract_data"]
             logger.info("Merging STR prohibition data: %d tracts", len(str_data))
-            
-            # Simple merge - just merge the whole dataframe and rename later
+
             merged_data = merged_data.merge(
                 str_data,
                 left_on="tract_id",
                 right_on="tract_geoid",
                 how="left",
-                suffixes=("", "_str")
+                suffixes=("", "_str"),
             )
-            
+
             # Rename STR prohibition columns
             if "point_count" in merged_data.columns:
-                merged_data = merged_data.rename(columns={"point_count": "str_prohibition_count"})
-            if "point_density" in merged_data.columns:
-                merged_data = merged_data.rename(columns={"point_density": "str_prohibition_density"})
+                merged_data = merged_data.rename(
+                    columns={"point_count": "str_prohibition_count"}
+                )
             if "number_of_units_sum" in merged_data.columns:
-                merged_data = merged_data.rename(columns={"number_of_units_sum": "str_prohibition_units_total"})
+                merged_data = merged_data.rename(
+                    columns={"number_of_units_sum": "str_prohibition_units_total"}
+                )
             if "number_of_units_mean" in merged_data.columns:
-                merged_data = merged_data.rename(columns={"number_of_units_mean": "str_prohibition_units_mean"})
-            
+                merged_data = merged_data.rename(
+                    columns={"number_of_units_mean": "str_prohibition_units_mean"}
+                )
+
             # Drop duplicate geometry column if it exists
             if "geometry_str" in merged_data.columns:
                 merged_data = merged_data.drop(columns=["geometry_str"])
         else:
             logger.warning("No STR prohibition data found, skipping STR merge")
-        
+
         # Merge census data
         if "census_data" in context:
             census_data = context["census_data"]
             logger.info("Merging census data: %d tracts", len(census_data))
-            
+
             # Rename columns to avoid conflicts
             census_cols = {
                 "total_population": "census_population",
                 "median_income": "census_median_income",
-                "median_house_value": "census_median_house_value", 
+                "median_house_value": "census_median_house_value",
                 "median_age": "census_median_age",
-                "pct_bachelor": "census_pct_bachelor"
+                "pct_bachelor": "census_pct_bachelor",
+                "pct_rented": "census_pct_rented",
             }
             census_data_renamed = census_data.rename(columns=census_cols)
-            
+
             merged_data = merged_data.merge(
                 census_data_renamed[["tract_id"] + list(census_cols.values())],
                 left_on="tract_id",
                 right_on="tract_id",
-                how="left"
+                how="left",
             )
         else:
             logger.warning("No census data found, skipping census merge")
-        
-        # Fill missing values with 0 for count/density columns
-        count_columns = [
-            "airbnb_count", "airbnb_density", "str_prohibition_count", 
-            "str_prohibition_density", "str_prohibition_units_total"
-        ]
-        for col in count_columns:
-            if col in merged_data.columns:
-                merged_data[col] = merged_data[col].fillna(0)
-        
-        # Calculate population density (people per square km)
+
+        # Calculate population density before interpolation (so it can be interpolated too)
         if "census_population" in merged_data.columns:
             # Reproject to a projected CRS (meters) for accurate area calculation
             # Using Albers Equal Area Conic (EPSG:5070) which is good for US area calculations
             geometry_projected = merged_data.geometry.to_crs("EPSG:5070")
             # Convert area from square meters to square kilometers
             merged_data["area_sq_km"] = geometry_projected.area / 1_000_000
+
+            # Filter out tracts with very small area (likely data errors)
+            small_area_mask = (
+                merged_data["area_sq_km"] < MIN_TRACT_AREA_KM2
+            )  # Less than 10 hectares
+            if small_area_mask.any():
+                logger.info(
+                    "Found %d tracts with very small area (< %.2f km²), setting density to NaN",
+                    small_area_mask.sum(),
+                    MIN_TRACT_AREA_KM2,
+                )
+
+            # Calculate population density
             merged_data["population_density"] = (
                 merged_data["census_population"] / merged_data["area_sq_km"]
-            ).fillna(0)
-        
+            )
+
+            # Calculate STR prohibition densities
+            if "str_prohibition_count" in merged_data.columns:
+                merged_data["str_prohibition_building_density"] = (
+                    merged_data["str_prohibition_count"] / merged_data["area_sq_km"]
+                )
+                # Set density to NaN for very small areas
+                merged_data.loc[small_area_mask, "str_prohibition_building_density"] = (
+                    np.nan
+                )
+
+            if "str_prohibition_units_total" in merged_data.columns:
+                merged_data["str_prohibition_units_density"] = (
+                    merged_data["str_prohibition_units_total"]
+                    / merged_data["area_sq_km"]
+                )
+                # Set density to NaN for very small areas
+                merged_data.loc[small_area_mask, "str_prohibition_units_density"] = (
+                    np.nan
+                )
+
+            # Set density to NaN for very small areas (keep as NaN for proper handling)
+            merged_data.loc[small_area_mask, "population_density"] = np.nan
+
+        # Interpolate missing values using spatial KNN (now includes population_density)
+        context["merged_tract_data"] = merged_data
+        interpolator = SpatialInterpolator(k_neighbors=5)
+        context = interpolator.execute(context)
+        merged_data = context["merged_tract_data"]
+
+        # Winsorize population density after interpolation to cap extreme outliers
+        if "population_density" in merged_data.columns:
+            # Use more conservative approach - only cap top 1% or truly extreme values
+            valid_density = merged_data[merged_data["population_density"] > 0][
+                "population_density"
+            ]
+            if len(valid_density) > 0:
+                # Log key distribution statistics
+                percentile_99 = valid_density.quantile(0.99)
+                logger.info(
+                    "Population density 99th percentile: %.1f people/km², max: %.1f",
+                    percentile_99,
+                    valid_density.max(),
+                )
+
+                # Use 99th percentile OR 50k people/km² (very dense urban), whichever is lower
+                # This is more conservative than 95th percentile
+                percentile_99 = valid_density.quantile(0.99)
+                upper_bound = min(percentile_99, 50000)
+
+                initial_extreme = (
+                    merged_data["population_density"] > upper_bound
+                ).sum()
+
+                if initial_extreme > 0:
+                    merged_data["population_density"] = merged_data[
+                        "population_density"
+                    ].clip(upper=upper_bound)
+                    logger.info(
+                        "Capped %d extreme population_density values at %.1f people/km²",
+                        initial_extreme,
+                        upper_bound,
+                    )
+                else:
+                    logger.info("No extreme population density values to cap")
+
+        # Winsorize str_prohibition_units_density at 99.9th percentile
+        if "str_prohibition_units_density" in merged_data.columns:
+            valid_density = merged_data[
+                merged_data["str_prohibition_units_density"] > 0
+            ]["str_prohibition_units_density"]
+            if len(valid_density) > 0:
+                # Log key distribution statistics
+                percentile_99 = valid_density.quantile(0.99)
+                logger.info(
+                    "STR units density 99th percentile: %.1f units/km², max: %.1f",
+                    percentile_99,
+                    valid_density.max(),
+                )
+
+                # Use 99th percentile as upper bound
+                upper_bound = valid_density.quantile(0.99)
+
+                initial_extreme = (
+                    merged_data["str_prohibition_units_density"] > upper_bound
+                ).sum()
+
+                if initial_extreme > 0:
+                    merged_data["str_prohibition_units_density"] = merged_data[
+                        "str_prohibition_units_density"
+                    ].clip(upper=upper_bound)
+                    logger.info(
+                        "Capped %d extreme str_prohibition_units_density values at %.1f units/km²",
+                        initial_extreme,
+                        upper_bound,
+                    )
+                else:
+                    logger.info("No extreme STR units density values to cap")
+
+        # Fill missing values with 0 for count/density columns
+        count_columns = [
+            "airbnb_count",
+            "airbnb_density",
+            "str_prohibition_count",
+            "str_prohibition_building_density",
+            "str_prohibition_units_total",
+            "str_prohibition_units_density",
+        ]
+        for col in count_columns:
+            if col in merged_data.columns:
+                merged_data[col] = merged_data[col].fillna(0)
+
         # Clean up redundant columns
         merged_data = self._clean_columns(merged_data)
-        
+
+        # Process data for clustering (handle missing values, prepare for scaling)
+        merged_data = self._prepare_clustering_data(merged_data)
+
         # Log summary statistics
         self._log_merge_summary(merged_data)
-        
+
         return {"clustering_data": merged_data}
-    
+
     def _clean_columns(self, df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """Remove redundant columns and keep only essential data for clustering."""
         logger.info("Cleaning up redundant columns")
-        
+
         # Keep essential columns
         keep_columns = [
             "geometry",  # Always keep geometry
             "tract_id",  # Keep one tract identifier
-            
             # Rental data
             "rental_price_mean",  # Area-weighted average (most accurate)
             "rental_price_min",
             "rental_price_max",
-            
             # Airbnb data
             "airbnb_count",
             "airbnb_price_mean",
@@ -232,102 +444,150 @@ class TractDataMerger(PipelineComponent):
             "price_numeric_min",
             "price_numeric_max",
             "airbnb_density",
-            
             # STR prohibition data
             "str_prohibition_count",
             "str_prohibition_units_total",
             "str_prohibition_units_mean",
             "number_of_units_median",
-            "str_prohibition_density",
-            
+            "str_prohibition_building_density",
+            "str_prohibition_units_density",
             # Census data
             "census_population",
             "census_median_income",
             "census_median_house_value",
             "census_median_age",
             "census_pct_bachelor",
-            
+            "census_pct_rented",
             # Calculated fields
             "area_sq_km",
             "population_density",
         ]
-        
+
         # Filter to only columns that exist
         available_columns = [col for col in keep_columns if col in df.columns]
-        
+
         # Keep additional census columns if needed for reference
         census_cols = ["GEOID", "NAME"]  # Keep original identifiers for reference
-        
+
         # Combine and filter
-        cols_to_keep = available_columns + [col for col in census_cols if col in df.columns]
-        
+        cols_to_keep = available_columns + [
+            col for col in census_cols if col in df.columns
+        ]
+
         cleaned_df = df[cols_to_keep].copy()
-        
+
         # Log what was removed
         removed_cols = set(df.columns) - set(cleaned_df.columns)
         if removed_cols:
             logger.info("Removed %d redundant columns", len(removed_cols))
-        
+
         return cleaned_df
-    
+
+    def _prepare_clustering_data(self, df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """Prepare data for clustering analysis by handling missing values."""
+        logger.info("Preparing data for clustering analysis")
+
+        # Define clustering variables (same as in clustering_analysis.py)
+        cluster_variables = [
+            # Demographics
+            "census_median_income",
+            "census_median_age",
+            "census_pct_bachelor",
+            # Housing market
+            "census_median_house_value",
+            "census_pct_rented",
+            "rental_price_mean",
+            "airbnb_price_mean",
+            # STR activity
+            "airbnb_density",
+            "str_prohibition_building_density",
+            "str_prohibition_units_density",
+            # Population
+            "population_density",
+        ]
+
+        # Filter to only variables that exist in the data
+        available_cluster_vars = [var for var in cluster_variables if var in df.columns]
+        logger.info(
+            "Found %d clustering variables: %s",
+            len(available_cluster_vars),
+            available_cluster_vars,
+        )
+
+        # Replace -9999 (no-data marker from GeoJSON) with NaN for clustering variables
+        for col in available_cluster_vars:
+            if col in df.columns:
+                # Count how many no-data markers we're replacing
+                no_data_count = (df[col] == NO_DATA_MARKER).sum()
+                if no_data_count > 0:
+                    logger.info(
+                        "Replacing %d no-data markers (%d) with NaN in %s",
+                        no_data_count,
+                        NO_DATA_MARKER,
+                        col,
+                    )
+                    df[col] = df[col].replace(NO_DATA_MARKER, np.nan)
+
+        # Check for missing data in clustering variables
+        cluster_subset = df[available_cluster_vars].copy()
+        missing_data_mask = cluster_subset.isna().any(axis=1)
+
+        if missing_data_mask.any():
+            missing_count = missing_data_mask.sum()
+            logger.info(
+                "Found %d tracts with missing clustering data (%.1f%%), removing them",
+                missing_count,
+                100 * missing_count / len(df),
+            )
+
+            # Log which variables are most problematic
+            missing_by_var = cluster_subset.isna().sum().sort_values(ascending=False)
+            problematic_vars = missing_by_var[missing_by_var > 0]
+            if len(problematic_vars) > 0:
+                logger.info("Variables with missing data:")
+                for var in problematic_vars.head(3).index:
+                    count = problematic_vars[var]
+                    logger.info("  %s: %d tracts missing", var, count)
+
+            # Remove tracts with missing clustering data
+            cleaned_df = df[~missing_data_mask].copy()
+
+        logger.info(
+            "Final clustering dataset: %d tracts with complete data", len(cleaned_df)
+        )
+
+        return cleaned_df
+
     def _log_merge_summary(self, df: gpd.GeoDataFrame) -> None:
         """Log summary statistics of merged data."""
         logger.info("Clustering Data Summary:")
         logger.info("  Total tracts: %d", len(df))
-        
-        # Count tracts with each type of data
-        data_types = {
+
+        # Count tracts with each type of data (non-redundant)
+        data_sources = {
             "Rental data": "rental_price_mean",
-            "Airbnb data": "airbnb_count", 
-            "STR prohibition data": "str_prohibition_count",
-            "Census data": "census_population"
+            "Airbnb data": "airbnb_density",
+            "STR prohibition data": "str_prohibition_building_density",
+            "Census data": "census_median_income",
         }
-        
-        for data_type, col in data_types.items():
+
+        for data_type, col in data_sources.items():
             if col in df.columns:
                 count = df[col].notna().sum()
-                logger.info("  %s: %d tracts (%.1f%%)", 
-                          data_type, count, 100 * count / len(df))
-        
-        # Log data ranges for key variables
-        if "airbnb_density" in df.columns:
-            airbnb_tracts = df[df["airbnb_density"] > 0]
-            if len(airbnb_tracts) > 0:
-                logger.info("  Airbnb density range: %.2f - %.2f listings/km²",
-                          airbnb_tracts["airbnb_density"].min(),
-                          airbnb_tracts["airbnb_density"].max())
-        
-        if "str_prohibition_density" in df.columns:
-            str_tracts = df[df["str_prohibition_density"] > 0]
-            if len(str_tracts) > 0:
-                logger.info("  STR prohibition density range: %.2f - %.2f units/km²",
-                          str_tracts["str_prohibition_density"].min(),
-                          str_tracts["str_prohibition_density"].max())
-        
-        if "rental_price_mean" in df.columns:
-            rental_tracts = df[df["rental_price_mean"].notna()]
-            if len(rental_tracts) > 0:
-                logger.info("  Rental price range: $%.0f - $%.0f",
-                          rental_tracts["rental_price_mean"].min(),
-                          rental_tracts["rental_price_mean"].max())
-        
-        if "census_median_income" in df.columns:
-            income_tracts = df[df["census_median_income"].notna()]
-            if len(income_tracts) > 0:
-                logger.info("  Census median income range: $%.0f - $%.0f",
-                          income_tracts["census_median_income"].min(),
-                          income_tracts["census_median_income"].max())
+                logger.info(
+                    "  %s: %d tracts (%.1f%%)", data_type, count, 100 * count / len(df)
+                )
 
 
 def run_clustering_pipeline() -> tuple[Pipeline, list[PipelineResult]]:
     """Run the clustering data preparation pipeline."""
     logger.info("Running Housing Clustering Data Pipeline")
     logger.info("=" * 50)
-    
+
     config = PipelineConfig()
     pipeline = Pipeline("Housing Clustering Data Pipeline", config=config)
     pipeline.load_config()
-    
+
     # Step 1: Load all data sources
     logger.info("Step 1: Loading data sources")
     pipeline.register_component(RentalDataLoader())
@@ -336,11 +596,11 @@ def run_clustering_pipeline() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(AirbnbDataLoader())
     pipeline.register_component(CensusDataLoader(api_key=os.getenv("CENSUS_API_KEY")))
-    
+
     # Step 2: Aggregate zip-level rental data to tracts
     logger.info("Step 2: Aggregating rental data to tracts")
     pipeline.register_component(ZipToTractProcessor())
-    
+
     # Step 3: Aggregate STR prohibition points to tracts
     logger.info("Step 3: Aggregating STR prohibition data to tracts")
     pipeline.register_component(
@@ -354,7 +614,7 @@ def run_clustering_pipeline() -> tuple[Pipeline, list[PipelineResult]]:
             calculate_density=True,
         )
     )
-    
+
     # Step 4: Aggregate Airbnb points to tracts
     logger.info("Step 4: Aggregating Airbnb data to tracts")
     pipeline.register_component(
@@ -368,36 +628,39 @@ def run_clustering_pipeline() -> tuple[Pipeline, list[PipelineResult]]:
             calculate_density=True,
         )
     )
-    
+
     # Step 5: Merge all data at tract level
     logger.info("Step 5: Merging all data at tract level")
     merger = TractDataMerger()
     pipeline.register_component(merger)
-    
+
     # Execute the pipeline
     results = pipeline.execute()
-    
+
     return pipeline, results
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    
+
     logger.info("Chicago Housing Clustering Data Pipeline")
     logger.info("=" * 50)
-    
+
     pipeline, results = run_clustering_pipeline()
-    
+
     # Print final summary
     logger.info("\n" + "=" * 50)
     logger.info("Pipeline execution completed!")
-    
+
     # Check if clustering data was created successfully
     if "clustering_data" in pipeline.context:
         clustering_data = pipeline.context["clustering_data"]
-        logger.info("Successfully created clustering dataset with %d tracts", len(clustering_data))
+        logger.info(
+            "Successfully created clustering dataset with %d tracts",
+            len(clustering_data),
+        )
         logger.info("Available columns: %s", list(clustering_data.columns))
-        
+
         # Clean data types for GeoJSON export
         # GeoJSON doesn't support nullable integer types or NaN values
         for col in clustering_data.columns:
@@ -408,7 +671,7 @@ if __name__ == "__main__":
                 # Replace NaN with -9999 (standard no-data value) for float columns
                 if clustering_data[col].dtype.name == "float64":
                     clustering_data[col] = clustering_data[col].fillna(-9999)
-        
+
         # Save the merged data for further analysis
         output_path = "/project/output/clustering_data.geojson"
         clustering_data.to_file(output_path, driver="GeoJSON")
