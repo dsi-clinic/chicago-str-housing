@@ -61,7 +61,7 @@ class AffordableMapVisualizer(Visualizer):
         if tract_data is not None and tract_boundaries is not None:
             # Merge tract data with boundaries for plotting
             tract_map_data = tract_boundaries.merge(
-                tract_data[["tract_geoid", "affordable_development_density", "unit_density"]],
+                tract_data[["tract_geoid", "affordable_development_density", "affordable_development_unit_density"]],
                 on="tract_geoid",
                 how="left",
             )
@@ -119,7 +119,7 @@ class AffordableMapVisualizer(Visualizer):
 
             # Create choropleth
             tract_map_data.plot(
-                column="unit_density",
+                column="affordable_development_unit_density",
                 ax=axes[1],
                 legend=True,
                 cmap="viridis",  # Red (expensive) to Green (affordable)
@@ -135,13 +135,13 @@ class AffordableMapVisualizer(Visualizer):
             )
 
             axes[1].set_title(
-                f"Unit Density (n={tract_data['unit_density'].notna().sum()})",
+                f"Unit Density (n={tract_data["affordable_development_unit_density"].notna().sum()})",
                 fontsize=16,
             )
             axes[1].axis("off")
 
             # Add statistics text
-            unit_density = tract_data["unit_density"].dropna()
+            unit_density = tract_data["affordable_development_unit_density"].dropna()
             stats_text = (
                 f"Min: {unit_density.min():.0f}\n"
                 f"Median: {unit_density.median():.0f}\n"

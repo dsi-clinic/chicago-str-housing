@@ -55,7 +55,7 @@ class AffordableDistributionVisualizer(Visualizer):
 
         # 1. Tract-level unit density distribution
         if tract_data is not None:
-            tract_unit_density = tract_data["unit_density"].dropna()
+            tract_unit_density = tract_data["affordable_development_unit_density"].dropna()
             axes[0, 0].hist(
                 tract_unit_density,
                 bins=30,

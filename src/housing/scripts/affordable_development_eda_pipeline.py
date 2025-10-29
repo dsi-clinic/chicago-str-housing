@@ -2,6 +2,9 @@
 
 import logging
 
+from housing.components.analyzers.affordable_density_outliers import (
+    AffordableDevelopmentOutlierAnalyzer,
+)
 from housing.components.analyzers.affordable_development_tract_correlation import (
     AffordableCorrelationAnalyzer,
 )
@@ -13,6 +16,7 @@ from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.processors.affordable_development_points_to_tract import (
     AffordableToTractProcessor,
 )
+from housing.components.processors.outlier_removal import DensityOutlierRemovalProcessor
 from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.visualizers.affordable_development_distribution import (
     AffordableDistributionVisualizer,
@@ -43,7 +47,22 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     # Step 2: Tract-level data aggregation
     pipeline.register_component(AffordableToTractProcessor())
 
-    # Step 3: Community aggregation (ability to add later if useful)
+    pipeline.register_component(AffordableDevelopmentOutlierAnalyzer(
+            ["affordable_development_density", "affordable_development_unit_density"]
+        )
+    )
+
+    pipeline.register_component(
+        DensityOutlierRemovalProcessor(
+            input_key="affordable_developments_tract_data",
+            output_key="affordable_developments_tract_data",
+            density_columns=["affordable_development_density", "affordable_development_unit_density"],
+            method="winsorize",
+            percentile_threshold=0.99,
+        )
+    )
+
+    """# Step 3: Community aggregation (ability to add later if useful)
     # pipeline.register_component(AffordableCommunityDensityProcessor())
 
     # Step 4: Load in and get correlation analysis with other data
@@ -80,7 +99,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     # Step 5: Visualize rental distributions at both levels
     pipeline.register_component(AffordableDistributionVisualizer())
-    pipeline.register_component(AffordableMapVisualizer())
+    pipeline.register_component(AffordableMapVisualizer())"""
 
     results = pipeline.execute()
 
@@ -92,3 +111,7 @@ if __name__ == "__main__":
     logger.info("=" * 50)
 
     pipeline, results = run_full_analysis()
+
+    pipeline.context["affordable_developments_data"].to_csv("/project/output/point_data.csv")
+    pipeline.context["affordable_developments_tract_data"].to_csv("/project/output/tract_data.csv")
+
