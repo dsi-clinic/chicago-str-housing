@@ -22,7 +22,7 @@ from housing.components.loaders.str_prohibition_data import STRProhibitionDataLo
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
 from housing.components.processors.affordable_development_points_to_tract import (
-    AffordableToTractProcessor
+    AffordableToTractProcessor,
 )
 from housing.components.processors.outlier_removal import DensityOutlierRemovalProcessor
 from housing.components.processors.points_to_tract import PointsToTractProcessor
@@ -95,7 +95,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
         )
     )
 
-    #Step 4: Affordable Development → Tract aggregation
+    # Step 4: Affordable Development → Tract aggregation
     pipeline.register_component(AffordableToTractProcessor())
 
     # Step 5: Tract → Community aggregation (the clean way!)
@@ -138,8 +138,10 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
         DensityOutlierRemovalProcessor(
             input_key="affordable_development_tract_data",
             output_key="affordable_development_tract_data",
-            density_columns=["affordable_developent_density",
-                             "affordable_development_unit_density"],
+            density_columns=[
+                "affordable_developent_density",
+                "affordable_development_unit_density",
+            ],
             method="winsorize",
             percentile_threshold=0.99,
         )
