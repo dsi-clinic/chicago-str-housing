@@ -13,6 +13,7 @@ import logging
 
 from housing.components.analyzers.rental_tract import RentalTractAnalyzer
 from housing.components.analyzers.str_prohibition import STRProhibitionAnalyzer
+from housing.components.loaders.affordable_development_data import AffordableDataLoader
 from housing.components.loaders.airbnb_data import AirbnbDataLoader
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.community_boundaries import CommunityBoundariesLoader
@@ -20,6 +21,9 @@ from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
+from housing.components.processors.affordable_development_points_to_tract import (
+    AffordableToTractProcessor,
+)
 from housing.components.processors.outlier_removal import DensityOutlierRemovalProcessor
 from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.processors.tract_to_community import TractToCommunityProcessor
@@ -58,6 +62,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(CityBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(AirbnbDataLoader())
+    pipeline.register_component(AffordableDataLoader())
 
     # Step 2: Zip → Tract aggregation
     pipeline.register_component(ZipToTractProcessor())
@@ -90,6 +95,9 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
         )
     )
 
+    # Step 4: Affordable Development → Tract aggregation
+    pipeline.register_component(AffordableToTractProcessor())
+
     # Step 5: Tract → Community aggregation (the clean way!)
     pipeline.register_component(
         TractToCommunityProcessor(
@@ -121,6 +129,19 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
             input_key="airbnb_tract_data",
             output_key="airbnb_tract_data",
             density_columns=["airbnb_density"],
+            method="winsorize",
+            percentile_threshold=0.99,
+        )
+    )
+
+    pipeline.register_component(
+        DensityOutlierRemovalProcessor(
+            input_key="affordable_development_tract_data",
+            output_key="affordable_development_tract_data",
+            density_columns=[
+                "affordable_developent_density",
+                "affordable_development_unit_density",
+            ],
             method="winsorize",
             percentile_threshold=0.99,
         )
