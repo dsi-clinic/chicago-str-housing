@@ -10,12 +10,10 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 
+from housing.components.constants import MIN_LAND_AREA_SQ_METERS
 from pipeline.base import Visualizer
 
 logger = logging.getLogger(__name__)
-
-# Minimum land area in square meters to exclude water-only tracts
-MIN_LAND_AREA_SQ_METERS = 10000
 
 
 class ForeclosedMapVisualizer(Visualizer):

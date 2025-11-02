@@ -4,7 +4,6 @@ This module performs spatial joins to transform rental data from zip code level
 to census tract level using area-weighted aggregation.
 """
 
-import logging
 from typing import Any
 
 import geopandas as gpd
@@ -12,13 +11,10 @@ import pandas as pd
 
 from pipeline.base import DataProcessor
 
-logger = logging.getLogger(__name__)
-
 
 class ZipToTractProcessor(DataProcessor):
     """Perform spatial join to transform data from zip codes to census tracts.
 
-    This is the ADVANCED CONCEPT for granular analysis:
     - Maps zip codes to census tracts (many-to-many relationship)
     - Handles overlapping boundaries with area-weighted aggregation
     - Census tracts provide fine-grained geographic units
@@ -33,21 +29,15 @@ class ZipToTractProcessor(DataProcessor):
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Perform spatial join and aggregation to census tract level."""
-        logger.info("Performing spatial join: zip codes -> census tracts")
-
         # Get the data from context
         rental_data = context["rental_data"]
         zip_boundaries = context["zip_boundaries"]
         tract_boundaries = context["tract_boundaries"]
 
         # Step 1: Join rental data with zip boundaries
-        logger.info("Step 1: Joining rental data with zip boundaries...")
         zip_rental = zip_boundaries.merge(rental_data, on="zip_code", how="inner")
-        logger.info("Joined %d zip codes with rental data", len(zip_rental))
 
         # Step 2: Spatial join - zip codes to census tracts
-        logger.info("Step 2: Performing spatial join (zip codes -> census tracts)...")
-
         # Ensure same CRS for spatial operations
         if zip_rental.crs != tract_boundaries.crs:
             tract_boundaries = tract_boundaries.to_crs(zip_rental.crs)
@@ -59,11 +49,7 @@ class ZipToTractProcessor(DataProcessor):
             zip_rental, tract_boundaries, how="inner", predicate="intersects"
         )
 
-        logger.info("Spatial join resulted in %d zip-tract pairs", len(spatial_join))
-
         # Step 3: Calculate intersection areas for proper weighting
-        logger.info("Step 3: Calculating intersection areas for weighting...")
-
         # For each zip-tract pair, calculate the actual intersection area
         # This is crucial for accurate aggregation
         intersection_data = []
@@ -89,12 +75,8 @@ class ZipToTractProcessor(DataProcessor):
 
         # Create dataframe with intersection data
         intersections_df = pd.DataFrame(intersection_data)
-        logger.info(
-            "Calculated intersections for %d zip-tract pairs", len(intersections_df)
-        )
 
         # Step 4: Aggregate rental prices by census tract
-        logger.info("Step 4: Aggregating rental prices by census tract...")
 
         # Calculate area-weighted average rental price
         intersections_df["weighted_rent"] = (
@@ -141,12 +123,6 @@ class ZipToTractProcessor(DataProcessor):
             tract_rental_gdf.drop(columns=["geometry"]), on="tract_geoid", how="left"
         )
 
-        logger.info("Final result: %d census tracts", len(final_result))
-        logger.info(
-            "Tracts with rental data: %d",
-            final_result["avg_rental_price"].notna().sum(),
-        )
-
         # Create zip-to-tract crosswalk
         crosswalk = intersections_df[
             ["zip_code", "tract_geoid", "intersection_area"]
@@ -154,8 +130,6 @@ class ZipToTractProcessor(DataProcessor):
         crosswalk = crosswalk.sort_values(
             ["zip_code", "intersection_area"], ascending=[True, False]
         )
-
-        logger.info("Created zip-to-tract crosswalk with %d mappings", len(crosswalk))
 
         return {
             "tract_rental_data": final_result,

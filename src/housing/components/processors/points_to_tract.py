@@ -64,25 +64,21 @@ class PointsToTractProcessor(DataProcessor):
         # Set data source name - use input_key if not provided
         if data_source_name is None:
             # Extract meaningful name from input_key (e.g., "airbnb_data" -> "airbnb")
-            self.data_source_name = input_key.replace("_data", "").replace("_", "_")
+            self.data_source_name = input_key.replace("_data", "")
         else:
             self.data_source_name = data_source_name
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Perform spatial join and aggregation."""
-        logger.info("Aggregating %s point data to census tracts...", self.input_key)
-
         # Get data from context
         point_data = context[self.input_key]
         tract_boundaries = context["tract_boundaries"]
 
         # Step 1: Ensure both datasets are in same CRS
-        logger.info("Step 1: Aligning coordinate systems...")
         if point_data.crs != tract_boundaries.crs:
             point_data = point_data.to_crs(tract_boundaries.crs)
 
         # Step 2: Spatial join - which tract is each point in?
-        logger.info("Step 2: Spatial join (points → tracts)...")
         points_with_tract = gpd.sjoin(
             point_data,
             tract_boundaries[["tract_geoid", "geometry"]],
@@ -90,18 +86,7 @@ class PointsToTractProcessor(DataProcessor):
             predicate="within",
         )
 
-        # Log statistics
-        total_points = len(points_with_tract)
-        matched_points = points_with_tract["tract_geoid"].notna().sum()
-        logger.info(
-            "Matched %d/%d points to census tracts (%.1f%%)",
-            matched_points,
-            total_points,
-            100 * matched_points / total_points if total_points > 0 else 0,
-        )
-
         # Step 3: Aggregate by tract
-        logger.info("Step 3: Aggregating by census tract...")
 
         # Build aggregation dictionary
         agg_dict = {}
@@ -137,10 +122,7 @@ class PointsToTractProcessor(DataProcessor):
             columns={count_col_name: f"{self.data_source_name}_count"}
         )
 
-        logger.info("Aggregated to %d census tracts", len(tract_agg))
-
         # Step 4: Join with tract geometries
-        logger.info("Step 4: Joining with tract geometries...")
         tract_data = tract_boundaries[["tract_geoid", "geometry"]].merge(
             tract_agg, on="tract_geoid", how="left"
         )
@@ -151,8 +133,6 @@ class PointsToTractProcessor(DataProcessor):
 
         # Step 5: Calculate density if requested
         if self.calculate_density:
-            logger.info("Step 5: Calculating point density per km²...")
-
             # Convert to projected CRS for accurate area calculation
             tract_projected = tract_data.to_crs("EPSG:32616")  # UTM Zone 16N
             tract_projected["area_km2"] = tract_projected.geometry.area / 1_000_000
@@ -169,25 +149,9 @@ class PointsToTractProcessor(DataProcessor):
                 density_column_name
             ].to_numpy()
 
-            logger.info(
-                "Density range: %.2f - %.2f points/km²",
-                tract_data[density_column_name].min(),
-                tract_data[density_column_name].max(),
-            )
-
         # Convert to GeoDataFrame
         tract_data = gpd.GeoDataFrame(
             tract_data, geometry="geometry", crs=tract_boundaries.crs
-        )
-
-        # Log summary statistics
-        logger.info(
-            "Summary: %d tracts total, %d with points (%.1f%%)",
-            len(tract_data),
-            (tract_data[count_column_name] > 0).sum(),
-            100 * (tract_data[count_column_name] > 0).sum() / len(tract_data)
-            if len(tract_data) > 0
-            else 0,
         )
 
         return {

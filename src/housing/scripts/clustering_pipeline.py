@@ -10,33 +10,51 @@ for clustering analysis. It combines:
 
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import geopandas as gpd
 import numpy as np
 from dotenv import load_dotenv
 
+from housing.components.constants import MIN_TRACT_AREA_KM2, NO_DATA_MARKER
+from housing.components.loaders.affordable_development_data import (
+    AffordableDataLoader,
+)
 from housing.components.loaders.airbnb_data import AirbnbDataLoader
 from housing.components.loaders.census_data import CensusDataLoader
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
+from housing.components.loaders.foreclosed_data import ForeclosedDataLoader
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
+from housing.components.processors.affordable_development_points_to_tract import (
+    AffordableToTractProcessor,
+)
 from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.processors.spatial_interpolator import SpatialInterpolator
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
+from housing.components.utils import winsorize
 from pipeline import Pipeline, PipelineResult
 from pipeline.base import PipelineComponent
 from pipeline.config import PipelineConfig
 
 logger = logging.getLogger(__name__)
 
-# Constants
-MIN_TRACT_AREA_KM2 = 0.01  # Minimum tract area in km² (10 hectares)
-NO_DATA_MARKER = -9999  # No-data marker from GeoJSON files
-
 load_dotenv()
+
+# =============================================================================
+# PATH CONFIGURATION
+# =============================================================================
+
+# Base paths for input and output
+PROJECT_ROOT = Path("/project")
+DATA_DIR = PROJECT_ROOT / "data"
+OUTPUT_DIR = PROJECT_ROOT / "output"
+
+# Output file paths
+CLUSTERING_DATA_OUTPUT = OUTPUT_DIR / "clustering_data.geojson"
 
 
 class TractDataMerger(PipelineComponent):
@@ -54,6 +72,8 @@ class TractDataMerger(PipelineComponent):
             "airbnb_tract_data",
             "str_tract_data",
             "census_data",
+            "affordable_development_tract_data",
+            "foreclosed_tract_data",
         ]
         self.output_data = ["clustering_data"]
 
@@ -71,8 +91,6 @@ class TractDataMerger(PipelineComponent):
 
     def _filter_non_residential_tracts(self, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """Filter out non-residential tracts like airports, industrial areas, etc."""
-        logger.info("Filtering out non-residential tracts")
-
         # O'Hare Airport tract IDs
         ohare_tract_ids = [
             "17031980000",
@@ -99,18 +117,13 @@ class TractDataMerger(PipelineComponent):
                 "Filtered out %d non-residential tracts (O'Hare airport area)",
                 removed_count,
             )
-        else:
-            logger.info("No non-residential tracts found to filter")
 
         return filtered_gdf
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Merge all tract-level data for clustering analysis."""
-        logger.info("Merging all housing data at census tract level")
-
         # Get tract boundaries as base
         tract_boundaries = context["tract_boundaries"]
-        logger.info("Starting with %d census tracts", len(tract_boundaries))
 
         # Clip to Chicago boundaries
         try:
@@ -139,7 +152,6 @@ class TractDataMerger(PipelineComponent):
         # Merge rental data
         if "tract_rental_data" in context:
             rental_data = context["tract_rental_data"]
-            logger.info("Merging rental data: %d tracts", len(rental_data))
 
             # Select only the columns we want (exclude geometry and tract_geoid to avoid conflicts)
             rental_cols = [
@@ -186,9 +198,7 @@ class TractDataMerger(PipelineComponent):
         # Merge Airbnb data
         if "airbnb_tract_data" in context:
             airbnb_data = context["airbnb_tract_data"]
-            logger.info("Merging Airbnb data: %d tracts", len(airbnb_data))
 
-            # Simple merge - just merge the whole dataframe and rename later
             merged_data = merged_data.merge(
                 airbnb_data,
                 left_on="tract_id",
@@ -197,22 +207,14 @@ class TractDataMerger(PipelineComponent):
                 suffixes=("", "_airbnb"),
             )
 
-            # Rename Airbnb columns
-            if "point_count" in merged_data.columns:
+            # Rename Airbnb price columns (use median for robustness)
+            if "price_numeric_median" in merged_data.columns:
                 merged_data = merged_data.rename(
-                    columns={"point_count": "airbnb_count"}
-                )
-            if "point_density" in merged_data.columns:
-                merged_data = merged_data.rename(
-                    columns={"point_density": "airbnb_density"}
+                    columns={"price_numeric_median": "airbnb_price_mean"}
                 )
             if "price_numeric_mean" in merged_data.columns:
                 merged_data = merged_data.rename(
-                    columns={"price_numeric_mean": "airbnb_price_mean"}
-                )
-            if "price_numeric_median" in merged_data.columns:
-                merged_data = merged_data.rename(
-                    columns={"price_numeric_median": "airbnb_price_median"}
+                    columns={"price_numeric_mean": "airbnb_price_median"}
                 )
 
             # Drop duplicate geometry column if it exists
@@ -224,7 +226,6 @@ class TractDataMerger(PipelineComponent):
         # Merge STR prohibition data
         if "str_tract_data" in context:
             str_data = context["str_tract_data"]
-            logger.info("Merging STR prohibition data: %d tracts", len(str_data))
 
             merged_data = merged_data.merge(
                 str_data,
@@ -235,10 +236,6 @@ class TractDataMerger(PipelineComponent):
             )
 
             # Rename STR prohibition columns
-            if "point_count" in merged_data.columns:
-                merged_data = merged_data.rename(
-                    columns={"point_count": "str_prohibition_count"}
-                )
             if "number_of_units_sum" in merged_data.columns:
                 merged_data = merged_data.rename(
                     columns={"number_of_units_sum": "str_prohibition_units_total"}
@@ -257,7 +254,6 @@ class TractDataMerger(PipelineComponent):
         # Merge census data
         if "census_data" in context:
             census_data = context["census_data"]
-            logger.info("Merging census data: %d tracts", len(census_data))
 
             # Rename columns to avoid conflicts
             census_cols = {
@@ -278,6 +274,60 @@ class TractDataMerger(PipelineComponent):
             )
         else:
             logger.warning("No census data found, skipping census merge")
+
+        # Merge affordable development data
+        if "affordable_development_tract_data" in context:
+            affordable_data = context["affordable_development_tract_data"]
+
+            merged_data = merged_data.merge(
+                affordable_data,
+                left_on="tract_id",
+                right_on="tract_geoid",
+                how="left",
+                suffixes=("", "_affordable"),
+            )
+
+            # Rename affordable development columns for clarity
+            if "units_sum" in merged_data.columns:
+                merged_data = merged_data.rename(
+                    columns={"units_sum": "affordable_units_total"}
+                )
+            if "units_mean" in merged_data.columns:
+                merged_data = merged_data.rename(
+                    columns={"units_mean": "affordable_units_mean"}
+                )
+            if "affordable_development_unit_density" in merged_data.columns:
+                merged_data = merged_data.rename(
+                    columns={
+                        "affordable_development_unit_density": "affordable_unit_density"
+                    }
+                )
+
+            # Drop duplicate geometry column if it exists
+            if "geometry_affordable" in merged_data.columns:
+                merged_data = merged_data.drop(columns=["geometry_affordable"])
+        else:
+            logger.warning(
+                "No affordable development data found, skipping affordable merge"
+            )
+
+        # Merge foreclosed data
+        if "foreclosed_tract_data" in context:
+            foreclosed_data = context["foreclosed_tract_data"]
+
+            merged_data = merged_data.merge(
+                foreclosed_data,
+                left_on="tract_id",
+                right_on="tract_geoid",
+                how="left",
+                suffixes=("", "_foreclosed"),
+            )
+
+            # Drop duplicate geometry column if it exists
+            if "geometry_foreclosed" in merged_data.columns:
+                merged_data = merged_data.drop(columns=["geometry_foreclosed"])
+        else:
+            logger.warning("No foreclosed data found, skipping foreclosed merge")
 
         # Calculate population density before interpolation (so it can be interpolated too)
         if "census_population" in merged_data.columns:
@@ -332,74 +382,23 @@ class TractDataMerger(PipelineComponent):
         context = interpolator.execute(context)
         merged_data = context["merged_tract_data"]
 
-        # Winsorize population density after interpolation to cap extreme outliers
-        if "population_density" in merged_data.columns:
-            # Use more conservative approach - only cap top 1% or truly extreme values
-            valid_density = merged_data[merged_data["population_density"] > 0][
-                "population_density"
-            ]
-            if len(valid_density) > 0:
-                # Log key distribution statistics
-                percentile_99 = valid_density.quantile(0.99)
-                logger.info(
-                    "Population density 99th percentile: %.1f people/km², max: %.1f",
-                    percentile_99,
-                    valid_density.max(),
-                )
-
-                # Use 99th percentile OR 50k people/km² (very dense urban), whichever is lower
-                # This is more conservative than 95th percentile
-                percentile_99 = valid_density.quantile(0.99)
-                upper_bound = min(percentile_99, 50000)
-
-                initial_extreme = (
-                    merged_data["population_density"] > upper_bound
-                ).sum()
-
-                if initial_extreme > 0:
-                    merged_data["population_density"] = merged_data[
-                        "population_density"
-                    ].clip(upper=upper_bound)
-                    logger.info(
-                        "Capped %d extreme population_density values at %.1f people/km²",
-                        initial_extreme,
-                        upper_bound,
-                    )
-                else:
-                    logger.info("No extreme population density values to cap")
-
-        # Winsorize str_prohibition_units_density at 99.9th percentile
-        if "str_prohibition_units_density" in merged_data.columns:
-            valid_density = merged_data[
-                merged_data["str_prohibition_units_density"] > 0
-            ]["str_prohibition_units_density"]
-            if len(valid_density) > 0:
-                # Log key distribution statistics
-                percentile_99 = valid_density.quantile(0.99)
-                logger.info(
-                    "STR units density 99th percentile: %.1f units/km², max: %.1f",
-                    percentile_99,
-                    valid_density.max(),
-                )
-
-                # Use 99th percentile as upper bound
-                upper_bound = valid_density.quantile(0.99)
-
-                initial_extreme = (
-                    merged_data["str_prohibition_units_density"] > upper_bound
-                ).sum()
-
-                if initial_extreme > 0:
-                    merged_data["str_prohibition_units_density"] = merged_data[
-                        "str_prohibition_units_density"
-                    ].clip(upper=upper_bound)
-                    logger.info(
-                        "Capped %d extreme str_prohibition_units_density values at %.1f units/km²",
-                        initial_extreme,
-                        upper_bound,
-                    )
-                else:
-                    logger.info("No extreme STR units density values to cap")
+        # Winsorize density variables after interpolation to cap extreme outliers
+        merged_data = winsorize(
+            merged_data,
+            "population_density",
+            max_bound=50000,
+            unit_name="people",
+            logger=logger,
+        )
+        merged_data = winsorize(
+            merged_data,
+            "str_prohibition_units_density",
+            unit_name="units",
+            logger=logger,
+        )
+        merged_data = winsorize(
+            merged_data, "foreclosed_density", unit_name="properties", logger=logger
+        )
 
         # Fill missing values with 0 for count/density columns
         count_columns = [
@@ -409,6 +408,9 @@ class TractDataMerger(PipelineComponent):
             "str_prohibition_building_density",
             "str_prohibition_units_total",
             "str_prohibition_units_density",
+            "affordable_development_density",
+            "affordable_unit_density",
+            "foreclosed_density",
         ]
         for col in count_columns:
             if col in merged_data.columns:
@@ -427,8 +429,6 @@ class TractDataMerger(PipelineComponent):
 
     def _clean_columns(self, df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """Remove redundant columns and keep only essential data for clustering."""
-        logger.info("Cleaning up redundant columns")
-
         # Keep essential columns
         keep_columns = [
             "geometry",  # Always keep geometry
@@ -458,6 +458,11 @@ class TractDataMerger(PipelineComponent):
             "census_median_age",
             "census_pct_bachelor",
             "census_pct_rented",
+            # Affordable development data
+            "affordable_development_density",
+            "affordable_unit_density",
+            # Foreclosed data
+            "foreclosed_density",
             # Calculated fields
             "area_sq_km",
             "population_density",
@@ -485,8 +490,6 @@ class TractDataMerger(PipelineComponent):
 
     def _prepare_clustering_data(self, df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """Prepare data for clustering analysis by handling missing values."""
-        logger.info("Preparing data for clustering analysis")
-
         # Define clustering variables (same as in clustering_analysis.py)
         cluster_variables = [
             # Demographics
@@ -504,29 +507,22 @@ class TractDataMerger(PipelineComponent):
             "str_prohibition_units_density",
             # Population
             "population_density",
+            # Affordable and foreclosed housing
+            "affordable_development_density",
+            "affordable_unit_density",
+            "foreclosed_density",
         ]
 
         # Filter to only variables that exist in the data
         available_cluster_vars = [var for var in cluster_variables if var in df.columns]
-        logger.info(
-            "Found %d clustering variables: %s",
-            len(available_cluster_vars),
-            available_cluster_vars,
-        )
+        logger.info("Found %d clustering variables", len(available_cluster_vars))
 
         # Replace -9999 (no-data marker from GeoJSON) with NaN for clustering variables
         for col in available_cluster_vars:
-            if col in df.columns:
-                # Count how many no-data markers we're replacing
-                no_data_count = (df[col] == NO_DATA_MARKER).sum()
-                if no_data_count > 0:
-                    logger.info(
-                        "Replacing %d no-data markers (%d) with NaN in %s",
-                        no_data_count,
-                        NO_DATA_MARKER,
-                        col,
-                    )
-                    df[col] = df[col].replace(NO_DATA_MARKER, np.nan)
+            # Count how many no-data markers we're replacing
+            no_data_count = (df[col] == NO_DATA_MARKER).sum()
+            if no_data_count > 0:
+                df[col] = df[col].replace(NO_DATA_MARKER, np.nan)
 
         # Check for missing data in clustering variables
         cluster_subset = df[available_cluster_vars].copy()
@@ -572,6 +568,8 @@ class TractDataMerger(PipelineComponent):
             "Airbnb data": "airbnb_density",
             "STR prohibition data": "str_prohibition_building_density",
             "Census data": "census_median_income",
+            "Affordable development data": "affordable_development_density",
+            "Foreclosed data": "foreclosed_density",
         }
 
         for data_type, col in data_sources.items():
@@ -584,28 +582,24 @@ class TractDataMerger(PipelineComponent):
 
 def run_clustering_pipeline() -> tuple[Pipeline, list[PipelineResult]]:
     """Run the clustering data preparation pipeline."""
-    logger.info("Running Housing Clustering Data Pipeline")
-    logger.info("=" * 50)
-
     config = PipelineConfig()
     pipeline = Pipeline("Housing Clustering Data Pipeline", config=config)
     pipeline.load_config()
 
-    # Step 1: Load all data sources
-    logger.info("Step 1: Loading data sources")
+    # Load all data sources
     pipeline.register_component(RentalDataLoader())
     pipeline.register_component(ZipBoundariesLoader())
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(AirbnbDataLoader())
     pipeline.register_component(CensusDataLoader(api_key=os.getenv("CENSUS_API_KEY")))
+    pipeline.register_component(AffordableDataLoader())
+    pipeline.register_component(ForeclosedDataLoader())
 
-    # Step 2: Aggregate zip-level rental data to tracts
-    logger.info("Step 2: Aggregating rental data to tracts")
+    # Aggregate zip-level rental data to tracts
     pipeline.register_component(ZipToTractProcessor())
 
-    # Step 3: Aggregate STR prohibition points to tracts
-    logger.info("Step 3: Aggregating STR prohibition data to tracts")
+    # Aggregate STR prohibition points to tracts
     pipeline.register_component(
         PointsToTractProcessor(
             input_key="str_prohibition_data",
@@ -618,8 +612,7 @@ def run_clustering_pipeline() -> tuple[Pipeline, list[PipelineResult]]:
         )
     )
 
-    # Step 4: Aggregate Airbnb points to tracts
-    logger.info("Step 4: Aggregating Airbnb data to tracts")
+    # Aggregate Airbnb points to tracts
     pipeline.register_component(
         PointsToTractProcessor(
             input_key="airbnb_data",
@@ -632,8 +625,21 @@ def run_clustering_pipeline() -> tuple[Pipeline, list[PipelineResult]]:
         )
     )
 
-    # Step 5: Merge all data at tract level
-    logger.info("Step 5: Merging all data at tract level")
+    # Aggregate affordable development points to tracts
+    pipeline.register_component(AffordableToTractProcessor())
+
+    # Aggregate foreclosed points to tracts
+    pipeline.register_component(
+        PointsToTractProcessor(
+            input_key="foreclosed_data",
+            output_key="foreclosed_tract_data",
+            id_column="id",
+            aggregate_columns={},
+            calculate_density=True,
+        )
+    )
+
+    # Merge all data at tract level
     merger = TractDataMerger()
     pipeline.register_component(merger)
 
@@ -662,7 +668,6 @@ if __name__ == "__main__":
             "Successfully created clustering dataset with %d tracts",
             len(clustering_data),
         )
-        logger.info("Available columns: %s", list(clustering_data.columns))
 
         # Clean data types for GeoJSON export
         # GeoJSON doesn't support nullable integer types or NaN values
@@ -676,8 +681,7 @@ if __name__ == "__main__":
                     clustering_data[col] = clustering_data[col].fillna(-9999)
 
         # Save the merged data for further analysis
-        output_path = "/project/output/clustering_data.geojson"
-        clustering_data.to_file(output_path, driver="GeoJSON")
-        logger.info("Clustering data saved to: %s", output_path)
+        clustering_data.to_file(CLUSTERING_DATA_OUTPUT, driver="GeoJSON")
+        logger.info("Clustering data saved to: %s", CLUSTERING_DATA_OUTPUT)
     else:
         logger.error("Failed to create clustering dataset")

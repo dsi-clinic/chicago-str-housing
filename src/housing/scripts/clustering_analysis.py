@@ -12,35 +12,44 @@ import logging
 from pathlib import Path
 
 import geopandas as gpd
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
-from esda.moran import Moran
-from libpysal.weights import Queen
-from sklearn.preprocessing import robust_scale
+
+from housing.components.constants import MAX_POPULATION_DENSITY_DISPLAY
+from housing.components.utils import (
+    calculate_morans_i,
+    calculate_value_cap,
+    create_choropleth_maps,
+    create_correlation_matrix,
+    standardize_data,
+)
 
 logger = logging.getLogger(__name__)
 
-# Constants for number formatting
-BILLION_THRESHOLD = 1e9
-MILLION_THRESHOLD = 1e6
-THOUSAND_THRESHOLD = 1e3
+# Base paths for input and output
+PROJECT_ROOT = Path("/project")
+DATA_DIR = PROJECT_ROOT / "data"
+OUTPUT_DIR = PROJECT_ROOT / "output"
 
-# Constants for visualization
-MAX_POPULATION_DENSITY_DISPLAY = 100000  # Cap for choropleth map display (people/km²)
+# Input and output file paths
+CLUSTERING_DATA_INPUT = OUTPUT_DIR / "clustering_data.geojson"
+CHOROPLETH_MAPS_OUTPUT = OUTPUT_DIR / "choropleth_maps.png"
+MORANS_I_OUTPUT = OUTPUT_DIR / "morans_i_results.csv"
+SCATTERPLOT_MATRIX_OUTPUT = OUTPUT_DIR / "scatterplot_matrix.png"
+SCALED_DATA_OUTPUT = OUTPUT_DIR / "clustering_data_scaled.csv"
 
 
-def load_clustering_data(
-    file_path: str = "output/clustering_data.geojson",
-) -> gpd.GeoDataFrame:
+def load_clustering_data(file_path: Path | None = None) -> gpd.GeoDataFrame:
     """Load the clustering data prepared by the pipeline."""
+    if file_path is None:
+        file_path = CLUSTERING_DATA_INPUT
+
     logger.info("Loading clustering data from %s", file_path)
 
-    if not Path(file_path).exists():
+    if not file_path.exists():
         raise FileNotFoundError(
             f"Clustering data not found: {file_path}\n"
-            "Please run the clustering pipeline first: python src/housing/scripts/clustering_pipeline.py"
+            "Please run the clustering pipeline first: make run-clustering-pipeline"
         )
 
     gdf = gpd.read_file(file_path)
@@ -72,6 +81,10 @@ def select_cluster_variables(gdf: gpd.GeoDataFrame) -> tuple[list[str], pd.DataF
         "str_prohibition_units_density",
         # Population
         "population_density",
+        # Affordable and foreclosed housing
+        "affordable_development_density",
+        "affordable_unit_density",
+        "foreclosed_density",
     ]
 
     # Filter to only variables that exist in the data
@@ -90,162 +103,12 @@ def select_cluster_variables(gdf: gpd.GeoDataFrame) -> tuple[list[str], pd.DataF
     return available_vars, cluster_data
 
 
-def create_choropleth_maps(
-    gdf: gpd.GeoDataFrame, variables: list[str], output_path: str | None = None
-) -> None:
-    """Create choropleth maps for each clustering variable."""
-    # Create subplots
-    n_vars = len(variables)
-    ncols = 3
-    nrows = (n_vars + ncols - 1) // ncols
-
-    f, axs = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 5 * nrows))
-    axs = axs.flatten()
-
-    # Plot each variable
-    for i, col in enumerate(variables):
-        ax = axs[i]
-
-        # Replace -9999 (no-data marker) with NaN for better visualization
-        plot_data = gdf.copy()
-        if col in plot_data.columns:
-            plot_data[col] = plot_data[col].replace(-9999, np.nan)
-
-            # Cap population density for better map visualization (data analysis uses original values)
-            if col == "population_density":
-                valid_values = plot_data[col].dropna()
-                if len(valid_values) > 0:
-                    # Cap at 95th percentile or max display threshold for clear map visualization
-                    percentile_95 = valid_values.quantile(0.95)
-                    upper_bound = min(percentile_95, MAX_POPULATION_DENSITY_DISPLAY)
-                    plot_data[col] = plot_data[col].clip(upper=upper_bound)
-
-        # Plot map
-        plot_data.plot(
-            column=col,
-            ax=ax,
-            scheme="Quantiles",
-            linewidth=0.1,
-            cmap="RdPu",
-            legend=True,
-            legend_kwds={"loc": "lower left"},
-            missing_kwds={"color": "lightgrey", "edgecolor": "none"},
-        )
-
-        # Remove axis clutter
-        ax.set_axis_off()
-        ax.set_title(col, fontsize=10)
-
-    # Hide extra subplots
-    for i in range(n_vars, len(axs)):
-        axs[i].set_axis_off()
-
-    plt.tight_layout()
-
-    if output_path:
-        plt.savefig(output_path, dpi=300, bbox_inches="tight")
-        logger.info("Saved choropleth maps to %s", output_path)
-
-    return f
-
-
-def calculate_morans_i(gdf: gpd.GeoDataFrame, variables: list[str]) -> pd.DataFrame:
-    """Calculate Moran's I for spatial autocorrelation."""
-    # Create spatial weights matrix using Queen contiguity
-    w = Queen.from_dataframe(gdf, use_index=True)
-
-    # Transform weights to row-standardized form
-    w.transform = "r"
-
-    # Calculate Moran's I for each variable
-    np.random.seed(123456)  # For reproducibility
-    mi_results = []
-
-    for variable in variables:
-        values = gdf[variable].to_numpy()
-        moran = Moran(values, w)
-        mi_results.append(
-            {"Variable": variable, "Moran's I": moran.I, "P-value": moran.p_sim}
-        )
-
-    # Create results dataframe
-    results_df = pd.DataFrame(mi_results).set_index("Variable")
-
-    logger.info("Moran's I Results:\n%s", results_df)
-
-    return results_df
-
-
-def create_correlation_matrix(
-    data: pd.DataFrame, output_path: str | None = None
-) -> None:
-    """Create a pairwise scatterplot matrix to explore correlations."""
-    # Create pairplot - each scatterplot panel has independent x and y scales
-    fig = sns.pairplot(
-        data,
-        kind="reg",
-        diag_kind="kde",
-        plot_kws={
-            "scatter_kws": {"alpha": 0.4, "s": 8},
-            "line_kws": {"color": "red", "lw": 0.5},
-        },
-    )
-
-    # Adjust axis labels and ticks for better readability
-    def format_number(x: float) -> str:
-        """Format numbers compactly for consistent label sizes."""
-        abs_x = abs(x)
-        if abs_x >= BILLION_THRESHOLD:
-            return f"{x / BILLION_THRESHOLD:.1f}B"
-        elif abs_x >= MILLION_THRESHOLD:
-            return f"{x / MILLION_THRESHOLD:.1f}M"
-        elif abs_x >= THOUSAND_THRESHOLD:
-            return f"{x / THOUSAND_THRESHOLD:.1f}K"
-        elif abs_x >= 1:
-            return f"{x:.0f}"
-        else:
-            return f"{x:.2f}"
-
-    for ax in fig.axes.flatten():
-        if ax is not None:
-            ax.tick_params(labelsize=5, rotation=45)
-            # Use compact number formatting - create formatter outside loop
-            try:
-                ax.yaxis.set_major_formatter(
-                    plt.FuncFormatter(lambda x, p: format_number(x))
-                )
-                ax.xaxis.set_major_formatter(
-                    plt.FuncFormatter(lambda x, p: format_number(x))
-                )
-            except Exception as e:
-                logger.warning("Could not format axis labels: %s", str(e))
-
-    plt.suptitle(
-        "Pairwise Relationships Between Clustering Variables", y=1.02, fontsize=14
-    )
-
-    if output_path:
-        plt.savefig(output_path, dpi=300, bbox_inches="tight")
-        logger.info("Saved scatterplot matrix to %s", output_path)
-
-    return fig
-
-
-def standardize_data(data: pd.DataFrame) -> np.ndarray:
-    """Standardize data using robust scaling."""
-    logger.info("Standardizing data using robust scaling")
-
-    scaled_data = robust_scale(data)
-
-    logger.info("Scaled data shape: %s", scaled_data.shape)
-    logger.info("Mean: %.3f, Std: %.3f", scaled_data.mean(), scaled_data.std())
-
-    return scaled_data
-
-
 def main() -> None:
     """Run the clustering analysis pipeline."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
+
+    # Set random seed for reproducibility
+    np.random.seed(123456)
 
     logger.info("Chicago Housing Clustering Analysis")
     logger.info("=" * 50)
@@ -267,13 +130,27 @@ def main() -> None:
         "str_prohibition_building_density",
         "str_prohibition_units_density",
         "population_density",
+        "affordable_development_density",
+        "affordable_unit_density",
+        "foreclosed_density",
     ]
     variables = [var for var in cluster_variables if var in gdf_full.columns]
 
     # Step 2: Create choropleth maps (includes all tracts, applies display capping for visualization)
     logger.info("\nStep 2: Creating choropleth maps")
+    # Calculate population density cap for visualization
+    max_value_caps = calculate_value_cap(
+        gdf_full,
+        "population_density",
+        percentile=0.95,
+        max_value=MAX_POPULATION_DENSITY_DISPLAY,
+    )
+
     create_choropleth_maps(
-        gdf_full, variables, output_path="output/choropleth_maps.png"
+        gdf_full,
+        variables,
+        output_path=CHOROPLETH_MAPS_OUTPUT,
+        max_value_caps=max_value_caps,
     )
 
     # Step 3: Select clustering variables and remove tracts with missing data
@@ -286,11 +163,15 @@ def main() -> None:
     # Step 4: Calculate Moran's I
     logger.info("\nStep 4: Calculating Moran's I")
     moran_results = calculate_morans_i(gdf_analysis, variables)
-    moran_results.to_csv("output/morans_i_results.csv")
+    moran_results.to_csv(MORANS_I_OUTPUT)
 
     # Step 5: Create correlation matrix
     logger.info("\nStep 5: Creating pairwise scatterplot matrix")
-    create_correlation_matrix(cluster_data, output_path="output/scatterplot_matrix.png")
+    create_correlation_matrix(
+        cluster_data,
+        output_path=SCATTERPLOT_MATRIX_OUTPUT,
+        title="Pairwise Relationships Between Clustering Variables",
+    )
 
     # Step 6: Standardize data
     logger.info("\nStep 6: Standardizing data")
@@ -298,11 +179,11 @@ def main() -> None:
 
     # Save standardized data
     scaled_df = pd.DataFrame(scaled_data, columns=variables, index=cluster_data.index)
-    scaled_df.to_csv("output/clustering_data_scaled.csv")
+    scaled_df.to_csv(SCALED_DATA_OUTPUT)
 
     logger.info("\n" + "=" * 50)
     logger.info("Clustering data preparation complete!")
-    logger.info("Standardized data saved to: output/clustering_data_scaled.csv")
+    logger.info("Standardized data saved to: %s", SCALED_DATA_OUTPUT)
 
     return gdf_full, cluster_data, scaled_data, moran_results
 
