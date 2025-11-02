@@ -10,9 +10,11 @@ from housing.components.analyzers.affordable_development_tract_correlation impor
 )
 from housing.components.loaders.affordable_development_data import AffordableDataLoader
 from housing.components.loaders.airbnb_data import AirbnbDataLoader
+from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.community_boundaries import CommunityBoundariesLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
+from housing.components.processors.affordable_community_density import AffordableToCommunityProcessor
 from housing.components.processors.affordable_development_points_to_tract import (
     AffordableToTractProcessor,
 )
@@ -42,6 +44,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     # Step 1: Load all boundaries
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(CommunityBoundariesLoader())
+    pipeline.register_component(CityBoundariesLoader())
     pipeline.register_component(AffordableDataLoader())
 
     # Step 2: Tract-level data aggregation
@@ -62,10 +65,10 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
         )
     )
 
-    """# Step 3: Community aggregation (ability to add later if useful)
-    # pipeline.register_component(AffordableCommunityDensityProcessor())
+    # Step 3: Community aggregation (ability to add later if useful)
+    pipeline.register_component(AffordableToCommunityProcessor())
 
-    # Step 4: Load in and get correlation analysis with other data
+    """# Step 4: Load in and get correlation analysis with other data
     pipeline.register_component(AirbnbDataLoader())
     pipeline.register_component(STRProhibitionDataLoader())
 
@@ -95,11 +98,11 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
         )
     )
 
-    pipeline.register_component(AffordableCorrelationAnalyzer())
+    pipeline.register_component(AffordableCorrelationAnalyzer())"""
 
     # Step 5: Visualize rental distributions at both levels
     pipeline.register_component(AffordableDistributionVisualizer())
-    pipeline.register_component(AffordableMapVisualizer())"""
+    pipeline.register_component(AffordableMapVisualizer())
 
     results = pipeline.execute()
 
@@ -112,6 +115,5 @@ if __name__ == "__main__":
 
     pipeline, results = run_full_analysis()
 
-    pipeline.context["affordable_developments_data"].to_csv("/project/output/point_data.csv")
-    pipeline.context["affordable_developments_tract_data"].to_csv("/project/output/tract_data.csv")
+    print(len(pipeline.context["tract_boundaries"]))
 

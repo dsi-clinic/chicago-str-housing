@@ -9,6 +9,10 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 
+from housing.components.utils import (
+    create_choropleth_map,
+    prepare_map_data,
+)
 from pipeline.base import Visualizer
 
 logger = logging.getLogger(__name__)
@@ -41,46 +45,79 @@ class AffordableMapVisualizer(Visualizer):
         logger.info("Creating affordable development density map visualizations...")
 
         tract_data = context.get("affordable_developments_tract_data")
+        community_data = context.get("affordable_developments_community_data")
         tract_boundaries = context.get("tract_boundaries")
+        community_boundaries = context.get("community_boundaries")
+        city_boundaries = context.get("city_boundaries")
+        
 
         if tract_data is None:
             logger.warning("No tract level data available for mapping")
             return {}
-
-        tract_data = tract_data.loc[tract_data["affordable_development_density"] > 0]
+        
+        if community_data is None:
+            logger.warning("No community level data available for mapping")
+            return {}
 
         # Create figure with subplots
-        fig, axes = plt.subplots(1, 2, figsize=(16, 10))
+        fig, axes = plt.subplots(2, 2, figsize=(16, 20))
         fig.suptitle(
             "Chicago Affordable Development Density by Geography",
             fontsize=20,
             fontweight="bold",
         )
 
-        # 1. Development Density Level Map
-        if tract_data is not None and tract_boundaries is not None:
-            # Merge tract data with boundaries for plotting
-            tract_map_data = tract_boundaries.merge(
-                tract_data[["tract_geoid", "affordable_development_density", "affordable_development_unit_density"]],
-                on="tract_geoid",
+        #ONE: Tract-Level Maps
+        map_data = prepare_map_data(
+            tract_data,
+            tract_boundaries,
+            ["affordable_development_density",
+             "affordable_development_unit_density"],
+            city_boundaries,
+            logger=logger,
+        )
+
+        # Create the buildings choropleth map
+        create_choropleth_map(
+            axes[0, 0],
+            map_data,
+            "affordable_development_density",
+            "Affordable Development Building Density",
+            "Affordable Development Building Density per km2",
+            cmap="YlOrRd",
+            stats_format="{:.0f}",
+            logger=logger,
+        )
+
+        #create the units choropleth map
+        create_choropleth_map(
+            axes[0, 1],
+            map_data,
+            "affordable_development_unit_density",
+            "Affordable Development Unit Density",
+            "Affordable Development Unit Density per km2",
+            cmap="YlOrRd",
+            stats_format="{:.0f}",
+            logger=logger,
+        )
+
+        #TWO: Community area-level maps
+
+        if community_data is not None and community_boundaries is not None:
+            #1. Building Density
+            # Merge community data with boundaries for plotting
+            community_map_data = community_boundaries.merge(
+                community_data[["community_area", "affordable_development_density", "affordable_development_unit_density"]],
+                on="community_area",
                 how="left",
             )
 
-            # Filter out Lake Michigan and other water-only tracts
-            # ALAND = land area in square meters; water tracts have ALAND = 0 or very small
-            if "ALAND" in tract_map_data.columns:
-                # Only keep tracts with significant land area
-                tract_map_data = tract_map_data[
-                    tract_map_data["ALAND"] > MIN_LAND_AREA_SQ_METERS
-                ].copy()
-                logger.info("Filtered to %d tracts with land area", len(tract_map_data))
-
             # Create choropleth
-            tract_map_data.plot(
+            community_map_data.plot(
                 column="affordable_development_density",
-                ax=axes[0],
+                ax=axes[1, 0],
                 legend=True,
-                cmap="viridis",
+                cmap="YlOrRd",
                 edgecolor="black",
                 linewidth=0.1,
                 missing_kwds={"color": "lightgrey", "label": "No Data"},
@@ -92,24 +129,24 @@ class AffordableMapVisualizer(Visualizer):
                 },
             )
 
-            axes[0].set_title(
-                f"Building Density (n={tract_data["affordable_development_density"].notna().sum()})",
+            axes[1, 0].set_title(
+                f"Affordable Development Building Density (n={community_data["affordable_development_density"].notna().sum()})",
                 fontsize=16,
             )
-            axes[0].axis("off")
+            axes[1, 0].axis("off")
 
             # Add statistics text
-            point_density = tract_data["affordable_development_density"].dropna()
+            point_density = community_data["affordable_development_density"].dropna()
             stats_text = (
                 f"Min: {point_density.min():.0f}\n"
                 f"Median: {point_density.median():.0f}\n"
                 f"Max: {point_density.max():.0f}"
             )
-            axes[0].text(
+            axes[1, 0].text(
                 0.02,
                 0.98,
                 stats_text,
-                transform=axes[0].transAxes,
+                transform=axes[1, 0].transAxes,
                 fontsize=12,
                 verticalalignment="top",
                 bbox={"boxstyle": "round,pad=0.5", "facecolor": "white", "alpha": 0.8},
@@ -118,11 +155,11 @@ class AffordableMapVisualizer(Visualizer):
             # 2. Unit Density Level Map
 
             # Create choropleth
-            tract_map_data.plot(
+            community_map_data.plot(
                 column="affordable_development_unit_density",
-                ax=axes[1],
+                ax=axes[1, 1],
                 legend=True,
-                cmap="viridis",  # Red (expensive) to Green (affordable)
+                cmap="YlOrRd",
                 edgecolor="black",
                 linewidth=0.1,
                 missing_kwds={"color": "lightgrey", "label": "No Data"},
@@ -134,30 +171,30 @@ class AffordableMapVisualizer(Visualizer):
                 },
             )
 
-            axes[1].set_title(
-                f"Unit Density (n={tract_data["affordable_development_unit_density"].notna().sum()})",
+            axes[1, 1].set_title(
+                f"Affordable Development Unit Density (n={community_data["affordable_development_unit_density"].notna().sum()})",
                 fontsize=16,
             )
-            axes[1].axis("off")
+            axes[1, 1].axis("off")
 
             # Add statistics text
-            unit_density = tract_data["affordable_development_unit_density"].dropna()
+            unit_density = community_data["affordable_development_unit_density"].dropna()
             stats_text = (
                 f"Min: {unit_density.min():.0f}\n"
                 f"Median: {unit_density.median():.0f}\n"
                 f"Max: {unit_density.max():.0f}"
             )
-            axes[1].text(
+            axes[1, 1].text(
                 0.02,
                 0.98,
                 stats_text,
-                transform=axes[1].transAxes,
+                transform=axes[1, 1].transAxes,
                 fontsize=12,
                 verticalalignment="top",
                 bbox={"boxstyle": "round,pad=0.5", "facecolor": "white", "alpha": 0.8},
             )
 
-        plt.tight_layout()
+        fig.tight_layout(rect=[0, 0, 1, 0.98])
 
         # Save the plot
         output_path = Path(self.output_dir) / "affordable_development_maps.png"
