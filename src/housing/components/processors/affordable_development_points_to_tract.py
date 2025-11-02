@@ -57,7 +57,7 @@ class AffordableToTractProcessor(PointsToTractProcessor):
                 tract_data[f"{self.unit_column}_sum"] / tract_data["area_km2"]
             )
             tract_data[f"{self.data_source_name}_unit_density"] = tract_data[
-                "unit_density"
+                f"{self.data_source_name}_unit_density"
             ].fillna(0)
             logger.info(
                 "Calculated unit density range: %.2f - %.2f units/km²",
