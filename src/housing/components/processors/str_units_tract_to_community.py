@@ -1,6 +1,6 @@
 """Census tract to community area aggregation processor.
 
-This module aggregates tract-level STR building data up to community area level using
+This module aggregates tract-level STR units data up to community area level using
 area-weighted aggregation and centroid-based spatial joins.
 """
 
@@ -14,22 +14,22 @@ from pipeline.base import DataProcessor
 logger = logging.getLogger(__name__)
 
 
-class STRBuildingsToCommunityProcessor(DataProcessor):
-    """Aggregate STR buildings tract-level data up to community areas."""
+class STRUnitsToCommunityProcessor(DataProcessor):
+    """Aggregate STR units tract-level data up to community areas."""
 
     def __init__(self) -> None:
-        """Initializing processor for STR buildings from tract to community level"""
+        """Initializing STR units tract data to community level"""
         super().__init__(
-            "str_buildings_tract_to_community",
-            "Aggregate STR buildings tract data to community areas",
+            "str_units_tract_to_community",
+            "Aggregate STR units tract data to community areas",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """STR buildings tract data to community areas processor"""
-        logger.info("Aggregating STR buildings tract data to community areas...")
+        """Using STR units tract data to aggregate into community areas"""
+        logger.info("Aggregating STR units tract data to community areas...")
 
-        # Grab STR buildings tract data and community boundaries
-        tract_data = context["str_buildings_tract_data"]
+        # Grab STR units tract data and community boundaries
+        tract_data = context["str_units_tract_data"]
         community_boundaries = context["community_boundaries"]
 
         # Step 1: Spatial join to find which community each tract belongs to
@@ -59,7 +59,7 @@ class STRBuildingsToCommunityProcessor(DataProcessor):
         # Step 2: Aggregate tract data by community
         community_agg = (
             tract_community.groupby("community_name")
-            .agg({"str_buildings_count": "sum"})
+            .agg({"str_units_count": "sum"})
             .reset_index()
         )
 
@@ -69,7 +69,7 @@ class STRBuildingsToCommunityProcessor(DataProcessor):
         )
 
         # Step 4: Calculate community area (in km²) and density
-        logger.info("Calculating community area and STR buildings density...")
+        logger.info("Calculating community area and STR units density...")
 
         # Convert to projected CRS for accurate area calculation (UTM Zone 16N covers Chicago)
         final_result = final_result.to_crs("EPSG:32616")
@@ -78,13 +78,11 @@ class STRBuildingsToCommunityProcessor(DataProcessor):
         final_result["area_km2"] = final_result.geometry.area / 1_000_000
 
         # Fill any missing counts with 0 before computing density
-        final_result["str_buildings_count"] = final_result[
-            "str_buildings_count"
-        ].fillna(0)
+        final_result["str_units_count"] = final_result["str_units_count"].fillna(0)
 
         # Compute density (listings per km²)
-        final_result["str_buildings_density"] = (
-            final_result["str_buildings_count"] / final_result["area_km2"]
+        final_result["str_units_density"] = (
+            final_result["str_units_count"] / final_result["area_km2"]
         )
 
         # Convert back to WGS84 for plotting
@@ -92,10 +90,10 @@ class STRBuildingsToCommunityProcessor(DataProcessor):
 
         logger.info(
             "Density range: %.2f - %.2f listings/km²",
-            final_result["str_buildings_density"].min(),
-            final_result["str_buildings_density"].max(),
+            final_result["str_units_density"].min(),
+            final_result["str_units_density"].max(),
         )
 
         logger.info("Final result: %d community areas", len(final_result))
 
-        return {"str_buildings_community_data": final_result}
+        return {"str_units_community_data": final_result}

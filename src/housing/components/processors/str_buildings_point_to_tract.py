@@ -1,4 +1,4 @@
-"""STR point data to census tract aggregation processor."""
+"""STR building point data to census tract aggregation processor."""
 
 import logging
 from typing import Any
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class STRBuildingsToTractProcessor(PointsToTractProcessor):
-    """Convenience class for STR listings → tracts aggregation."""
+    """Convenience class for STR building listings → tracts aggregation."""
 
     def __init__(
         self,
@@ -17,10 +17,10 @@ class STRBuildingsToTractProcessor(PointsToTractProcessor):
         output_key: str = "str_buildings_tract_data",
         id_column: str = "submission_id",
     ) -> None:
-        """Initialize STR to tract processor.
+        """Initialize STR building to tract processor.
 
         Args:
-            input_key: Context key for STR point data
+            input_key: Context key for STR building point data
             output_key: Context key for output tract data
             id_column: Column with listing IDs
         """
@@ -43,5 +43,9 @@ class STRBuildingsToTractProcessor(PointsToTractProcessor):
                 "Make sure you registered TractBoundariesLoader first."
             )
 
-        # Calling the parent method (does the spatial join and aggregation)
-        return super().execute(context)
+        result = super().execute(context)
+
+        # Save the output
+        context[self.output_key] = result
+
+        return result
