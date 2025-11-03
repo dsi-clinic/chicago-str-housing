@@ -11,9 +11,9 @@ This script demonstrates the full Chicago housing data analysis workflow:
 
 import logging
 
+from housing.components.analyzers.acs_correlation import ACSTractAnalyzer
 from housing.components.analyzers.rental_tract import RentalTractAnalyzer
 from housing.components.analyzers.str_prohibition import STRProhibitionAnalyzer
-from housing.components.analyzers.acs_correlation import ACSTractAnalyzer
 from housing.components.loaders.acs_data import ACSLoader
 from housing.components.loaders.airbnb_data import AirbnbDataLoader
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
@@ -23,27 +23,16 @@ from housing.components.loaders.str_prohibition_data import STRProhibitionDataLo
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
 from housing.components.processors.acs_to_tract import ACSToTractProcessor
+from housing.components.processors.acs_tract_to_community import (
+    ACSTractToCommunityProcessor,
+)
 from housing.components.processors.outlier_removal import DensityOutlierRemovalProcessor
 from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.processors.tract_to_community import TractToCommunityProcessor
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
-from housing.components.processors.acs_tract_to_community import (
-    ACSTractToCommunityProcessor,
-)
-from housing.components.visualizers.airbnb_distribution import (
-    AirbnbDistributionVisualizer,
-)
-from housing.components.visualizers.airbnb_map import AirbnbMapVisualizer
-from housing.components.visualizers.rental_distribution import (
-    RentalDistributionVisualizer,
-)
-from housing.components.visualizers.rental_map import RentalMapVisualizer
-from housing.components.visualizers.str_distribution import STRDistributionVisualizer
-from housing.components.visualizers.str_map import STRMapVisualizer
-from housing.components.visualizers.str_prohibition_viz import STRProhibitionVisualizer
-from housing.components.visualizers.acs_map import ACSMapVisualizer
-from housing.components.visualizers.acs_income_map import ACSIncomeVisualizer
 from housing.components.visualizers.acs_distribution import ACSDistribution
+from housing.components.visualizers.acs_income_map import ACSIncomeVisualizer
+from housing.components.visualizers.acs_map import ACSMapVisualizer
 from housing.components.visualizers.airbnb_acs_rental_distribution import (
     IncomePriceDistributionVisualizer,
 )

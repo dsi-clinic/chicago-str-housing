@@ -8,9 +8,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-import matplotlib.pyplot as plt
-import seaborn as sns
 import geopandas as gpd
+import matplotlib.pyplot as plt
 
 from pipeline.base import Visualizer
 

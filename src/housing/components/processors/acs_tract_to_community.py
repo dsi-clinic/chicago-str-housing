@@ -9,7 +9,6 @@ import logging
 from typing import Any
 
 import geopandas as gpd
-import pandas as pd
 
 from pipeline.base import DataProcessor
 
