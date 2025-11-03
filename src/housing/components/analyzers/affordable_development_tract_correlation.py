@@ -95,7 +95,9 @@ class AffordableCorrelationAnalyzer(Analyzer):
         # Statistical summary
         summary_stats = {
             "total_tracts": len(data),
-            "tracts_with_developments": len(data.loc[data["affordable_development_count"] > 0]),
+            "tracts_with_developments": len(
+                data.loc[data["affordable_development_count"] > 0]
+            ),
             "avg_development_unit_density": analysis_data["unit_density"].mean(),
             "development_unit_density_std": analysis_data["unit_density"].std(),
             "avg_area_km2": analysis_data["area_km2"].mean(),

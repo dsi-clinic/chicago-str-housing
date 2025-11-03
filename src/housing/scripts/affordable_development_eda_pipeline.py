@@ -14,7 +14,9 @@ from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.community_boundaries import CommunityBoundariesLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
-from housing.components.processors.affordable_community_density import AffordableToCommunityProcessor
+from housing.components.processors.affordable_community_density import (
+    AffordableToCommunityProcessor,
+)
 from housing.components.processors.affordable_development_points_to_tract import (
     AffordableToTractProcessor,
 )
@@ -50,7 +52,8 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     # Step 2: Tract-level data aggregation
     pipeline.register_component(AffordableToTractProcessor())
 
-    pipeline.register_component(AffordableDevelopmentOutlierAnalyzer(
+    pipeline.register_component(
+        AffordableDevelopmentOutlierAnalyzer(
             ["affordable_development_density", "affordable_development_unit_density"]
         )
     )
@@ -59,7 +62,10 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
         DensityOutlierRemovalProcessor(
             input_key="affordable_developments_tract_data",
             output_key="affordable_developments_tract_data",
-            density_columns=["affordable_development_density", "affordable_development_unit_density"],
+            density_columns=[
+                "affordable_development_density",
+                "affordable_development_unit_density",
+            ],
             method="winsorize",
             percentile_threshold=0.99,
         )
@@ -68,7 +74,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     # Step 3: Community aggregation (ability to add later if useful)
     pipeline.register_component(AffordableToCommunityProcessor())
 
-    """# Step 4: Load in and get correlation analysis with other data
+    # Step 4: Load in and get correlation analysis with other data
     pipeline.register_component(AirbnbDataLoader())
     pipeline.register_component(STRProhibitionDataLoader())
 
@@ -81,7 +87,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
                 "number_of_units": ["sum", "mean", "median"],
             },
             calculate_density=True,
-            data_source_name="str_prohibition"
+            data_source_name="str_prohibition",
         )
     )
 
@@ -94,11 +100,11 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
                 "price_numeric": ["mean", "median", "min", "max"],
             },
             calculate_density=True,
-            data_source_name="airbnb"
+            data_source_name="airbnb",
         )
     )
 
-    pipeline.register_component(AffordableCorrelationAnalyzer())"""
+    pipeline.register_component(AffordableCorrelationAnalyzer())
 
     # Step 5: Visualize rental distributions at both levels
     pipeline.register_component(AffordableDistributionVisualizer())
@@ -114,4 +120,3 @@ if __name__ == "__main__":
     logger.info("=" * 50)
 
     pipeline, results = run_full_analysis()
-

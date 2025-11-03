@@ -49,12 +49,11 @@ class AffordableMapVisualizer(Visualizer):
         tract_boundaries = context.get("tract_boundaries")
         community_boundaries = context.get("community_boundaries")
         city_boundaries = context.get("city_boundaries")
-        
 
         if tract_data is None:
             logger.warning("No tract level data available for mapping")
             return {}
-        
+
         if community_data is None:
             logger.warning("No community level data available for mapping")
             return {}
@@ -67,12 +66,11 @@ class AffordableMapVisualizer(Visualizer):
             fontweight="bold",
         )
 
-        #ONE: Tract-Level Maps
+        # ONE: Tract-Level Maps
         map_data = prepare_map_data(
             tract_data,
             tract_boundaries,
-            ["affordable_development_density",
-             "affordable_development_unit_density"],
+            ["affordable_development_density", "affordable_development_unit_density"],
             city_boundaries,
             logger=logger,
         )
@@ -89,7 +87,7 @@ class AffordableMapVisualizer(Visualizer):
             logger=logger,
         )
 
-        #create the units choropleth map
+        # create the units choropleth map
         create_choropleth_map(
             axes[0, 1],
             map_data,
@@ -101,13 +99,19 @@ class AffordableMapVisualizer(Visualizer):
             logger=logger,
         )
 
-        #TWO: Community area-level maps
+        # TWO: Community area-level maps
 
         if community_data is not None and community_boundaries is not None:
-            #1. Building Density
+            # 1. Building Density
             # Merge community data with boundaries for plotting
             community_map_data = community_boundaries.merge(
-                community_data[["community_area", "affordable_development_density", "affordable_development_unit_density"]],
+                community_data[
+                    [
+                        "community_area",
+                        "affordable_development_density",
+                        "affordable_development_unit_density",
+                    ]
+                ],
                 on="community_area",
                 how="left",
             )
@@ -178,7 +182,9 @@ class AffordableMapVisualizer(Visualizer):
             axes[1, 1].axis("off")
 
             # Add statistics text
-            unit_density = community_data["affordable_development_unit_density"].dropna()
+            unit_density = community_data[
+                "affordable_development_unit_density"
+            ].dropna()
             stats_text = (
                 f"Min: {unit_density.min():.0f}\n"
                 f"Median: {unit_density.median():.0f}\n"

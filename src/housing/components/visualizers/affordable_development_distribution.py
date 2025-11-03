@@ -10,14 +10,13 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 
-from pipeline.base import Visualizer
 from housing.components.utils import (
-    add_statistical_summary_to_plot,
     calculate_pairwise_correlation_matrix,
     create_correlation_heatmap,
     create_histogram_with_median,
     create_scatter_with_trend,
 )
+from pipeline.base import Visualizer
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +49,8 @@ class AffordableDistributionVisualizer(Visualizer):
         if tract_data is None:
             logger.warning("No tract level data available for visualization")
             return {}
-        
-        #PLOT ONE: UNITS
+
+        # PLOT ONE: UNITS
 
         # Create figure with subplots
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
@@ -63,15 +62,17 @@ class AffordableDistributionVisualizer(Visualizer):
 
         # 1. Tract-level unit density distribution
         if tract_data is not None:
-            tract_unit_density = tract_data["affordable_development_unit_density"].dropna()
+            tract_unit_density = tract_data[
+                "affordable_development_unit_density"
+            ].dropna()
             tract_unit_density = tract_unit_density[tract_unit_density > 0]
 
             create_histogram_with_median(
-                ax = axes[0, 0],
-                data = tract_unit_density,
-                title = "Unit Density by Census Tract",
-                xlabel = "Tract Unit Density (Units/km2)",
-                ylabel = "Number of Census Tracts",
+                ax=axes[0, 0],
+                data=tract_unit_density,
+                title="Unit Density by Census Tract",
+                xlabel="Tract Unit Density (Units/km2)",
+                ylabel="Number of Census Tracts",
                 median_format="{:.0f}",
             )
 
@@ -79,11 +80,11 @@ class AffordableDistributionVisualizer(Visualizer):
         if tract_data is not None:
             tract_units = tract_data["units_sum"].dropna()
             create_histogram_with_median(
-                ax = axes[0, 1],
-                data = tract_units,
-                title = "Total Units by Census Tract",
-                xlabel = "Tract Unit Density (Units/km2)",
-                ylabel = "Number of Census Tracts",
+                ax=axes[0, 1],
+                data=tract_units,
+                title="Total Units by Census Tract",
+                xlabel="Tract Unit Density (Units/km2)",
+                ylabel="Number of Census Tracts",
                 median_format="{:.0f}",
             )
 
@@ -125,7 +126,11 @@ class AffordableDistributionVisualizer(Visualizer):
 
         # 4. Statistical summary
         axes[1, 1].axis("off")
-        stats_lines = ["Affordable Development Units Statistics (For Nonzero Tracts)\n" + "=" * 40 + "\n"]
+        stats_lines = [
+            "Affordable Development Units Statistics (For Nonzero Tracts)\n"
+            + "=" * 40
+            + "\n"
+        ]
 
         if tract_data is not None:
             stats_lines.append("UNIT DENSITY:")
@@ -174,7 +179,7 @@ class AffordableDistributionVisualizer(Visualizer):
 
         plt.close()
 
-        #PLOT TWO: BUILDING VS UNIT DENSITY
+        # PLOT TWO: BUILDING VS UNIT DENSITY
 
         # Create figure with subplots
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
@@ -190,48 +195,58 @@ class AffordableDistributionVisualizer(Visualizer):
             tract_density = tract_density[tract_density > 0]
 
             create_histogram_with_median(
-                ax = axes[0, 0],
-                data = tract_density,
-                title = "Affordable Development Building Density by Census Tract",
-                xlabel = "Tract Development Density (Buildings/km2)",
-                ylabel = "Number of Census Tracts",
+                ax=axes[0, 0],
+                data=tract_density,
+                title="Affordable Development Building Density by Census Tract",
+                xlabel="Tract Development Density (Buildings/km2)",
+                ylabel="Number of Census Tracts",
                 median_format="{:.0f}",
             )
 
         # 2. Tract-level unit density distribution
         if tract_data is not None:
             create_histogram_with_median(
-                ax = axes[0, 1],
-                data = tract_unit_density,
-                title = "Unit Density by Census Tract",
-                xlabel = "Tract Unit Density (Units/km2)",
-                ylabel = "Number of Census Tracts",
+                ax=axes[0, 1],
+                data=tract_unit_density,
+                title="Unit Density by Census Tract",
+                xlabel="Tract Unit Density (Units/km2)",
+                ylabel="Number of Census Tracts",
                 median_format="{:.0f}",
             )
 
-        #3. Scatterplot of building vs. unit density with trend
+        # 3. Scatterplot of building vs. unit density with trend
         if tract_data is not None:
             create_scatter_with_trend(
-                ax= axes[1, 0],
-                x_data = tract_density,
-                y_data = tract_unit_density,
+                ax=axes[1, 0],
+                x_data=tract_density,
+                y_data=tract_unit_density,
                 title="Building vs. Unit Density for Affordable Housing Developments: Tract-Level Data",
                 xlabel="Building Density",
-                ylabel="Unit Density")
-            
-        #4. Correlation Matrix (incl. zero-tracts?)
+                ylabel="Unit Density",
+            )
+
+        # 4. Correlation Matrix (incl. zero-tracts?)
         if tract_data is not None:
             corr = calculate_pairwise_correlation_matrix(
-                df = tract_data,
-                columns = ["affordable_development_count", "affordable_development_density",
-                           "units_sum", "affordable_development_unit_density"]
+                df=tract_data,
+                columns=[
+                    "affordable_development_count",
+                    "affordable_development_density",
+                    "units_sum",
+                    "affordable_development_unit_density",
+                ],
             )
 
             create_correlation_heatmap(
-                ax = axes[1, 1],
-                corr_matrix = corr,
-                labels = ["Building Count", "Building Density", "Unit Count", "Unit Density"],
-                title = "Affordable Development Dataset Correlation Matrix",
+                ax=axes[1, 1],
+                corr_matrix=corr,
+                labels=[
+                    "Building Count",
+                    "Building Density",
+                    "Unit Count",
+                    "Unit Density",
+                ],
+                title="Affordable Development Dataset Correlation Matrix",
             )
 
         plt.tight_layout()
@@ -246,5 +261,7 @@ class AffordableDistributionVisualizer(Visualizer):
 
         plt.close()
 
-        return {"affordable_units_distribution_plot": str(units_output_path),
-                "affordable_development_distribution_plot": str(buildings_output_path)}
+        return {
+            "affordable_units_distribution_plot": str(units_output_path),
+            "affordable_development_distribution_plot": str(buildings_output_path),
+        }

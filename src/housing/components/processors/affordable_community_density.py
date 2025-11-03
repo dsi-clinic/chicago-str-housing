@@ -30,10 +30,10 @@ class AffordableToCommunityProcessor(DataProcessor):
         input_key: str = "affordable_developments_data",
         output_key: str = "affordable_developments_community_data",
         id_column: str | None = None,
-        aggregate_columns: dict[str, str | list[str]] | None = {"units": ["sum", "mean", "median"]},
+        aggregate_columns: dict[str, str | list[str]] | None = None,
         calculate_density: bool = True,
         data_source_name: str | None = "affordable_development",
-        unit_column: str | None = "units"
+        unit_column: str | None = "units",
     ) -> None:
         """Initialize the points to community area processor.
 
@@ -45,6 +45,7 @@ class AffordableToCommunityProcessor(DataProcessor):
                               e.g., {"price": "mean"} or {"price": ["mean", "median"]}
             calculate_density: Whether to calculate points per km²
             data_source_name: Prefix for column names (e.g., "airbnb", "str_prohibition")
+            unit_column: The name of the column in the input where unit data is stored
         """
         super().__init__(
             f"points_to_community_{input_key}",
@@ -53,7 +54,9 @@ class AffordableToCommunityProcessor(DataProcessor):
         self.input_key = input_key
         self.output_key = output_key
         self.id_column = id_column
-        self.aggregate_columns = aggregate_columns or {}
+        self.aggregate_columns = aggregate_columns or {
+            "units": ["sum", "mean", "median"]
+        }
         self.calculate_density = calculate_density
         self.unit_column = unit_column
 
@@ -72,16 +75,20 @@ class AffordableToCommunityProcessor(DataProcessor):
         point_data = context[self.input_key]
         community_boundaries = context["community_boundaries"]
 
-        #remove confusing community_area column from point data
+        # remove confusing community_area column from point data
         point_data = point_data.drop("community_area", axis=1)
 
-        #ensure columns to merge on are the same datatype
+        # ensure columns to merge on are the same datatype
         boundary_numbers_type = community_boundaries["community_area"].dtype
         point_numbers_type = point_data["community_area_number"].dtype
 
         if boundary_numbers_type != point_numbers_type:
-            point_data["community_area_number"] = point_data["community_area_number"].astype(int)
-            community_boundaries["community_area"] = community_boundaries["community_area"].astype(int)
+            point_data["community_area_number"] = point_data[
+                "community_area_number"
+            ].astype(int)
+            community_boundaries["community_area"] = community_boundaries[
+                "community_area"
+            ].astype(int)
 
         # Step 1: Ensure both datasets are in same CRS
         logger.info("Step 1: Aligning coordinate systems...")
@@ -124,7 +131,9 @@ class AffordableToCommunityProcessor(DataProcessor):
         agg_dict.update(self.aggregate_columns)
 
         # Perform aggregation
-        community_agg = points_with_community.groupby("community_area").agg(agg_dict).reset_index()
+        community_agg = (
+            points_with_community.groupby("community_area").agg(agg_dict).reset_index()
+        )
 
         # Flatten MultiIndex columns if they exist
         if isinstance(community_agg.columns, pd.MultiIndex):
@@ -148,9 +157,9 @@ class AffordableToCommunityProcessor(DataProcessor):
 
         # Step 4: Join with community area geometries
         logger.info("Step 4: Joining with community area geometries...")
-        community_data = community_boundaries[["community_area", "community_name", "geometry"]].merge(
-            community_agg, on="community_area", how="left"
-        )
+        community_data = community_boundaries[
+            ["community_area", "community_name", "geometry"]
+        ].merge(community_agg, on="community_area", how="left")
 
         # Fill NaN counts with 0 (communities with no points)
         count_column_name = f"{self.data_source_name}_count"
@@ -162,7 +171,9 @@ class AffordableToCommunityProcessor(DataProcessor):
 
             # Convert to projected CRS for accurate area calculation
             community_projected = community_data.to_crs("EPSG:32616")  # UTM Zone 16N
-            community_projected["area_km2"] = community_projected.geometry.area / 1_000_000
+            community_projected["area_km2"] = (
+                community_projected.geometry.area / 1_000_000
+            )
 
             # Calculate density
             density_column_name = f"{self.data_source_name}_density"
@@ -184,9 +195,12 @@ class AffordableToCommunityProcessor(DataProcessor):
 
             if f"{self.unit_column}_sum" in community_data.columns:
                 community_data[f"{self.data_source_name}_unit_density"] = (
-                    community_data[f"{self.unit_column}_sum"] / community_data["area_km2"]
+                    community_data[f"{self.unit_column}_sum"]
+                    / community_data["area_km2"]
                 )
-                community_data[f"{self.data_source_name}_unit_density"] = community_data[f"{self.data_source_name}_unit_density"].fillna(0)
+                community_data[f"{self.data_source_name}_unit_density"] = (
+                    community_data[f"{self.data_source_name}_unit_density"].fillna(0)
+                )
                 logger.info(
                     "Calculated unit density range: %.2f - %.2f units/km²",
                     community_data[f"{self.data_source_name}_unit_density"].min(),
@@ -216,9 +230,15 @@ class AffordableToCommunityProcessor(DataProcessor):
             self.output_key: community_data,
             f"{self.output_key}_summary": {
                 "total_communities": len(community_data),
-                "communities_with_points": (community_data[count_column_name] > 0).sum(),
+                "communities_with_points": (
+                    community_data[count_column_name] > 0
+                ).sum(),
                 "total_points": int(community_data[count_column_name].sum()),
-                "avg_points_per_community": float(community_data[count_column_name].mean()),
-                "max_points_per_community": int(community_data[count_column_name].max()),
+                "avg_points_per_community": float(
+                    community_data[count_column_name].mean()
+                ),
+                "max_points_per_community": int(
+                    community_data[count_column_name].max()
+                ),
             },
         }
