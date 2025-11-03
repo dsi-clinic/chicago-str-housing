@@ -115,5 +115,3 @@ if __name__ == "__main__":
 
     pipeline, results = run_full_analysis()
 
-    print(len(pipeline.context["tract_boundaries"]))
-
