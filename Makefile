@@ -18,7 +18,7 @@ project_dir := "$(current_abs_path)"
 # Optional data directory mount (if DATA_DIR is set)
 mount_data := $(if $(DATA_DIR),-v $(DATA_DIR):/project/data,)
 
-.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline    
+.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis    
 
 help: ## Show the help message
 	@echo "Available commands:"
@@ -29,8 +29,10 @@ help: ## Show the help message
 	@echo "  run-interactive        Run interactive bash session in container"
 	@echo "  clean                  Clean up Docker images and containers"
 	@echo "  test                   Run all tests with pytest"
-	@echo "  run-generic-pipeline  Run the generic pipeline demo"
-	@echo "  run-eda-pipeline          Run the housing EDA pipeline"
+	@echo "  run-generic-pipeline     Run the generic pipeline demo"
+	@echo "  run-eda-pipeline         Run the housing EDA pipeline"
+	@echo "  run-clustering-pipeline  Prepare data for clustering"
+	@echo "  run-clustering-analysis  Run clustering data exploration"
 	@echo ""
 	@echo "Optional environment variables (.env file):"
 	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
@@ -58,3 +60,9 @@ run-generic-pipeline: build-only ## Run the generic pipeline demo
 
 run-eda-pipeline: build-only ## Run the housing EDA pipeline
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/housing_eda_pipeline.py
+
+run-clustering-pipeline: build-only ## Prepare data for clustering
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/clustering_pipeline.py
+
+run-clustering-analysis: build-only ## Run clustering data exploration
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/clustering_analysis.py
