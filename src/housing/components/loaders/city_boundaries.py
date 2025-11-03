@@ -90,8 +90,17 @@ class CityBoundariesLoader(DataLoader):
 
         logger.info("Loaded city boundary: %s", city_gdf["name"].iloc[0])
         logger.info("CRS: %s", city_gdf.crs)
-        logger.info(
-            "Boundary area: %.2f km²", city_gdf.geometry.area.sum() * 111 * 111
-        )  # Rough conversion from degrees² to km²
+
+        # Calculate area properly using projected CRS
+        if city_gdf.crs.is_geographic:
+            # Reproject to Albers Equal Area Conic (EPSG:5070) for accurate area calculation
+            city_projected = city_gdf.to_crs("EPSG:5070")
+            area_km2 = (
+                city_projected.geometry.area.sum() / 1_000_000
+            )  # Convert m² to km²
+        else:
+            area_km2 = city_gdf.geometry.area.sum() / 1_000_000
+
+        logger.info("Boundary area: %.2f km²", area_km2)
 
         return {"city_boundaries": city_gdf}

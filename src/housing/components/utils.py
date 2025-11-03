@@ -12,9 +12,86 @@ import matplotlib.axes
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
+from esda.moran import Moran
+from libpysal.weights import Queen
+from sklearn.preprocessing import robust_scale
+
+from housing.components.constants import (
+    BILLION_THRESHOLD,
+    MILLION_THRESHOLD,
+    MIN_LAND_AREA_SQ_METERS,
+    THOUSAND_THRESHOLD,
+)
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# DATA UTILITIES
+# =============================================================================
+
+
+def format_number(x: float) -> str:
+    """Format numbers compactly for consistent label sizes.
+
+    Args:
+        x: Number to format
+
+    Returns:
+        Formatted string (e.g., "1.5B", "2.3M", "500K", "42", "0.12")
+    """
+    abs_x = abs(x)
+    if abs_x >= BILLION_THRESHOLD:
+        return f"{x / BILLION_THRESHOLD:.1f}B"
+    elif abs_x >= MILLION_THRESHOLD:
+        return f"{x / MILLION_THRESHOLD:.1f}M"
+    elif abs_x >= THOUSAND_THRESHOLD:
+        return f"{x / THOUSAND_THRESHOLD:.1f}K"
+    elif abs_x >= 1:
+        return f"{x:.0f}"
+    else:
+        return f"{x:.2f}"
+
+
+def calculate_value_cap(
+    gdf: gpd.GeoDataFrame | pd.DataFrame,
+    column: str,
+    percentile: float = 0.95,
+    max_value: float | None = None,
+) -> dict[str, float] | None:
+    """Calculate a value cap for visualization based on percentile and optional max.
+
+    This function is useful for capping extreme values in choropleth maps to improve
+    visualization while preserving the original data for analysis.
+
+    Args:
+        gdf: GeoDataFrame or DataFrame containing the data
+        column: Column name to calculate cap for
+        percentile: Percentile to use for cap calculation (default 0.95)
+        max_value: Optional hard maximum value to cap at
+
+    Returns:
+        Dictionary with column name as key and cap value, or None if no valid values
+    """
+    if column not in gdf.columns:
+        return None
+
+    valid_values = gdf[column].dropna()
+    if len(valid_values) == 0:
+        return None
+
+    percentile_value = valid_values.quantile(percentile)
+    if max_value is not None:
+        cap_value = min(percentile_value, max_value)
+    else:
+        cap_value = percentile_value
+
+    return {column: cap_value}
+
+
+# =============================================================================
+# STATISTICAL UTILITIES
+# =============================================================================
 
 
 def calculate_pairwise_correlations(
@@ -73,6 +150,224 @@ def calculate_pairwise_correlation_matrix(
                     corr_matrix[i, j] = subset[col1].corr(subset[col2])
 
     return corr_matrix
+
+
+def calculate_morans_i(gdf: gpd.GeoDataFrame, variables: list[str]) -> pd.DataFrame:
+    """Calculate Moran's I for spatial autocorrelation.
+
+    Args:
+        gdf: GeoDataFrame with spatial data
+        variables: List of variable names to calculate Moran's I for
+
+    Returns:
+        DataFrame with Moran's I results (indexed by variable name)
+    """
+    # Create spatial weights matrix using Queen contiguity
+    w = Queen.from_dataframe(gdf, use_index=True)
+
+    # Transform weights to row-standardized form
+    w.transform = "r"
+
+    # Calculate Moran's I for each variable
+    mi_results = []
+
+    for variable in variables:
+        values = gdf[variable].to_numpy()
+        moran = Moran(values, w)
+        mi_results.append(
+            {"Variable": variable, "Moran's I": moran.I, "P-value": moran.p_sim}
+        )
+
+    # Create results dataframe
+    results_df = pd.DataFrame(mi_results).set_index("Variable")
+
+    return results_df
+
+
+def standardize_data(data: pd.DataFrame) -> np.ndarray:
+    """Standardize data using robust scaling.
+
+    Args:
+        data: DataFrame containing the data to standardize
+
+    Returns:
+        NumPy array of standardized data
+    """
+    scaled_data = robust_scale(data)
+
+    return scaled_data
+
+
+# =============================================================================
+# OUTLIER REMOVAL UTILITIES
+# =============================================================================
+
+
+def remove_density_outliers(
+    tract_data: pd.DataFrame,
+    density_column: str,
+    method: Literal["iqr", "percentile", "zscore", "winsorize"] = "iqr",
+    threshold: float = 1.5,
+    percentile_threshold: float = 0.99,
+    zscore_threshold: float = 3.0,
+) -> pd.DataFrame:
+    """Remove tracts with extreme density values.
+
+    Args:
+        tract_data: Tract-level data with density columns
+        density_column: Name of density column to filter on
+        method: Outlier detection method
+        threshold: IQR multiplier or z-score threshold
+        percentile_threshold: Percentile threshold (0.99 = remove top 1%)
+        zscore_threshold: Z-score threshold for outlier detection
+
+    Returns:
+        Filtered tract data with outliers removed
+    """
+    if density_column not in tract_data.columns:
+        logger.warning(
+            "Density column '%s' not found, skipping outlier removal", density_column
+        )
+        return tract_data
+
+    if method == "iqr":
+        q1 = tract_data[density_column].quantile(0.25)
+        q3 = tract_data[density_column].quantile(0.75)
+        iqr = q3 - q1
+        upper_bound = q3 + (threshold * iqr)
+
+    elif method == "percentile":
+        upper_bound = tract_data[density_column].quantile(percentile_threshold)
+
+    elif method == "zscore":
+        mean_density = tract_data[density_column].mean()
+        std_density = tract_data[density_column].std()
+        upper_bound = mean_density + (zscore_threshold * std_density)
+
+    elif method == "winsorize":
+        upper_bound = tract_data[density_column].quantile(percentile_threshold)
+        # For winsorization, we cap values instead of removing them
+        filtered = tract_data.copy()
+        filtered[density_column] = tract_data[density_column].clip(upper=upper_bound)
+
+        capped_count = (tract_data[density_column] > upper_bound).sum()
+        if capped_count > 0:
+            logger.info(
+                "Winsorized %d tracts with extreme %s (capped at %.2f)",
+                capped_count,
+                density_column,
+                upper_bound,
+            )
+
+        return filtered
+
+    else:
+        raise ValueError(f"Unknown outlier method: {method}")
+
+    outliers = tract_data[tract_data[density_column] > upper_bound]
+    filtered = tract_data[tract_data[density_column] <= upper_bound].copy()
+
+    if len(outliers) > 0:
+        logger.info(
+            "Removed %d tracts with extreme %s (threshold: %.2f)",
+            len(outliers),
+            density_column,
+            upper_bound,
+        )
+
+    return filtered
+
+
+def remove_multiple_density_outliers(
+    tract_data: pd.DataFrame,
+    density_columns: list[str],
+    method: Literal["iqr", "percentile", "zscore"] = "iqr",
+    threshold: float = 1.5,
+) -> pd.DataFrame:
+    """Remove outliers from multiple density columns.
+
+    Args:
+        tract_data: Tract-level data
+        density_columns: List of density columns to filter
+        method: Outlier detection method
+        threshold: Threshold parameter
+
+    Returns:
+        Filtered tract data
+    """
+    filtered_data = tract_data.copy()
+
+    for density_col in density_columns:
+        if density_col in filtered_data.columns:
+            filtered_data = remove_density_outliers(
+                filtered_data, density_col, method=method, threshold=threshold
+            )
+
+    return filtered_data
+
+
+def winsorize(
+    df: pd.DataFrame,
+    column: str,
+    percentile: float = 0.99,
+    max_bound: float | None = None,
+    unit_name: str = "",
+    logger: logging.Logger | None = None,
+) -> pd.DataFrame:
+    """Winsorize a column by capping extreme values at the specified percentile.
+
+    Args:
+        df: DataFrame containing the column to winsorize
+        column: Name of the column to winsorize
+        percentile: Percentile to use as upper bound (default 0.99)
+        max_bound: Optional hard maximum bound
+        unit_name: Unit name for logging (e.g., "people", "units", "properties", "$")
+        logger: Optional logger instance (uses module logger if not provided)
+
+    Returns:
+        DataFrame with winsorized values
+    """
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    if column not in df.columns:
+        return df
+
+    # Filter to positive values for percentile calculation (exclude zeros)
+    valid_values = df[df[column] > 0][column]
+    if len(valid_values) == 0:
+        return df
+
+    # Calculate upper bound
+    upper_bound = valid_values.quantile(percentile)
+    if max_bound is not None:
+        upper_bound = min(upper_bound, max_bound)
+
+    # Log statistics
+    logger.info(
+        "%s %s 99th percentile: %.1f %s, max: %.1f",
+        column.replace("_", " ").title(),
+        unit_name if unit_name else "",
+        upper_bound,
+        unit_name,
+        valid_values.max(),
+    )
+
+    # Clip extreme values
+    initial_extreme = (df[column] > upper_bound).sum()
+    if initial_extreme > 0:
+        df[column] = df[column].clip(upper=upper_bound)
+        logger.info(
+            "Capped %d extreme %s values at %.1f %s",
+            initial_extreme,
+            column,
+            upper_bound,
+            unit_name,
+        )
+    else:
+        logger.info("No extreme %s values to cap", column)
+
+    return df
 
 
 # =============================================================================
@@ -296,6 +591,9 @@ def create_correlation_heatmap(
         center: Center value for colormap
         fmt: Number format for annotations
     """
+    # Lazy import to avoid dependency on seaborn unless needed
+    import seaborn as sns
+
     if np.isnan(corr_matrix).all():
         ax.text(
             0.5,
@@ -330,7 +628,7 @@ def create_correlation_heatmap(
 
 def setup_figure_and_save(
     fig: plt.Figure,
-    output_path: Path,
+    output_path: str | Path,
     title: str = None,
     title_y: float = 0.98,
     dpi: int = 300,
@@ -340,7 +638,7 @@ def setup_figure_and_save(
 
     Args:
         fig: Matplotlib figure
-        output_path: Path to save the figure
+        output_path: Path to save the figure (str or Path)
         title: Figure title (optional)
         title_y: Y position for title (default 0.98)
         dpi: Resolution for saved figure
@@ -354,7 +652,7 @@ def setup_figure_and_save(
         plt.subplots_adjust(top=0.85)  # Make space for title
 
     # Ensure output directory exists
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     # Save figure
     fig.savefig(output_path, dpi=dpi, bbox_inches="tight")
@@ -365,12 +663,61 @@ def setup_figure_and_save(
     plt.close(fig)
 
 
-# =============================================================================
-# CHOROPLETH MAP UTILITIES
-# =============================================================================
+def create_correlation_matrix(
+    data: pd.DataFrame, output_path: str | Path | None = None, title: str | None = None
+) -> plt.Figure:
+    """Create a pairwise scatterplot matrix to explore correlations.
 
-# Minimum land area in square meters to exclude water-only tracts
-MIN_LAND_AREA_SQ_METERS = 10000
+    Args:
+        data: DataFrame with data to visualize
+        output_path: Optional path to save the figure (str or Path)
+        title: Optional custom title (default: "Pairwise Relationships Between Variables")
+
+    Returns:
+        Matplotlib figure object
+    """
+    # Lazy import to avoid dependency on seaborn unless needed
+    import seaborn as sns
+
+    # Create pairplot - each scatterplot panel has independent x and y scales
+    fig = sns.pairplot(
+        data,
+        kind="reg",
+        diag_kind="kde",
+        plot_kws={
+            "scatter_kws": {"alpha": 0.4, "s": 8},
+            "line_kws": {"color": "red", "lw": 0.5},
+        },
+    )
+
+    # Adjust axis labels and ticks for better readability
+    for ax in fig.axes.flatten():
+        if ax is not None:
+            ax.tick_params(labelsize=5, rotation=45)
+            # Use compact number formatting
+            try:
+                ax.yaxis.set_major_formatter(
+                    plt.FuncFormatter(lambda x, p: format_number(x))
+                )
+                ax.xaxis.set_major_formatter(
+                    plt.FuncFormatter(lambda x, p: format_number(x))
+                )
+            except Exception as e:
+                logger.warning("Could not format axis labels: %s", str(e))
+
+    plt.suptitle(
+        title or "Pairwise Relationships Between Variables", y=1.02, fontsize=14
+    )
+
+    if output_path:
+        plt.savefig(output_path, dpi=300, bbox_inches="tight")
+
+    return fig
+
+
+# =============================================================================
+# SPATIAL VISUALIZATION UTILITIES
+# =============================================================================
 
 
 def prepare_map_data(
@@ -599,109 +946,74 @@ def create_dual_choropleth_maps(
     return fig, axes
 
 
-# =============================================================================
-# OUTLIER REMOVAL UTILITIES
-# =============================================================================
-
-
-def remove_density_outliers(
-    tract_data: pd.DataFrame,
-    density_column: str,
-    method: Literal["iqr", "percentile", "zscore", "winsorize"] = "iqr",
-    threshold: float = 1.5,
-    percentile_threshold: float = 0.99,
-    zscore_threshold: float = 3.0,
-) -> pd.DataFrame:
-    """Remove tracts with extreme density values.
+def create_choropleth_maps(
+    gdf: gpd.GeoDataFrame,
+    variables: list[str],
+    output_path: str | Path | None = None,
+    ncols: int = 3,
+    cmap: str = "RdPu",
+    max_value_caps: dict[str, float] | None = None,
+) -> plt.Figure:
+    """Create choropleth maps for multiple variables.
 
     Args:
-        tract_data: Tract-level data with density columns
-        density_column: Name of density column to filter on
-        method: Outlier detection method
-        threshold: IQR multiplier or z-score threshold
-        percentile_threshold: Percentile threshold (0.99 = remove top 1%)
-        zscore_threshold: Z-score threshold for outlier detection
+        gdf: GeoDataFrame with spatial data
+        variables: List of variable names to plot
+        output_path: Optional path to save the figure (str or Path)
+        ncols: Number of columns in the subplot grid
+        cmap: Colormap to use for maps
+        max_value_caps: Optional dict mapping variable names to max display values
 
     Returns:
-        Filtered tract data with outliers removed
+        Matplotlib figure object
     """
-    if density_column not in tract_data.columns:
-        logger.warning(
-            "Density column '%s' not found, skipping outlier removal", density_column
-        )
-        return tract_data
+    # Create subplots
+    n_vars = len(variables)
+    nrows = (n_vars + ncols - 1) // ncols
 
-    if method == "iqr":
-        q1 = tract_data[density_column].quantile(0.25)
-        q3 = tract_data[density_column].quantile(0.75)
-        iqr = q3 - q1
-        upper_bound = q3 + (threshold * iqr)
+    f, axs = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 5 * nrows))
+    axs = axs.flatten()
 
-    elif method == "percentile":
-        upper_bound = tract_data[density_column].quantile(percentile_threshold)
+    # Plot each variable
+    for i, col in enumerate(variables):
+        ax = axs[i]
 
-    elif method == "zscore":
-        mean_density = tract_data[density_column].mean()
-        std_density = tract_data[density_column].std()
-        upper_bound = mean_density + (zscore_threshold * std_density)
+        # Replace -9999 (no-data marker) with NaN for better visualization
+        plot_data = gdf.copy()
+        if col in plot_data.columns:
+            plot_data[col] = plot_data[col].replace(-9999, np.nan)
 
-    elif method == "winsorize":
-        upper_bound = tract_data[density_column].quantile(percentile_threshold)
-        # For winsorization, we cap values instead of removing them
-        filtered = tract_data.copy()
-        filtered[density_column] = tract_data[density_column].clip(upper=upper_bound)
+            # Cap variable if specified in max_value_caps
+            if max_value_caps and col in max_value_caps:
+                plot_data[col] = plot_data[col].clip(upper=max_value_caps[col])
 
-        capped_count = (tract_data[density_column] > upper_bound).sum()
-        if capped_count > 0:
-            logger.info(
-                "Winsorized %d tracts with extreme %s (capped at %.2f)",
-                capped_count,
-                density_column,
-                upper_bound,
-            )
-
-        return filtered
-
-    else:
-        raise ValueError(f"Unknown outlier method: {method}")
-
-    outliers = tract_data[tract_data[density_column] > upper_bound]
-    filtered = tract_data[tract_data[density_column] <= upper_bound].copy()
-
-    if len(outliers) > 0:
-        logger.info(
-            "Removed %d tracts with extreme %s (threshold: %.2f)",
-            len(outliers),
-            density_column,
-            upper_bound,
+        # Plot map
+        # For variables with many zeros, force k=5 by using NaturalBreaks instead of Quantiles
+        # This ensures consistent 5-class classification across all maps
+        plot_data.plot(
+            column=col,
+            ax=ax,
+            scheme="NaturalBreaks",
+            k=5,
+            linewidth=0.1,
+            edgecolor="black",
+            cmap=cmap,
+            legend=True,
+            legend_kwds={"loc": "lower left"},
+            missing_kwds={"color": "lightgrey", "edgecolor": "none"},
         )
 
-    return filtered
+        # Remove axis clutter
+        ax.set_axis_off()
+        ax.set_title(col, fontsize=10)
 
+    # Hide extra subplots
+    for i in range(n_vars, len(axs)):
+        axs[i].set_axis_off()
 
-def remove_multiple_density_outliers(
-    tract_data: pd.DataFrame,
-    density_columns: list[str],
-    method: Literal["iqr", "percentile", "zscore"] = "iqr",
-    threshold: float = 1.5,
-) -> pd.DataFrame:
-    """Remove outliers from multiple density columns.
+    plt.tight_layout()
 
-    Args:
-        tract_data: Tract-level data
-        density_columns: List of density columns to filter
-        method: Outlier detection method
-        threshold: Threshold parameter
+    if output_path:
+        plt.savefig(output_path, dpi=300, bbox_inches="tight")
 
-    Returns:
-        Filtered tract data
-    """
-    filtered_data = tract_data.copy()
-
-    for density_col in density_columns:
-        if density_col in filtered_data.columns:
-            filtered_data = remove_density_outliers(
-                filtered_data, density_col, method=method, threshold=threshold
-            )
-
-    return filtered_data
+    return f

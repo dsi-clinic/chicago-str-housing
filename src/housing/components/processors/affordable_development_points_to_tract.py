@@ -13,8 +13,8 @@ class AffordableToTractProcessor(PointsToTractProcessor):
 
     def __init__(
         self,
-        input_key: str = "affordable_developments_data",
-        output_key: str = "affordable_developments_tract_data",
+        input_key: str = "affordable_development_data",
+        output_key: str = "affordable_development_tract_data",
         id_column: str = "property_name",
         unit_column: str = "units",
     ) -> None:

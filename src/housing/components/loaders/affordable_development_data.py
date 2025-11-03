@@ -1,4 +1,4 @@
-"""This loads the data from Affordable_Rental_Housing_Developments.csv into a pandas DataFrame"""
+"""This loads the data from the affordable rental housing dataset API into a geopandas GeoDataFrame"""
 
 import json
 import logging
@@ -101,4 +101,4 @@ class AffordableDataLoader(DataLoader):
             crs=tract_boundaries.crs,
         )
 
-        return {"affordable_developments_data": geo_affordable_df}
+        return {"affordable_development_data": geo_affordable_df}
