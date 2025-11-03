@@ -30,8 +30,8 @@ class AffordableDevelopmentOutlierAnalyzer(Analyzer):
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Perform outlier identification for analysis"""
-        tract_data = context["affordable_developments_tract_data"]
-        point_data = context["affordable_developments_data"]
+        tract_data = context["affordable_development_tract_data"]
+        point_data = context["affordable_development_data"]
         text_to_write = ""
 
         for col in self.density_columns:

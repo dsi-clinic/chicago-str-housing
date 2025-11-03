@@ -44,7 +44,7 @@ class AffordableDistributionVisualizer(Visualizer):
         """Create affordable development distribution visualizations."""
         logger.info("Creating affordable development distribution visualizations...")
 
-        tract_data = context.get("affordable_developments_tract_data")
+        tract_data = context.get("affordable_development_tract_data")
 
         if tract_data is None:
             logger.warning("No tract level data available for visualization")

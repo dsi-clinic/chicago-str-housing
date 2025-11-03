@@ -44,8 +44,8 @@ class AffordableMapVisualizer(Visualizer):
         """Create affordable development density map visualizations."""
         logger.info("Creating affordable development density map visualizations...")
 
-        tract_data = context.get("affordable_developments_tract_data")
-        community_data = context.get("affordable_developments_community_data")
+        tract_data = context.get("affordable_development_tract_data")
+        community_data = context.get("affordable_development_community_data")
         tract_boundaries = context.get("tract_boundaries")
         community_boundaries = context.get("community_boundaries")
         city_boundaries = context.get("city_boundaries")

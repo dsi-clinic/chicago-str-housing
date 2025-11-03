@@ -37,7 +37,7 @@ class AffordableCorrelationAnalyzer(Analyzer):
 
         data = context["airbnb_tract_data"]
         data = data.merge(
-            context["affordable_developments_tract_data"],
+            context["affordable_development_tract_data"],
             on=["tract_geoid", "geometry"],
         )
         data = data.merge(

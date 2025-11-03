@@ -27,8 +27,8 @@ class AffordableToCommunityProcessor(DataProcessor):
 
     def __init__(
         self,
-        input_key: str = "affordable_developments_data",
-        output_key: str = "affordable_developments_community_data",
+        input_key: str = "affordable_development_data",
+        output_key: str = "affordable_development_community_data",
         id_column: str | None = None,
         aggregate_columns: dict[str, str | list[str]] | None = None,
         calculate_density: bool = True,
