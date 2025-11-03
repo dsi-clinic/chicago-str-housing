@@ -25,6 +25,11 @@ class ACSDistribution(Visualizer):
     """
 
     def __init__(self, output_dir: str | None = None) -> None:
+        """Initialize the ACS visualizer.
+
+        Args:
+            output_dir: Optional output directory for visualizations
+        """
         super().__init__(
             "acs_distribution_visualization",
             "Create visualizations for ACS Distribution",

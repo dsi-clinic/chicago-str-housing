@@ -1,3 +1,8 @@
+"""ACS Income Map.
+
+This module creates visualizations for ACSS results on tract and community level.
+"""
+
 import logging
 from pathlib import Path
 from typing import Any
