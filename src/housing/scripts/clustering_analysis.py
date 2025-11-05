@@ -1,11 +1,9 @@
 """Chicago Housing Clustering Analysis.
 
-This script prepares data for clustering and regionalization analysis following
-the methods from Geographic Data Science textbook. It includes:
+This script performs analysis on pre-processed clustering data. It includes:
 1. Choropleth maps for each variable
 2. Moran's I for spatial autocorrelation
 3. Pairwise correlation analysis
-4. Data standardization
 """
 
 import logging
@@ -21,7 +19,6 @@ from housing.components.utils import (
     calculate_value_cap,
     create_choropleth_maps,
     create_correlation_matrix,
-    standardize_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,10 +30,10 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 
 # Input and output file paths
 CLUSTERING_DATA_INPUT = OUTPUT_DIR / "clustering_data.geojson"
+CLUSTERING_DATA_SCALED_INPUT = OUTPUT_DIR / "clustering_data_scaled.csv"
 CHOROPLETH_MAPS_OUTPUT = OUTPUT_DIR / "choropleth_maps.png"
 MORANS_I_OUTPUT = OUTPUT_DIR / "morans_i_results.csv"
 SCATTERPLOT_MATRIX_OUTPUT = OUTPUT_DIR / "scatterplot_matrix.png"
-SCALED_DATA_OUTPUT = OUTPUT_DIR / "clustering_data_scaled.csv"
 
 
 def load_clustering_data(file_path: Path | None = None) -> gpd.GeoDataFrame:
@@ -58,49 +55,26 @@ def load_clustering_data(file_path: Path | None = None) -> gpd.GeoDataFrame:
     return gdf
 
 
-def select_cluster_variables(gdf: gpd.GeoDataFrame) -> tuple[list[str], pd.DataFrame]:
-    """Select and prepare variables for clustering.
+def load_cluster_variables(scaled_data_path: Path) -> list[str]:
+    """Load cluster variable names from standardized data CSV.
+
+    Args:
+        scaled_data_path: Path to the standardized data CSV file
 
     Returns:
-        Tuple of (variable names, dataframe with selected variables)
+        List of cluster variable names
     """
-    # Select variables for clustering - mix of housing market, demographics, and STR activity
-    cluster_variables = [
-        # Demographics
-        "census_median_income",
-        "census_median_age",
-        "census_pct_bachelor",
-        # Housing market
-        "census_median_house_value",
-        "census_pct_rented",
-        "rental_price_mean",
-        "airbnb_price_mean",
-        # STR activity
-        "airbnb_density",
-        "str_prohibition_building_density",
-        "str_prohibition_units_density",
-        # Population
-        "population_density",
-        # Affordable and foreclosed housing
-        "affordable_development_density",
-        "affordable_unit_density",
-        "foreclosed_density",
-    ]
+    if not scaled_data_path.exists():
+        raise FileNotFoundError(
+            f"Standardized data not found: {scaled_data_path}\n"
+            "Please run the clustering pipeline first: make run-clustering-pipeline"
+        )
 
-    # Filter to only variables that exist in the data
-    available_vars = [var for var in cluster_variables if var in gdf.columns]
-
-    # Create subset with only clustering variables
-    # Data processing (missing values, outliers) now handled upstream in clustering pipeline
-    cluster_data = gdf[available_vars].copy()
-
-    logger.info(
-        "Selected %d clustering variables for %d tracts",
-        len(available_vars),
-        len(cluster_data),
-    )
-
-    return available_vars, cluster_data
+    # Read just the header to get variable names
+    scaled_df = pd.read_csv(scaled_data_path, nrows=0, index_col=0)
+    variables = list(scaled_df.columns)  # Get variable names from columns
+    logger.info("Loaded %d cluster variables from standardized data", len(variables))
+    return variables
 
 
 def main() -> None:
@@ -113,28 +87,12 @@ def main() -> None:
     logger.info("Chicago Housing Clustering Analysis")
     logger.info("=" * 50)
 
-    # Step 1: Load data (already clipped to Chicago in pipeline)
+    # Step 1: Load data (already processed by pipeline)
     gdf_full = load_clustering_data()
     logger.info("Loaded clustering data with %d tracts", len(gdf_full))
 
-    # Define variables for clustering
-    cluster_variables = [
-        "census_median_income",
-        "census_median_age",
-        "census_pct_bachelor",
-        "census_median_house_value",
-        "census_pct_rented",
-        "rental_price_mean",
-        "airbnb_price_mean",
-        "airbnb_density",
-        "str_prohibition_building_density",
-        "str_prohibition_units_density",
-        "population_density",
-        "affordable_development_density",
-        "affordable_unit_density",
-        "foreclosed_density",
-    ]
-    variables = [var for var in cluster_variables if var in gdf_full.columns]
+    # Load cluster variables (already selected and standardized by pipeline)
+    variables = load_cluster_variables(CLUSTERING_DATA_SCALED_INPUT)
 
     # Step 2: Create choropleth maps (includes all tracts, applies display capping for visualization)
     logger.info("\nStep 2: Creating choropleth maps")
@@ -151,14 +109,15 @@ def main() -> None:
         variables,
         output_path=CHOROPLETH_MAPS_OUTPUT,
         max_value_caps=max_value_caps,
+        scheme="FisherJenks",
     )
 
-    # Step 3: Select clustering variables and remove tracts with missing data
+    # Step 3: Filter data for statistical analysis (only tracts that were used in clustering)
     logger.info("\nStep 3: Filtering data for statistical analysis")
-    variables, cluster_data = select_cluster_variables(gdf_full)
-
-    # Update gdf for analysis
-    gdf_analysis = gdf_full.loc[cluster_data.index]
+    # Load standardized data to get the index of tracts used in clustering
+    scaled_df = pd.read_csv(CLUSTERING_DATA_SCALED_INPUT, index_col=0)
+    cluster_data = gdf_full.loc[scaled_df.index, variables].copy()
+    gdf_analysis = gdf_full.loc[scaled_df.index]
 
     # Step 4: Calculate Moran's I
     logger.info("\nStep 4: Calculating Moran's I")
@@ -173,19 +132,10 @@ def main() -> None:
         title="Pairwise Relationships Between Clustering Variables",
     )
 
-    # Step 6: Standardize data
-    logger.info("\nStep 6: Standardizing data")
-    scaled_data = standardize_data(cluster_data)
-
-    # Save standardized data
-    scaled_df = pd.DataFrame(scaled_data, columns=variables, index=cluster_data.index)
-    scaled_df.to_csv(SCALED_DATA_OUTPUT)
-
     logger.info("\n" + "=" * 50)
-    logger.info("Clustering data preparation complete!")
-    logger.info("Standardized data saved to: %s", SCALED_DATA_OUTPUT)
+    logger.info("Clustering analysis complete!")
 
-    return gdf_full, cluster_data, scaled_data, moran_results
+    return gdf_full, cluster_data, scaled_df, moran_results
 
 
 if __name__ == "__main__":
