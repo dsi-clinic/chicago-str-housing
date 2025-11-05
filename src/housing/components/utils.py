@@ -953,6 +953,7 @@ def create_choropleth_maps(
     ncols: int = 3,
     cmap: str = "RdPu",
     max_value_caps: dict[str, float] | None = None,
+    scheme: str = "Quantiles",
 ) -> plt.Figure:
     """Create choropleth maps for multiple variables.
 
@@ -963,6 +964,7 @@ def create_choropleth_maps(
         ncols: Number of columns in the subplot grid
         cmap: Colormap to use for maps
         max_value_caps: Optional dict mapping variable names to max display values
+        scheme: Classification scheme to use (default: "Quantiles", options: "Quantiles", "EqualInterval", "FisherJenks", "NaturalBreaks")
 
     Returns:
         Matplotlib figure object
@@ -988,12 +990,12 @@ def create_choropleth_maps(
                 plot_data[col] = plot_data[col].clip(upper=max_value_caps[col])
 
         # Plot map
-        # For variables with many zeros, force k=5 by using NaturalBreaks instead of Quantiles
-        # This ensures consistent 5-class classification across all maps
+        # Use specified classification scheme (default: Quantiles for equal-sized bins)
+        # NaturalBreaks was previously used but Quantiles provides more consistent visualization
         plot_data.plot(
             column=col,
             ax=ax,
-            scheme="NaturalBreaks",
+            scheme=scheme,
             k=5,
             linewidth=0.1,
             edgecolor="black",

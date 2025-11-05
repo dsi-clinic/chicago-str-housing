@@ -15,6 +15,7 @@ from typing import Any
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 from dotenv import load_dotenv
 
 from housing.components.constants import MIN_TRACT_AREA_KM2, NO_DATA_MARKER
@@ -35,7 +36,7 @@ from housing.components.processors.affordable_development_points_to_tract import
 from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.processors.spatial_interpolator import SpatialInterpolator
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
-from housing.components.utils import winsorize
+from housing.components.utils import standardize_data, winsorize
 from pipeline import Pipeline, PipelineResult
 from pipeline.base import PipelineComponent
 from pipeline.config import PipelineConfig
@@ -55,6 +56,7 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 
 # Output file paths
 CLUSTERING_DATA_OUTPUT = OUTPUT_DIR / "clustering_data.geojson"
+CLUSTERING_DATA_SCALED_OUTPUT = OUTPUT_DIR / "clustering_data_scaled.csv"
 
 
 class TractDataMerger(PipelineComponent):
@@ -75,7 +77,11 @@ class TractDataMerger(PipelineComponent):
             "affordable_development_tract_data",
             "foreclosed_tract_data",
         ]
-        self.output_data = ["clustering_data"]
+        self.output_data = [
+            "clustering_data",
+            "cluster_variables",
+            "clustering_data_scaled",
+        ]
 
     def _load_chicago_boundaries(self) -> gpd.GeoDataFrame | None:
         """Load Chicago city boundaries for clipping."""
@@ -92,12 +98,7 @@ class TractDataMerger(PipelineComponent):
     def _filter_non_residential_tracts(self, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """Filter out non-residential tracts like airports, industrial areas, etc."""
         # O'Hare Airport tract IDs
-        ohare_tract_ids = [
-            "17031980000",
-            "17031760801",
-            "17031760802",
-            "17031760803",
-        ]
+        ohare_tract_ids = ["17031980000", "17031760801", "17031760802", "17031760803"]
 
         initial_count = len(gdf)
 
@@ -125,7 +126,8 @@ class TractDataMerger(PipelineComponent):
         # Get tract boundaries as base
         tract_boundaries = context["tract_boundaries"]
 
-        # Clip to Chicago boundaries
+        # Filter to tracts whose centroids are within Chicago boundaries
+        # This ensures we only keep tracts that are truly within Chicago, avoiding edge cases
         try:
             city_boundaries = self._load_chicago_boundaries()
             if city_boundaries is not None:
@@ -133,14 +135,33 @@ class TractDataMerger(PipelineComponent):
                 if tract_boundaries.crs != city_boundaries.crs:
                     city_boundaries = city_boundaries.to_crs(tract_boundaries.crs)
 
-                # Clip tracts to Chicago boundaries
-                tract_boundaries = gpd.clip(tract_boundaries, city_boundaries)
+                # Calculate centroids (use projected CRS for accuracy)
+                tract_boundaries_projected = tract_boundaries.to_crs("EPSG:32616")
+                centroids = tract_boundaries_projected.geometry.centroid.to_crs(
+                    tract_boundaries.crs
+                )
+
+                # Create temporary GeoDataFrame with centroids for spatial join
+                centroids_gdf = gpd.GeoDataFrame(
+                    geometry=centroids,
+                    index=tract_boundaries.index,
+                    crs=tract_boundaries.crs,
+                )
+
+                # Spatial join to find which centroids are within Chicago
+                tracts_within = gpd.sjoin(
+                    centroids_gdf, city_boundaries, how="inner", predicate="within"
+                )
+
+                # Filter tract boundaries to only those whose centroids are within Chicago
+                tract_boundaries = tract_boundaries.loc[tracts_within.index].copy()
+
                 logger.info(
-                    "Clipped to Chicago boundaries: %d tracts remaining",
+                    "Filtered to tracts with centroids within Chicago: %d tracts remaining",
                     len(tract_boundaries),
                 )
         except Exception as e:
-            logger.warning("Could not clip to Chicago boundaries: %s", e)
+            logger.warning("Could not filter to Chicago boundaries: %s", e)
 
         # Filter out non-residential areas (airports, etc.)
         tract_boundaries = self._filter_non_residential_tracts(tract_boundaries)
@@ -419,13 +440,32 @@ class TractDataMerger(PipelineComponent):
         # Clean up redundant columns
         merged_data = self._clean_columns(merged_data)
 
-        # Process data for clustering (handle missing values, prepare for scaling)
-        merged_data = self._prepare_clustering_data(merged_data)
+        # Process data for clustering (handle missing values, select variables, standardize)
+        merged_data, cluster_variables = self._prepare_clustering_data(merged_data)
+
+        # Standardize the cluster variables
+        cluster_data = merged_data[cluster_variables].copy()
+        scaled_data = standardize_data(cluster_data)
+
+        # Convert scaled data to DataFrame for easy saving
+        scaled_df = pd.DataFrame(
+            scaled_data, columns=cluster_variables, index=cluster_data.index
+        )
 
         # Log summary statistics
         self._log_merge_summary(merged_data)
 
-        return {"clustering_data": merged_data}
+        logger.info(
+            "Standardized %d variables for %d tracts",
+            len(cluster_variables),
+            len(merged_data),
+        )
+
+        return {
+            "clustering_data": merged_data,
+            "cluster_variables": cluster_variables,
+            "clustering_data_scaled": scaled_df,
+        }
 
     def _clean_columns(self, df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """Remove redundant columns and keep only essential data for clustering."""
@@ -488,8 +528,14 @@ class TractDataMerger(PipelineComponent):
 
         return cleaned_df
 
-    def _prepare_clustering_data(self, df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-        """Prepare data for clustering analysis by handling missing values."""
+    def _prepare_clustering_data(
+        self, df: gpd.GeoDataFrame
+    ) -> tuple[gpd.GeoDataFrame, list[str]]:
+        """Prepare data for clustering analysis by handling missing values and selecting variables.
+
+        Returns:
+            Tuple of (cleaned GeoDataFrame, list of cluster variable names)
+        """
         # Define clustering variables (same as in clustering_analysis.py)
         cluster_variables = [
             # Demographics
@@ -515,7 +561,7 @@ class TractDataMerger(PipelineComponent):
 
         # Filter to only variables that exist in the data
         available_cluster_vars = [var for var in cluster_variables if var in df.columns]
-        logger.info("Found %d clustering variables", len(available_cluster_vars))
+        logger.info("Selected %d clustering variables", len(available_cluster_vars))
 
         # Replace -9999 (no-data marker from GeoJSON) with NaN for clustering variables
         for col in available_cluster_vars:
@@ -555,7 +601,7 @@ class TractDataMerger(PipelineComponent):
             "Final clustering dataset: %d tracts with complete data", len(cleaned_df)
         )
 
-        return cleaned_df
+        return cleaned_df, available_cluster_vars
 
     def _log_merge_summary(self, df: gpd.GeoDataFrame) -> None:
         """Log summary statistics of merged data."""
@@ -683,5 +729,11 @@ if __name__ == "__main__":
         # Save the merged data for further analysis
         clustering_data.to_file(CLUSTERING_DATA_OUTPUT, driver="GeoJSON")
         logger.info("Clustering data saved to: %s", CLUSTERING_DATA_OUTPUT)
+
+        # Save standardized data to CSV
+        if "clustering_data_scaled" in pipeline.context:
+            scaled_df = pipeline.context["clustering_data_scaled"]
+            scaled_df.to_csv(CLUSTERING_DATA_SCALED_OUTPUT)
+            logger.info("Saved standardized data to: %s", CLUSTERING_DATA_SCALED_OUTPUT)
     else:
         logger.error("Failed to create clustering dataset")
