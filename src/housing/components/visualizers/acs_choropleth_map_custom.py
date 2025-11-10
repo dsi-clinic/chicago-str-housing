@@ -31,7 +31,9 @@ class ACSChoroplethPlotVisualizer(Visualizer):
         """Initialize the ACS map visualizer.
 
         Args:
+            input_key: Context key for input point data (GeoDataFrame)
             output_dir: Optional output directory for visualizations
+            scheme: type of scheme for choropleth map
         """
         super().__init__(
             "acs_map_visualization",
