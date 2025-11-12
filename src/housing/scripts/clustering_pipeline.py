@@ -170,6 +170,8 @@ class TractDataMerger(PipelineComponent):
         merged_data = tract_boundaries.copy()
         merged_data["tract_id"] = merged_data["tract_geoid"]
 
+        columns_to_drop: list[str] = []
+
         # Merge rental data
         if "tract_rental_data" in context:
             rental_data = context["tract_rental_data"]
@@ -196,17 +198,13 @@ class TractDataMerger(PipelineComponent):
                     columns={"area_weighted_avg_rent": "rental_price_mean"}
                 )
             if "min_rental_price" in merged_data.columns:
-                merged_data = merged_data.rename(
-                    columns={"min_rental_price": "rental_price_min"}
-                )
-            if "max_rental_price" in merged_data.columns:
-                merged_data = merged_data.rename(
-                    columns={"max_rental_price": "rental_price_max"}
-                )
-
-            # Drop the unweighted average as it's less accurate
-            if "avg_rental_price" in merged_data.columns:
-                merged_data = merged_data.drop(columns=["avg_rental_price"])
+                columns_to_drop.append("min_rental_price")
+            # Drop unused rental statistics
+            columns_to_drop.extend(
+                col
+                for col in ["max_rental_price", "avg_rental_price"]
+                if col in merged_data.columns
+            )
 
             # Drop duplicate tract_geoid from merge (we only need tract_id)
             if "tract_geoid_y" in merged_data.columns:
@@ -228,15 +226,21 @@ class TractDataMerger(PipelineComponent):
                 suffixes=("", "_airbnb"),
             )
 
-            # Rename Airbnb price columns (use median for robustness)
+            # Rename Airbnb price columns (keep median as primary statistic)
             if "price_numeric_median" in merged_data.columns:
                 merged_data = merged_data.rename(
-                    columns={"price_numeric_median": "airbnb_price_mean"}
+                    columns={"price_numeric_median": "airbnb_price_median"}
                 )
-            if "price_numeric_mean" in merged_data.columns:
-                merged_data = merged_data.rename(
-                    columns={"price_numeric_mean": "airbnb_price_median"}
-                )
+            # Drop unused Airbnb price stats
+            columns_to_drop.extend(
+                col
+                for col in [
+                    "price_numeric_mean",
+                    "price_numeric_min",
+                    "price_numeric_max",
+                ]
+                if col in merged_data.columns
+            )
 
             # Drop duplicate geometry column if it exists
             if "geometry_airbnb" in merged_data.columns:
@@ -271,6 +275,10 @@ class TractDataMerger(PipelineComponent):
                 merged_data = merged_data.drop(columns=["geometry_str"])
         else:
             logger.warning("No STR prohibition data found, skipping STR merge")
+
+        # Drop any columns collected for removal
+        if columns_to_drop:
+            merged_data = merged_data.drop(columns=list(set(columns_to_drop)))
 
         # Merge census data
         if "census_data" in context:
@@ -428,7 +436,9 @@ class TractDataMerger(PipelineComponent):
             "str_prohibition_count",
             "str_prohibition_building_density",
             "str_prohibition_units_total",
+            "str_prohibition_units_mean",
             "str_prohibition_units_density",
+            "number_of_units_median",
             "affordable_development_density",
             "affordable_unit_density",
             "foreclosed_density",
@@ -475,14 +485,9 @@ class TractDataMerger(PipelineComponent):
             "tract_id",  # Keep one tract identifier
             # Rental data
             "rental_price_mean",  # Area-weighted average (most accurate)
-            "rental_price_min",
-            "rental_price_max",
             # Airbnb data
             "airbnb_count",
-            "airbnb_price_mean",
             "airbnb_price_median",
-            "price_numeric_min",
-            "price_numeric_max",
             "airbnb_density",
             # STR prohibition data
             "str_prohibition_count",
@@ -546,7 +551,7 @@ class TractDataMerger(PipelineComponent):
             "census_median_house_value",
             "census_pct_rented",
             "rental_price_mean",
-            "airbnb_price_mean",
+            "airbnb_price_median",
             # STR activity
             "airbnb_density",
             "str_prohibition_building_density",
