@@ -22,7 +22,6 @@ from housing.components.visualizers.foreclosed_distribution import (
 )
 from housing.components.visualizers.foreclosed_map import ForeclosedMapVisualizer
 from pipeline import Pipeline, PipelineResult
-from pipeline.config import PipelineConfig
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +31,7 @@ def run_foreclosed_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     logger.info("Running Foreclosed EDA Analysis")
     logger.info("=" * 70)
 
-    config = PipelineConfig()
-    pipeline = Pipeline("Foreclosed EDA Analysis", config=config)
-    pipeline.load_config()
+    pipeline = Pipeline("Foreclosed EDA Analysis")
 
     # Step 1: Load all boundaries and foreclosed data
     pipeline.register_component(ForeclosedDataLoader())

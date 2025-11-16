@@ -39,7 +39,6 @@ from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.utils import standardize_data, winsorize
 from pipeline import Pipeline, PipelineResult
 from pipeline.base import PipelineComponent
-from pipeline.config import PipelineConfig
 
 logger = logging.getLogger(__name__)
 
@@ -633,9 +632,7 @@ class TractDataMerger(PipelineComponent):
 
 def run_clustering_pipeline() -> tuple[Pipeline, list[PipelineResult]]:
     """Run the clustering data preparation pipeline."""
-    config = PipelineConfig()
-    pipeline = Pipeline("Housing Clustering Data Pipeline", config=config)
-    pipeline.load_config()
+    pipeline = Pipeline("Housing Clustering Data Pipeline")
 
     # Load all data sources
     pipeline.register_component(RentalDataLoader())

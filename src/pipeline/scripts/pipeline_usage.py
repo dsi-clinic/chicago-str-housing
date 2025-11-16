@@ -22,7 +22,6 @@ from pipeline import (
     Visualizer,
     pipeline_component,
 )
-from pipeline.config import PipelineConfig
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -150,8 +149,7 @@ class ExampleVisualizer(Visualizer):
 
 def create_simple_pipeline() -> Pipeline:
     """Create a simple demo pipeline."""
-    config = PipelineConfig()
-    pipeline = Pipeline("Simple Demo Pipeline", config=config)
+    pipeline = Pipeline("Simple Demo Pipeline")
 
     # Register components in order
     pipeline.register_component(ExampleDataLoader())
@@ -164,8 +162,7 @@ def create_simple_pipeline() -> Pipeline:
 
 def create_pipeline_with_decorator() -> Pipeline:
     """Create a pipeline using the decorator pattern."""
-    config = PipelineConfig()
-    pipeline = Pipeline("Decorator Demo Pipeline", config=config)
+    pipeline = Pipeline("Decorator Demo Pipeline")
 
     # Register standard components
     pipeline.register_component(ExampleDataLoader())

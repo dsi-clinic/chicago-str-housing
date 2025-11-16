@@ -1,4 +1,4 @@
-"""Base pipeline architecture for Chicago housing analysis.
+"""Base pipeline architecture for data analysis pipelines.
 
 This module provides a flexible pipeline system that allows registering
 different analysis components and running them in a coordinated manner.
