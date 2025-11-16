@@ -32,7 +32,7 @@ help: ## Show the help message
 	@echo "  run-generic-pipeline     Run the generic pipeline demo"
 	@echo "  run-eda-pipeline         Run the housing EDA pipeline"
 	@echo "  run-clustering-pipeline  Prepare data for clustering"
-	@echo "  run-clustering-analysis  Run clustering data exploration"
+	@echo "  run-clustering-analysis  Run clustering data exploration (ARGS=\"--scatter-matrix\" to include scatter matrix)"
 	@echo ""
 	@echo "Optional environment variables (.env file):"
 	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
@@ -65,4 +65,4 @@ run-clustering-pipeline: build-only ## Prepare data for clustering
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/clustering_pipeline.py
 
 run-clustering-analysis: build-only ## Run clustering data exploration
-	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/clustering_analysis.py
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/clustering_analysis.py $(ARGS)

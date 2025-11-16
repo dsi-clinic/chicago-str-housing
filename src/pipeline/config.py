@@ -1,4 +1,4 @@
-"""Configuration management for the Chicago Housing Analysis Pipeline.
+"""Configuration management for data analysis pipelines.
 
 This module provides configuration management capabilities including:
 - YAML/JSON configuration loading
@@ -21,26 +21,8 @@ class DataConfig(BaseModel):
     """Configuration for data sources.
 
     This class accepts arbitrary data path fields from the config file.
-    Students can add new data sources in the YAML without modifying this code.
+    Users can add new data sources in the YAML without modifying this code.
     """
-
-    # Default data paths - these will be overridden by YAML config
-    rental_data_path: Path | str = Field(
-        default=Path("/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv"),
-        description="Path to rental price data file",
-    )
-    zip_boundaries_path: Path | str = Field(
-        default="https://data.cityofchicago.org/resource/unjd-c2ca.json",
-        description="Path to ZIP code boundaries file or URL",
-    )
-    community_boundaries_path: Path | str = Field(
-        default="https://data.cityofchicago.org/resource/igwz-8jzy.json",
-        description="Path to community area boundaries file or URL",
-    )
-    tract_boundaries_path: Path | str = Field(
-        default=Path("/project/data/tl_2023_17_tract/tl_2023_17_tract.shp"),
-        description="Path to census tract boundaries shapefile",
-    )
 
     # Allow additional fields from YAML config
     model_config = ConfigDict(extra="allow")
@@ -104,10 +86,10 @@ class PipelineConfig(BaseModel):
     """Main pipeline configuration."""
 
     name: str = Field(
-        default="Chicago Housing Analysis", description="Name of the pipeline"
+        default="Data Analysis Pipeline", description="Name of the pipeline"
     )
     description: str = Field(
-        default="Analyze rental prices and house share prohibitions in Chicago",
+        default="Generic data analysis pipeline",
         description="Description of the pipeline",
     )
     data: DataConfig = Field(

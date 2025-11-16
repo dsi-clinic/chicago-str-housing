@@ -60,7 +60,7 @@ class SpatialInterpolator(DataProcessor):
                 "census_population",
                 # Housing market
                 "rental_price_mean",
-                "airbnb_price_mean",
+                "airbnb_price_median",
                 # Population
                 "population_density",
             ]
