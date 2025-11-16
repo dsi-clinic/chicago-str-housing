@@ -41,7 +41,6 @@ from housing.components.visualizers.str_distribution import STRDistributionVisua
 from housing.components.visualizers.str_map import STRMapVisualizer
 from housing.components.visualizers.str_prohibition_viz import STRProhibitionVisualizer
 from pipeline import Pipeline, PipelineResult
-from pipeline.config import PipelineConfig
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +50,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     logger.info("Running Housing EDA Analysis with STR Prohibitions and Airbnb")
     logger.info("=" * 70)
 
-    config = PipelineConfig()
-    pipeline = Pipeline("Housing EDA with STR and Airbnb Analysis", config=config)
-    pipeline.load_config()
+    pipeline = Pipeline("Housing EDA with STR and Airbnb Analysis")
 
     # Step 1: Load all boundaries and data
     pipeline.register_component(RentalDataLoader())

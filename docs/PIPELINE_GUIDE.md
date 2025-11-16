@@ -161,19 +161,25 @@ pipeline.register_component(TractToCommunityProcessor())
 
 ## Configuration
 
-Components use configuration for file paths:
+Components use default file paths that can be overridden when instantiating loaders:
 
 ```python
-from pipeline.config import PipelineConfig
+# Use default paths
+pipeline.register_component(RentalDataLoader())
 
-config = PipelineConfig()
-pipeline = Pipeline("My Analysis", config=config)
-pipeline.load_config()
+# Override specific paths
+pipeline.register_component(RentalDataLoader(
+    file_path="/custom/path/to/rental_data.csv"
+))
 ```
 
-Configuration can be overridden with environment variables:
-- `DATA_DIR` - Data directory path
-- `OUTPUT_DIR` - Output directory path
+Default paths are defined in each loader's `__init__` method:
+- Rental data: `/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv`
+- Tract boundaries: `/project/data/tl_2023_17_tract/tl_2023_17_tract.shp`
+- Airbnb data: `/project/data/listings.csv`
+- API endpoints for Chicago Data Portal (URLs, cached automatically)
+
+To customize paths across multiple loaders, pass file paths when instantiating each loader.
 
 ## Error Handling
 
@@ -194,4 +200,4 @@ data = context["required_data"]
 - **Log important steps** with `logger.info()`
 - **Return clear dictionary keys** from components
 - **Handle missing data** gracefully
-- **Use configuration** for file paths, not hardcoded values
+- **Override file paths** when instantiating loaders if defaults don't match your setup

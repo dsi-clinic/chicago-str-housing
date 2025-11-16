@@ -216,7 +216,7 @@ The pipeline uses YAML configuration files with environment variable support. Co
 - Analysis parameters
 - Component execution order
 
-See `docs/PIPELINE_GUIDE.md` for configuration details and `config/pipeline_config.yaml` for examples.
+See `docs/PIPELINE_GUIDE.md` for configuration details.
 
 ### Data Management
 
