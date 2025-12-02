@@ -204,7 +204,7 @@ The pipeline generates the following visualizations in the `output/` directory:
 
 ### Creating New Components
 
-See `docs/STUDENT_GUIDE.md` for step-by-step instructions on:
+See `docs/HOUSING_GUIDE.md` for housing component details and `docs/PIPELINE_GUIDE.md` for framework usage:
 - Creating loaders, processors, analyzers, and visualizers
 - Registering components in the pipeline
 - Common patterns and best practices
@@ -254,6 +254,6 @@ ruff format
 ## Documentation
 
 - **docs/PIPELINE_GUIDE.md** - Pipeline architecture and available components
-- **docs/SPATIAL_AGGREGATION_GUIDE.md** - Spatial data aggregation (points→tracts→communities)
-- **docs/STUDENT_GUIDE.md** - Quick start guide for creating new components
-- **docs/METHODOLOGY.md** - Analysis methodology and statistical notes
+- **docs/HOUSING_GUIDE.md** - Housing components and clustering pipeline guide
+- **docs/CLUSTERING_PIPELINE.md** - Clustering data preparation methodology
+- **docs/CLUSTERING_ANALYSIS.md** - Clustering analysis workflow and outputs
