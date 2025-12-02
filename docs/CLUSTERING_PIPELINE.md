@@ -2,14 +2,14 @@
 
 ## Overview
 
-This document describes the methodology for preparing census tract-level housing data for clustering analysis. The pipeline integrates multiple data sources, handles missing values through spatial interpolation, and applies data quality filters to create a clean dataset suitable for neighborhood clustering.
+This document describes the methodology for preparing census tract-level housing data for clustering analysis. The pipeline integrates multiple data sources, handles missing values through spatial interpolation, and applies data quality filters to create a clean dataset suitable for geospatial clustering.
 
 ## Pipeline Architecture
 
 The clustering pipeline follows a modular design with the following stages:
 
 1. **Data Loading** - Load and validate multiple data sources
-2. **Spatial Processing** - Clip to Chicago boundaries and filter non-residential areas  
+2. **Spatial Processing** - Filter to Chicago boundaries and filter non-residential areas  
 3. **Data Integration** - Merge data sources at census tract level
 4. **Missing Value Imputation** - Spatial KNN interpolation for gaps
 5. **Data Quality Processing** - Outlier handling and data cleaning
@@ -44,7 +44,7 @@ Raw variables loaded from Census API:
 - `census_pct_rented` - Percentage of housing units that are rented (calculated from ACS tenure data)
 - `population_density` - People per square kilometer (calculated from population and tract area)
 - `rental_price_mean` - Area-weighted average rental price from ZIP to tract aggregation
-- `airbnb_price_mean` - Average Airbnb listing price per tract  
+- `airbnb_price_median` - Median Airbnb listing price per tract  
 - `airbnb_density` - Airbnb listings per square kilometer
 - `str_prohibition_building_density` - STR-prohibited buildings per square kilometer
 - `str_prohibition_units_density` - STR-prohibited units per square kilometer
@@ -54,8 +54,8 @@ Raw variables loaded from Census API:
 ### Geographic Scope
 
 1. **Initial Tract Loading**: Load all Cook County census tracts from TIGER/Line files
-2. **Chicago Boundary Clipping**: Clip tracts to Chicago city administrative boundaries using `gpd.clip()`
-3. **Non-Residential Filtering**: Remove O'Hare census tracts
+2. **Chicago Boundary Filtering**: Filter tracts to those whose centroids are within Chicago city administrative boundaries using spatial join
+3. **Non-Residential Filtering**: Remove O'Hare airport tracts by specific tract IDs
 
 ## Data Integration and Processing
 
@@ -64,8 +64,8 @@ The clustering pipeline merges multiple datasets at the census tract level throu
 ### Base Geographic Framework
 
 1. **Tract Boundaries**: Start with Cook County census tracts as the base geographic framework
-2. **Chicago Clipping**: Clip tracts to Chicago city administrative boundaries using `gpd.clip()`
-3. **Non-Residential Filtering**: Remove O'Hare airport tracts (4 tracts filtered out)
+2. **Chicago Boundary Filtering**: Filter tracts to those whose centroids are within Chicago city administrative boundaries using spatial join (reprojected to UTM Zone 16N for accuracy)
+3. **Non-Residential Filtering**: Remove O'Hare airport tracts by specific tract IDs (typically 4 tracts: 17031980000, 17031760801, 17031760802, 17031760803)
 
 ### Sequential Data Merging
 
@@ -78,14 +78,15 @@ Datasets are merged in this order using tract identifiers:
 
 #### 2. Airbnb Data Integration  
 - Merges aggregated Airbnb listing data (points-to-tract processing done upstream)
-- Renames variables: `point_count` → `airbnb_count`, `point_density` → `airbnb_density`
-- Includes price statistics: `price_numeric_mean` → `airbnb_price_mean`
+- Uses variables directly from aggregation: `airbnb_count`, `airbnb_density` (calculated by PointsToTractProcessor)
+- Renames price statistics: `price_numeric_median` → `airbnb_price_median` (primary clustering variable)
+- Drops unused price statistics (mean, min, max)
 
 #### 3. STR Prohibition Data Integration
 - Merges aggregated STR prohibition data (points-to-tract processing done upstream)  
-- Renames variables: `point_count` → `str_prohibition_count`
+- Uses variables directly from aggregation: `str_prohibition_count` (calculated by PointsToTractProcessor)
 - Calculates building density: `str_prohibition_building_density = str_prohibition_count / area_sq_km`
-- Includes unit counts: `number_of_units_sum` → `str_prohibition_units_total`
+- Renames unit counts: `number_of_units_sum` → `str_prohibition_units_total`
 
 #### 4. Census Data Integration
 - Merges tract-level ACS demographic data directly (no spatial processing needed)
@@ -133,9 +134,9 @@ The pipeline uses K-Nearest Neighbors (K=5) spatial interpolation to fill missin
 
 #### Variables Interpolated
 
-- All census demographic variables (income, age, education, housing values, tenure)
+- All census demographic variables (income, age, education, housing values, tenure, population)
 - `rental_price_mean` (market data gaps) 
-- `airbnb_price_mean` (short-term rental pricing gaps)
+- `airbnb_price_median` (short-term rental pricing gaps)
 - `population_density` (calculated density gaps)
 
 #### Variables Filled with Zero (Not Interpolated)
@@ -158,16 +159,16 @@ The pipeline uses K-Nearest Neighbors (K=5) spatial interpolation to fill missin
 Extreme density values are capped to prevent distortion of clustering results:
 
 #### Population Density
-1. **Distribution Analysis**: Log percentiles (50th, 90th, 95th, 99th, 99.9th) and maximum values
+1. **Distribution Analysis**: Calculate 99th percentile and maximum values from positive values only
 2. **Conservative Capping**: Use 99th percentile OR 50,000 people/km² (very dense urban), whichever is lower
-3. **Extreme Value Logging**: Document values being capped for transparency
+3. **Extreme Value Logging**: Log 99th percentile, maximum value, and count of values being capped
 
 **Rationale**: Census data occasionally contains calculation errors (e.g., tiny tract areas leading to impossible densities). Winsorization preserves rank order while preventing outlier distortion.
 
 #### STR Prohibition Units Density
-1. **Distribution Analysis**: Log percentiles (50th, 90th, 95th, 99th, 99.9th) and maximum values
+1. **Distribution Analysis**: Calculate 99th percentile and maximum values from positive values only
 2. **Conservative Capping**: Use 99th percentile as upper bound
-3. **Extreme Value Logging**: Document values being capped for transparency
+3. **Extreme Value Logging**: Log 99th percentile, maximum value, and count of values being capped
 
 **Rationale**: STR prohibition data can have extreme outliers from small tract areas or data entry errors. The 99th percentile provides robust outlier control while preserving policy intervention patterns.
 
@@ -187,13 +188,13 @@ Extreme density values are capped to prevent distortion of clustering results:
 
 After spatial interpolation, any remaining tracts with missing clustering variables are removed:
 
-1. **Complete Case Analysis**: Require all 11 clustering variables to be non-missing
+1. **Complete Case Analysis**: Require all clustering variables to be non-missing
 2. **Documentation**: Log which variables had missing data and how many tracts are affected  
-3. **Final Count**: 862 tracts with complete data (full Chicago coverage minus filtered O'Hare tracts)
+3. **Final Count**: All tracts with complete data (full Chicago coverage minus filtered O'Hare tracts)
 
 ### Clustering Variables
 
-The final dataset includes 11 standardized variables for clustering:
+The final dataset includes standardized variables for clustering. The pipeline defines the following variables (only those present in the data are used):
 
 #### Demographics (3 variables)
 - `census_median_income` - Economic status
@@ -204,7 +205,7 @@ The final dataset includes 11 standardized variables for clustering:
 - `census_median_house_value` - Housing cost (ownership)
 - `census_pct_rented` - Tenure patterns
 - `rental_price_mean` - Housing cost (rental market)
-- `airbnb_price_mean` - Short-term rental pricing
+- `airbnb_price_median` - Short-term rental pricing
 
 #### STR Activity (3 variables)  
 - `airbnb_density` - Short-term rental supply
@@ -213,6 +214,11 @@ The final dataset includes 11 standardized variables for clustering:
 
 #### Population (1 variable)
 - `population_density` - Urban density patterns
+
+#### Additional Housing Variables (3 variables, if available)
+- `affordable_development_density` - Affordable housing development density
+- `affordable_unit_density` - Affordable housing unit density
+- `foreclosed_density` - Foreclosed property density
 
 ### Data Export Format
 
@@ -234,11 +240,14 @@ Missing values in exports are coded as `-9999` for GeoJSON compatibility, then c
 ### Pipeline Logging
 
 Comprehensive logging documents:
-- Input data counts and coverage by source
-- Interpolation statistics (variables, tract counts, success rates)
-- Filtering results (non-residential tracts removed)
-- Data quality adjustments (winsorization, missing data handling)
-- Final dataset characteristics
+- **Component execution**: Each pipeline component logs its execution status and timing
+- **Spatial filtering**: Logs tract counts after Chicago boundary filtering and O'Hare removal
+- **Data merging**: Logs warnings for missing data sources and successful merges
+- **Interpolation**: Logs which variables are interpolated, number of missing values before/after
+- **Winsorization**: Logs 99th percentile, maximum value, and count of capped values for each density variable
+- **Missing data handling**: Logs which variables have missing data, tract counts affected, and final complete case count
+- **Data summary**: Logs total tracts and coverage percentages by data source (rental, Airbnb, STR prohibition, census, affordable development, foreclosed)
+- **Final dataset**: Logs number of clustering variables selected and number of tracts with complete data
 
 ## Usage Notes
 
@@ -246,7 +255,7 @@ Comprehensive logging documents:
 
 The pipeline output is ready for clustering with minimal additional preprocessing:
 
-1. **Standardization**: Apply `StandardScaler` or `RobustScaler` to handle different variable scales
+1. **Standardization**: Data is standardized using robust scaling (median and IQR) to handle different variable scales and reduce sensitivity to outliers
 2. **Algorithm Selection**: Suitable for K-means, hierarchical clustering, DBSCAN, etc.
 3. **Spatial Constraints**: Can be used with spatially-constrained clustering if desired
 
