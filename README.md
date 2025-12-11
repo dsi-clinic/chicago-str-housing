@@ -1,44 +1,78 @@
 # 2025-autumn-city-of-chicago-housing
 
-## Project Background
-The Department of Technology and Innovation (DTI) is the City of Chicago’s central IT
-agency. DTI manages the City’s core technology infrastructure, digital services, data
-management, data analytics, and applied data science. Our data team applies data science
-and advanced analytics, including model development, forecasting, and pattern detection,
-to strengthen decision-making, improve service delivery, and build more accessible,
-resident-centered digital tools.
+## Table of Contents
+- [Project Summary](#project-summary)
+  - [Background & Motivation](#background--motivation)
+  - [Exploratory Data Analysis (EDA)](#exploratory-data-analysis-eda)
+  - [Clustering](#clustering)
+- [Data](#data)
+  - [Primary Datasets](#primary-datasets)
+  - [Spatial Boundary Data](#spatial-boundary-data)
+- [Architecture](#architecture)
+  - [Repository Structure](#repository-structure)
+  - [Generic Pipeline Framework](#generic-pipeline-framework)
+  - [Housing Components](#housing-components)
+  - [Design Considerations](#design-considerations)
+- [Quick Start](#quick-start)
+  - [Setup Environment](#1-setup-environment)
+  - [Prepare Data Files](#2-prepare-data-files)
+  - [Choose Development Workflow](#3-choose-your-development-workflow)
+  - [Run the Pipeline](#4-run-the-pipeline)
+- [Analysis Outputs](#analysis-outputs)
+  - [EDA Outputs](#analysis-outputs)
+  - [Clustering Outputs](#clustering-outputs)
+- [Development](#development)
+  - [Creating New Components](#creating-new-components)
+  - [Configuration](#configuration)
+  - [Data Management](#data-management)
+  - [Make Commands](#make-commands)
+  - [Code Quality](#code-quality)
+- [Documentation](#documentation)
 
-This project investigates the relationship between affordable housing, short-term rental (STR) restrictions, Airbnb activity, and foreclosure activity in Chicago. Using publicly available datasets from the City of Chicago and supplemental socioeconomic indicators, the project analyzes how housing pressures vary across community areas and census tracts.
+## Project Summary
 
-The analysis emphasizes data wrangling, exploratory analysis, spatial correlation analysis, and comprehensive visualization of housing market dynamics across Chicago neighborhoods.
+### Background & Motivation
 
-Key questions include:
-- Do neighborhoods with high STR restrictions differ systematically from those without restrictions in terms of affordability and foreclosure activity?
-- How do Airbnb listings correlate with rental prices and STR units density across census tracts?
-- Can clustering techniques reveal distinct "neighborhood types" based on housing and socioeconomic conditions?
-- Can predictive modeling estimate the likelihood of a community area experiencing housing pressure—defined as an increased risk of affordability challenges due to overlapping factors such as STR restrictions, foreclosure rates, and limited affordable housing?
+The City of Chicago enforces short-term rental (STR) prohibitions under the Shared Housing Ordinance, but it remains unclear how these prohibitions relate to housing affordability, demographic trends, and socioeconomic conditions. The team worked with the City of Chicago’s Department of Technology and Innovation (DTI) to better understand the distribution of STR prohibitions and relationships with other demographic and market variables. Gaining insight into these connections is a critical step towards alleviating the City of Chicago’s rising housing pressures. 
 
+### Exploratory Data Analysis (EDA)
 
-## Project Goals
+**Key Question:** How does STR unit density correlate with housing affordability, Airbnb listings, foreclosures, and demographic data across census tracts?
 
-1. Cleaned and Integrated Dataset
-    - Merge Affordable Rental Housing Developments, STR Prohibited Buildings, Foreclosed Rental Properties, and Census socioeconomic indicators at the community area level.
-    - Standardize variables (e.g., proportions, normalized indicators) for analysis.
-2. Exploratory Data Analysis (EDA)
-    - Descriptive statistics and correlation analysis across datasets.
-    - Visualizations (scatterplots, bar charts, heatmaps, static choropleths) to highlight patterns and relationships between STR restrictions, affordable housing, and foreclosures.
-3. Clustering Analysis
-    - Apply clustering methods (k-means, hierarchical clustering) to group community areas based on housing and socioeconomic characteristics.
-    - Evaluate clusters with silhouette scores or gap statistics.
-    - Interpret clusters as different neighborhood types (e.g., high STR restrictions + low affordability vs. low restrictions + higher foreclosure rates).
-4. Predictive Modeling
-    - Build predictive models (logistic regression, random forest, gradient boosting) to estimate the likelihood of a community area becoming a housing pressure zone.
-    - Validate models using cross-validation and evaluate performance (ROC-AUC, precision/recall).
-    - Analyze feature importance to determine which factors most strongly influence housing pressure.
-5. Final Report
-    - Synthesize findings from EDA, clustering, and modeling into a clear narrative.
-    - Present visualizations that highlight key results.
-    - Provide evidence-based insights for anticipating and addressing housing challenges.
+The team built a pipeline to conduct a comprehensive analysis of Chicago’s housing landscape using data from the Chicago Data Portal, U.S. Census Bureau, Airbnb, Zillow, and city administrative records. The pipeline allows the users to merge datasets and perform geospatial analysis, enabling a comprehensive view of how key housing factors vary across the city and relate to one another.
+
+**Analysis Result:** While not all the variables we explored showed high correlation with STR unit density, significant relationships exist with population density and rental prices.
+
+**Key outputs** are identified and described in the [Analysis Outputs](#analysis-outputs) section
+
+### Clustering
+
+**Key Question:** Can clustering techniques reveal distinct "neighborhood types" based on housing and socioeconomic conditions?
+
+**Key Question:** Do neighborhoods with high STR restrictions differ systematically from those without restrictions in terms of affordability and foreclosure activity?
+
+**Features Used for Clustering:**
+- **Census Data:** `census_median_income`, `census_median_age`, `census_pct_bachelor`, `census_median_house_value`, `census_pct_rented`
+- **Zillow Data:** `rental_price_mean`
+- **Airbnb Data:** `airbnb_price_mean`, `airbnb_density`
+- **STR Prohibition Data:** `str_prohibition_building_density`, `str_prohibition_unit_density`
+- **Affordable Housing Development Data:** `affordable_development_density`, `affordable_development_unit_density`
+- **Foreclosure Data:** `foreclosure_density`
+
+**Clustering Algorithms Tested:**
+Using an elbow plot, we identified six clusters as the best number to build distinct neighborhood types.
+
+The algorithms we tried included two traditional clustering algorithms (KMeans and Ward) and two regionalization clustering algorithms (Ward-KNN and Ward-Queens). Geodemographic clusters consider only the tabular data, so the clusters formed are naive to spatial relationships. We can use the choropleth maps and other outputs to interpret the spatial story told by these clusters. Regionalization algorithms enforce the spatial constraint that (in our case) tracts in the same cluster must be contiguous.
+
+Enforcing the regionalization constraint greatly reduced the performance and interpretability of the resulting clusters, so we chose traditional clustering. Between the traditional clustering algorithms, KMeans performed the best, so we used it for our analysis.
+
+*Analysis Result**:
+- **First Question:** Clusters revealed neighborhood types driven by differences in STR prohibition levels and distinguished by their demographic, housing, and geographic characteristics
+- **Second Question:** Because of the high separation in STR density levels between clusters, the groupings reveal that neighborhoods with higher STR restrictions differ systematically in affordability, but not in foreclosure activity.
+
+By merging datasets and performing k-means clustering, the analysis revealed significant spatial variation across census tracts. STR distribution proved to be a non-random spatial process and the strongest distinguishing factor among 12 variables, confirming its central role in understanding housing pressures and neighborhood dynamics. 
+
+**Key outputs** are identified and described in the [Analysis Outputs](#clustering-outputs) section.
 
 ## Data
 
@@ -74,17 +108,38 @@ The pipeline uses three levels of geographic boundaries for spatial analysis:
 
 ## Architecture
 
-The codebase is organized into two main packages:
+The codebase is contained under the `src/` directory, which is organized as follows:
+```text
+src/
+├── housing/
+│   ├── __init__.py
+│   ├── components/              # “Building Blocks” of the pipeline
+│   │   ├── analyzers/           # Statistical evaluation tools
+│   │   ├── cluster/             # Classes + helpers for clustering pipeline
+│   │   ├── loaders/             # Data loaders for each dataset
+│   │   ├── processors/          # Transform + aggregate data (incl. geospatial)
+│   │   ├── visualizers/         # Visualization utilities
+│   │   ├── constants.py         # Shared named constants
+│   │   └── utils.py             # Shared helper functions
+│   │
+│   └── scripts/                 # User-facing runnable scripts
+│
+└── pipeline/                    # Pipeline architecture + orchestration layer
+
+
+```
 
 **Generic Pipeline Framework** (`src/pipeline/`):
 - Reusable, domain-agnostic framework for data analysis pipelines
-- Base classes: `Pipeline`, `DataLoader`, `DataProcessor`, `Analyzer`, `Visualizer`
+- Base classes: `Pipeline`, `PipelineResult`, `PipelineComponent`, `DataLoader`, `DataProcessor`, `Analyzer`, `Visualizer`
 - YAML/JSON configuration with environment variable support
 
 **Housing Components** (`src/housing/`):
 - Chicago-specific analysis components
-- Organized by type: loaders, processors, analyzers, visualizers, scripts
-- Implements the spatial aggregation workflow
+- Reusable functions: found in `utils.py`, (e.g., formatters, metric calculators, common visualizers)
+- Organized by type: loaders, processors, analyzers, visualizers
+- `cluster/` sub-directory includes helper functions and classes for the clustering pipeline
+-`scripts/` sub-directory includes user-facing runnable scripts for both the EDA and clustering pipelines
 
 ### Design Considerations
 - **Modularity**: Each component is independently developed and testable
@@ -96,6 +151,9 @@ The codebase is organized into two main packages:
 ## Quick Start
 
 ### 1. Setup Environment
+
+Docker is required for running the analysis. Instructions on how to install Docker Desktop can be found [here](https://docs.docker.com/desktop/) 
+ 
 ```bash
 # Clone the repository
 git clone <repository-url> spatial-data-analysis-pipeline
@@ -104,7 +162,7 @@ cd spatial-data-analysis-pipeline
 # Copy the example environment file
 cp .env.example .env
 
-# Edit .env to set your data directory path
+# Edit .env to set your data directory path 
 # Example: DATA_DIR=/Users/yourname/project/data
 ```
 
@@ -133,7 +191,20 @@ cp .env.example .env
 - Cached to `data/.cache/` on first run for faster subsequent runs
 - No manual download needed!
 
-See `docs/CENSUS_TRACT_GUIDE.md` for detailed instructions.
+**Required: Census API Key**
+ - Request [Census API Key](https://api.census.gov/data/key_signup.html) and store it in .env  
+ - Store Census API Key in `.env`
+
+```bash
+# Example: CENSUS_API_KEY = {Your-API-KEY}
+```
+
+
+
+**Automatic: City of Chicago Data Portal APIs**
+- The remaining datasets are fetched automatically from Chicago Data Portal
+- Cached to `data/.cache/` on first run for faster subsequent runs
+- No manual download needed!
 
 ### 3. Choose Your Development Workflow
 
@@ -173,6 +244,12 @@ make clean
 ```bash
 # Run the housing EDA pipeline
 make run-eda-pipeline
+
+# Run the prepare data for clustering
+Make run-clustering-pipeline
+
+# Run clustering data exploration
+Make run-clustering-analysis
 ```
 
 The housing pipeline generates comprehensive analysis including:
@@ -184,6 +261,7 @@ The housing pipeline generates comprehensive analysis including:
 ### Analysis Outputs
 
 The pipeline generates the following visualizations in the `output/` directory:
+
 
 **Rental Market Analysis:**
 - `rental_distribution_analysis.png` - Rental price distributions by tract and community area
@@ -197,6 +275,26 @@ The pipeline generates the following visualizations in the `output/` directory:
 **Airbnb Market Analysis:**
 - `airbnb_distribution_analysis.png` - Airbnb price and density distributions
 - `airbnb_analysis_maps.png` - Spatial maps of Airbnb pricing and density patterns
+
+**Foreclosures Analysis:**
+- `foreclosed_maps.png` - Foreclosure count choropleths by tract and community area
+- `foreclosed_top10_distribution.png` - communities with ten most foreclosed buildings
+
+### Clustering Outputs
+
+- `clustering_data.geojson` - fully merged cleaned data containing all variables across dataset for clustering analysis
+- `clustering_data_scaled.csv` - standard(scale) data on the clustering_data.geojson
+- `choropleth_maps` - Grid of maps for all clustering features, using Fisher-Jenks breaks to bin the data to easily view geospatial distributions
+- `scatterplot_matrix` - Grid of plots showing the distributions and pairwise correlations of features
+
+The team selected KMeans as the main clustering output for analysis given its superior performance and interpretability, as described above. As such, the most relevant output files in the `output/clustering/` directory correspond to this algorithm:
+
+- `kmeans_attribute_distributions.png` - KDE distribution plots for each attribute colored by cluster
+- `kmeans_cluster_profiles.png` - Table of cluster centroids showing average value of each feature by cluster
+- `kmeans_cluster_kruskal.png` - Kruskal-Wallis test result for each attribute across clusters
+- `kmeans_cluster_pairwise_ks.png` - Pairwise Kolmogorov-Smirnov test results for each attribute
+- `kmeans_cluster_pairwise_permanova.png` - Permanova test results to assess multivariate separation among clusters
+- `kmeans_cluster_pairwise_manova.png` - Manova (Wilks' lambda) test results to assess multivariate centroid differences
 
 
 
@@ -234,6 +332,8 @@ Common commands (run `make help` for full list):
 * `make run-interactive` - Interactive bash session in container
 * `make test` - Run all tests
 * `make run-eda-pipeline` - Run housing analysis pipeline
+* `make run-clustering-pipeline` - Prepare data for clustering
+* `run-clustering-analysis` - Run clustering data exploration
 * `make clean` - Clean up Docker artifacts
 
 See `Makefile` for implementation details.
