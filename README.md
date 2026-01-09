@@ -1,41 +1,14 @@
 # 2025-autumn-city-of-chicago-housing
 
-## Table of Contents
-- [Project Summary](#project-summary)
-  - [Background & Motivation](#background--motivation)
-  - [Exploratory Data Analysis (EDA)](#exploratory-data-analysis-eda)
-  - [Clustering](#clustering)
-- [Data](#data)
-  - [Primary Datasets](#primary-datasets)
-  - [Spatial Boundary Data](#spatial-boundary-data)
-- [Architecture](#architecture)
-  - [Repository Structure](#repository-structure)
-  - [Generic Pipeline Framework](#generic-pipeline-framework)
-  - [Housing Components](#housing-components)
-  - [Design Considerations](#design-considerations)
-- [Quick Start](#quick-start)
-  - [Setup Environment](#1-setup-environment)
-  - [Prepare Data Files](#2-prepare-data-files)
-  - [Choose Development Workflow](#3-choose-your-development-workflow)
-  - [Run the Pipeline](#4-run-the-pipeline)
-- [Analysis Outputs](#analysis-outputs)
-  - [EDA Outputs](#analysis-outputs)
-  - [Clustering Outputs](#clustering-outputs)
-- [Development](#development)
-  - [Creating New Components](#creating-new-components)
-  - [Configuration](#configuration)
-  - [Data Management](#data-management)
-  - [Make Commands](#make-commands)
-  - [Code Quality](#code-quality)
-- [Documentation](#documentation)
-
 ## Project Summary
 
 ### Background & Motivation
 
-The City of Chicago enforces short-term rental (STR) prohibitions under the Shared Housing Ordinance, but it remains unclear how these prohibitions relate to housing affordability, demographic trends, and socioeconomic conditions. The team worked with the City of Chicago’s Department of Technology and Innovation (DTI) to better understand the distribution of STR prohibitions and relationships with other demographic and market variables. Gaining insight into these connections is a critical step towards alleviating the City of Chicago’s rising housing pressures. 
+The City of Chicago enforces short-term rental (STR) prohibitions under the Shared Housing Ordinance, but it remains unclear how these prohibitions relate to housing affordability, demographic trends, and socioeconomic conditions. The team worked with the City of Chicago's Department of Technology and Innovation (DTI) to better understand the distribution of STR prohibitions and relationships with other demographic and market variables. Gaining insight into these connections is a critical step towards alleviating the City of Chicago's rising housing pressures. 
 
-### Exploratory Data Analysis (EDA)
+### Autumn 2025: Descriptive Analysis
+
+#### Exploratory Data Analysis (EDA)
 
 **Key Question:** How does STR unit density correlate with housing affordability, Airbnb listings, foreclosures, and demographic data across census tracts?
 
@@ -45,7 +18,7 @@ The team built a pipeline to conduct a comprehensive analysis of Chicago’s hou
 
 **Key outputs** are identified and described in the [Analysis Outputs](#analysis-outputs) section
 
-### Clustering
+#### Clustering
 
 **Key Question:** Can clustering techniques reveal distinct "neighborhood types" based on housing and socioeconomic conditions?
 
@@ -73,6 +46,14 @@ Enforcing the regionalization constraint greatly reduced the performance and int
 By merging datasets and performing k-means clustering, the analysis revealed significant spatial variation across census tracts. STR distribution proved to be a non-random spatial process and the strongest distinguishing factor among 12 variables, confirming its central role in understanding housing pressures and neighborhood dynamics. 
 
 **Key outputs** are identified and described in the [Analysis Outputs](#clustering-outputs) section.
+
+### Winter 2026: Causal Impact Analysis
+
+**Key Question:** What is the causal effect of STR prohibition adoption on rental prices in Chicago census tracts?
+
+Building on the descriptive and clustering analyses, this phase implements a **staggered Difference-in-Differences (DiD) analysis** to estimate the causal impact of STR prohibitions on rental prices. Since different tracts adopted prohibitions at different times (2015-2024), we can use later-treated tracts as controls for earlier-treated ones, leveraging the variation in treatment timing to identify causal effects. The analysis uses panel data methods with two-way fixed effects (tract and time) to control for time-invariant tract characteristics and city-wide trends, and includes event study analysis to test the parallel trends assumption and examine how treatment effects evolve over time.
+
+**Key outputs** and methodology are described in the [DiD Analysis Documentation](#did-analysis-documentation) section.
 
 ## Data
 
@@ -357,3 +338,7 @@ ruff format
 - **docs/HOUSING_GUIDE.md** - Housing components and clustering pipeline guide
 - **docs/CLUSTERING_PIPELINE.md** - Clustering data preparation methodology
 - **docs/CLUSTERING_ANALYSIS.md** - Clustering analysis workflow and outputs
+
+### DiD Analysis Documentation
+
+- **docs/DID_STUDENT_PLAN.md** - Implementation plan for staggered DiD analysis
