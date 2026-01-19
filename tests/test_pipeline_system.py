@@ -14,6 +14,7 @@ import pytest
 from housing import (
     CommunityBoundariesLoader,
     RentalDataLoader,
+    TimeSeriesRentalLoader,
     ZipBoundariesLoader,
 )
 from pipeline import Pipeline
@@ -74,6 +75,24 @@ class TestPipelineComponents:
         assert len(community_gdf) > 0
         assert "community_name" in community_gdf.columns  # Actual column name
         assert community_gdf.geometry is not None
+
+    def test_timeseries_rental_loader_success(self) -> None:
+        """Test TimeSeriesRentalLoader with valid data file."""
+        # Arrange
+        loader = TimeSeriesRentalLoader()
+
+        # Act
+        result = loader.execute({})
+
+        # Assert
+        assert isinstance(result, dict)
+        assert "timeseries_rental_data" in result
+        rental_df = result["timeseries_rental_data"]
+        assert isinstance(rental_df, pd.DataFrame)
+        assert len(rental_df) > 0
+        assert "zip_code" in rental_df.columns
+        assert "month" in rental_df.columns
+        assert "rental_price" in rental_df.columns
 
 
 class TestPipelineIntegration:

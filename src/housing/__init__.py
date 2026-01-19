@@ -19,6 +19,7 @@ from housing.components.loaders.community_boundaries import CommunityBoundariesL
 from housing.components.loaders.foreclosed_data import ForeclosedDataLoader
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
+from housing.components.loaders.timeseries_rental_data import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
 from housing.components.processors.points_to_tract import PointsToTractProcessor
@@ -53,6 +54,7 @@ __all__ = [
     "RentalDataLoader",
     "RentalDistributionVisualizer",
     "RentalMapVisualizer",
+    "TimeSeriesRentalLoader",
     "RentalTractAnalyzer",
     "STRDistributionVisualizer",
     "STRMapVisualizer",
