@@ -1,8 +1,7 @@
 """Aggregates zip codes to tract for time series rental data"""
 
-from typing import Any
-
 import logging
+from typing import Any
 
 import geopandas as gpd
 import pandas as pd
