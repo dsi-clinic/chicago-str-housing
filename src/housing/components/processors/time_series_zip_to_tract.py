@@ -2,6 +2,8 @@
 
 This module performs spatial joins to transform rental data from zip code level
 to census tract level using area-weighted aggregation.
+
+It also converts the DataFrame to panel time-series format.
 """
 
 import logging
@@ -162,9 +164,25 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
             tract_rental, geometry="geometry", crs=tract_boundaries.crs
         )
 
-        # Step 5: Join back with tract boundaries for final result
-        final_result = tract_boundaries.merge(
+        # Step 6: Join back with tract boundaries
+        merged_rental_gdf = tract_boundaries.merge(
             tract_rental_gdf.drop(columns=["geometry"]), on="tract_geoid", how="left"
+        )
+
+        # Step 7: convert to panel data format
+        long_rental_gdf = merged_rental_gdf.melt(
+            id_vars=["tract_geoid"],
+            value_vars=[f"{date}_area_weighted_avg_rent" for date in date_columns],
+            var_name="month",
+            value_name="rental_price",
+        )
+
+        long_rental_gdf["month"] = long_rental_gdf["month"].apply(
+            lambda x: x.split("_")[0]
+        )
+
+        final_result = tract_boundaries.merge(
+            long_rental_gdf, on="tract_geoid", how="left"
         )
 
         # Create zip-to-tract crosswalk
@@ -177,5 +195,6 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
 
         return {
             "tract_rental_data": final_result,
+            "wide_tract_rental_data": merged_rental_gdf,
             "zip_to_tract_crosswalk": crosswalk,
         }
