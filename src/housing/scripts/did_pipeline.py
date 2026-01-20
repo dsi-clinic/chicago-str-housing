@@ -44,7 +44,6 @@ if __name__ == "__main__":
     logger.info("=" * 70)
 
     pipeline, results = run_full_analysis()
-    print(pipeline.context.keys())
 
     logger.info("\n" + "=" * 70)
     logger.info("Demo complete! Check the output/ directory for visualizations.")
