@@ -27,7 +27,7 @@ class TimeSeriesRentalDataLoader(DataLoader):
             file_path: Optional path to rental data file
         """
         super().__init__(
-            "rental_data",
+            "time_series_rental_data",
             file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv",
             "Load rental price data from ZORI dataset",
         )
@@ -45,20 +45,20 @@ class TimeSeriesRentalDataLoader(DataLoader):
 
         # Time series formatting: convert to long format
         date_cols = [col for col in rental_df.columns if col.startswith("20")]
-        wide_df = rental_df.melt(
+        long_df = rental_df.melt(
             id_vars=["zip_code"],
             value_vars=date_cols,
             var_name="date",
             value_name="rental_price"
         )
         
-        print(wide_df.head())
+        logger.info("Sample data:\n%s", long_df.head())
 
-        logger.info("Loaded %d zip codes with rental data in time series format", len(rental_df))
+        logger.info("Loaded %d zip codes with rental data in time series format", len(long_df))
         logger.info(
             "Rental price range: $%.0f - $%.0f",
-            wide_df["rental_price"].min(),
-            wide_df["rental_price"].max(),
+            long_df["rental_price"].min(),
+            long_df["rental_price"].max(),
         )
 
-        return {"rental_data": wide_df}
+        return {"time_series_rental_data": long_df}

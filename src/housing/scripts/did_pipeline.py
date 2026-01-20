@@ -9,6 +9,10 @@ import logging
 from housing.components.loaders.time_series_rental_data import (
     TimeSeriesRentalDataLoader,
 )
+from housing.components.loaders.tract_boundaries import TractBoundariesLoader
+from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
+from housing.components.processors.time_series_rental_zip_to_tract import TimeSeriesRentalZipToTractProcessor
+
 from pipeline import Pipeline, PipelineResult
 
 logger = logging.getLogger(__name__)
@@ -23,6 +27,11 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     # Step 1: Load all data
     pipeline.register_component(TimeSeriesRentalDataLoader())
+    pipeline.register_component(ZipBoundariesLoader())
+    pipeline.register_component(TractBoundariesLoader())
+    
+    # Step 2: Aggregate time series rental data to tracts
+    pipeline.register_component(TimeSeriesRentalZipToTractProcessor())
 
     results = pipeline.execute()
 
