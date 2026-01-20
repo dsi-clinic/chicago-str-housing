@@ -1,15 +1,17 @@
-"""Chicago Housing Difference-in-Differences (DiD) pipeline.
-"""
+"""Chicago Housing Difference-in-Differences (DiD) pipeline."""
 
 import logging
 
 from housing.components.loaders.time_series_rental_data import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
-from housing.components.processors.time_series_zip_to_tract import TimeSeriesZipToTractProcessor
+from housing.components.processors.time_series_zip_to_tract import (
+    TimeSeriesZipToTractProcessor,
+)
 from pipeline import Pipeline, PipelineResult
 
 logger = logging.getLogger(__name__)
+
 
 def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     """Demonstrate housing DiD pipeline."""
@@ -25,7 +27,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     # Step 2: Join rental data to boundaries
     pipeline.register_component(TimeSeriesZipToTractProcessor())
-    
+
     results = pipeline.execute()
 
     return pipeline, results

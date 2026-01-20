@@ -11,19 +11,23 @@ import pandas as pd
 
 from pipeline.base import DataProcessor
 
+
 class TimeSeriesZipToTractProcessor(DataProcessor):
-    """Perform spatial join to transform time series rental data from zip code level
+    """Perform spatial join to transform time series rental data from zip code level.
+
     to census tract level using area-weighted aggregation.
     """
 
     def __init__(self) -> None:
         """Initialize the time series zip to tract processor."""
         super().__init__(
-            "time_series_zip_to_tract", "Transform time series rental data from zip code level to census tract level using area-weighted aggregation"
+            "time_series_zip_to_tract",
+            "Transform time series rental data from zip code level to census tract level using area-weighted aggregation",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Perform spatial join to transform time series rental data from zip code level
+        """Perform spatial join to transform time series rental data from zip code level.
+
         to census tract level using area-weighted aggregation.
         """
         # Get the data from context
@@ -32,7 +36,9 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
         tract_boundaries = context["tract_boundaries"]
 
         # Step 1: Join time series rental data with zip boundaries
-        zip_rental = zip_boundaries.merge(time_series_rental_data, on="zip_code", how="inner")
+        zip_rental = zip_boundaries.merge(
+            time_series_rental_data, on="zip_code", how="inner"
+        )
 
         # Step 2: Spatial join - zip codes to census tracts
         # Ensure same CRS for spatial operations
@@ -69,7 +75,7 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
                         "tract_geometry": tract_geom,
                     }
                 )
-                
+
         # Create dataframe with intersection data
         intersections_df = pd.DataFrame(intersection_data)
 
@@ -79,7 +85,7 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
         intersections_df["weighted_rent"] = (
             intersections_df["rental_price"] * intersections_df["intersection_area"]
         )
-        
+
         tract_rental = (
             intersections_df.groupby("tract_geoid")
             .agg(

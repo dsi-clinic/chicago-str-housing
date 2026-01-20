@@ -14,13 +14,16 @@ from pipeline.base import DataLoader
 
 logger = logging.getLogger(__name__)
 
+
 class TimeSeriesRentalLoader(DataLoader):
     """Load time series rental data from ZORI dataset.
 
     This demonstrates loading CSV data with geographic identifiers (zip codes).
     """
 
-    def __init__(self, file_path: str | None = None, output_dir: str | None = None) -> None:
+    def __init__(
+        self, file_path: str | None = None, output_dir: str | None = None
+    ) -> None:
         """Initialize the time series rental loader.
 
         Args:
@@ -30,7 +33,7 @@ class TimeSeriesRentalLoader(DataLoader):
         super().__init__(
             "rental_data",
             file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv",
-            "Load time series rental data from ZORI dataset"
+            "Load time series rental data from ZORI dataset",
         )
         self.output_dir = output_dir
 
@@ -47,9 +50,16 @@ class TimeSeriesRentalLoader(DataLoader):
 
         # Convert from wide to long format
         date_cols = [col for col in rental_wide_df.columns if col.startswith("20")]
-        rental_long_df = rental_wide_df.melt(id_vars=["zip_code"], value_vars=date_cols, var_name="month", value_name="rental_price")
+        rental_long_df = rental_wide_df.melt(
+            id_vars=["zip_code"],
+            value_vars=date_cols,
+            var_name="month",
+            value_name="rental_price",
+        )
 
-        logger.info("Loaded %d zip codes with time series rental data", len(rental_wide_df))
+        logger.info(
+            "Loaded %d zip codes with time series rental data", len(rental_wide_df)
+        )
         logger.info(
             "Time series rental price range: $%.0f - $%.0f",
             rental_long_df["rental_price"].min(),
