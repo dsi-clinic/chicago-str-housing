@@ -44,61 +44,66 @@ class TimeSeriesRentalLoader(DataLoader):
         """
         # Step 1: Load CSV
         logger.info("Loading time series rental data from: %s", self.file_path)
-        
+
         if not self.file_path.exists():
             raise FileNotFoundError(
                 f"Time series rental data file not found: {self.file_path}"
             )
-        
+
         rental_df = pd.read_csv(self.file_path)
-        logger.info("Loaded CSV with %d rows and %d columns", len(rental_df), len(rental_df.columns))
-        
+        logger.info(
+            "Loaded CSV with %d rows and %d columns",
+            len(rental_df),
+            len(rental_df.columns),
+        )
+
         # Clean and prepare the data - rename RegionName to zip_code
         if "RegionName" in rental_df.columns:
             rental_df = rental_df.rename(columns={"RegionName": "zip_code"})
-        
+
         if "zip_code" in rental_df.columns:
             rental_df["zip_code"] = rental_df["zip_code"].astype(str).str.zfill(5)
-        
+
         # Step 2: Identify date columns
         # Date columns typically start with "20" (years 2000+)
         date_columns = [col for col in rental_df.columns if col.startswith("20")]
         logger.info("Identified %d date columns", len(date_columns))
-        
+
         if not date_columns:
             logger.warning("No date columns found starting with '20'")
             return {"timeseries_rental_data": rental_df}
-        
+
         # Step 3: Reshape to long format using pd.melt()
         # Keep non-date columns as id_vars (identifier variables)
         id_vars = [col for col in rental_df.columns if col not in date_columns]
-        
+
         logger.info("Reshaping data from wide to long format")
         logger.info("ID variables: %s", id_vars)
         logger.info("Date columns (first 5): %s", date_columns[:5])
-        
+
         # Melt the DataFrame: wide format -> long format
         long_df = rental_df.melt(
             id_vars=id_vars,
             value_vars=date_columns,
             var_name="month",
-            value_name="rental_price"
+            value_name="rental_price",
         )
-        
+
         # Remove rows with missing rental prices
         long_df = long_df.dropna(subset=["rental_price"])
-        
+
         # Sort by zip_code and month for easier inspection
         long_df = long_df.sort_values(by=["zip_code", "month"]).reset_index(drop=True)
-        
+
         logger.info("Reshaped to panel format: %d rows", len(long_df))
         logger.info("Unique zip codes: %d", long_df["zip_code"].nunique())
-        logger.info("Date range: %s to %s", long_df["month"].min(), long_df["month"].max())
+        logger.info(
+            "Date range: %s to %s", long_df["month"].min(), long_df["month"].max()
+        )
         logger.info(
             "Rental price range: $%.0f - $%.0f",
             long_df["rental_price"].min(),
             long_df["rental_price"].max(),
         )
-        
-        return {"timeseries_rental_data": long_df}
 
+        return {"timeseries_rental_data": long_df}
