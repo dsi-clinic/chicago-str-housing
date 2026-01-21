@@ -110,10 +110,11 @@ Before starting, you should have:
    ```
 
 **Part B: Build Time Series Loader**
-1. **Create the component:**
+1. **Create the loader component:**
    - Build: `TimeSeriesRentalLoader` component
    - Tasks: Load CSV, identify date columns, reshape to long format
    - Test with small subset first
+   - Output: ZIP-level panel `(zip_code, month, rental_price)`
 
 2. **Incremental development:**
    - Step 1: Load CSV
@@ -121,9 +122,22 @@ Before starting, you should have:
    - Step 3: Reshape to long
    - Step 4: Test and validate
 
+**Part C: Convert ZIP to Tract**
+1. **Why convert to tract level?**
+   - STR prohibitions are tracked at the census tract level
+   - DiD analysis requires matching treatment assignment geography
+   - ZIP codes and tracts don't align perfectly — need spatial interpolation
+
+2. **Create the processor component:**
+   - Build: `TimeSeriesZipToTractProcessor` component
+   - Uses ZIP→tract crosswalk with area weights
+   - Apply crosswalk to each month's data
+   - Output: Tract-level panel `(tract_geoid, month, rental_price)`
+
 **Deliverable:**
 - `TimeSeriesRentalLoader` component
-- Panel dataset: `output/rental_panel_data.csv` with columns: `zip_code`, `month`, `rental_price`
+- `TimeSeriesZipToTractProcessor` component
+- Panel dataset: `output/rental_panel_data.csv` with columns: `tract_geoid`, `month`, `rental_price`
 
 ---
 
