@@ -2,6 +2,8 @@
 
 This module loads rental price data from the Zillow Observed Rent Index (ZORI) dataset,
 which provides zip code level rental price estimates.
+
+It then converts the data to a panel time-series dataset.
 """
 
 import logging
@@ -13,6 +15,19 @@ from pipeline.base import DataLoader
 
 logger = logging.getLogger(__name__)
 
+def _identify_date_columns(df: pd.DataFrame) -> list[str]:
+    """Identify date columns in the rental data.
+
+    ZORI dataset uses date columns starting with "20" (e.g., "2010-01", "2020-12").
+    This function filters columns that start with "20" to identify time series columns.
+
+    Args:
+        df: DataFrame containing rental data with potential date columns
+
+    Returns:
+        List of column names that represent date columns
+    """
+    return [col for col in df.columns if col.startswith("20")]
 
 class TimeSeriesRentalLoader(DataLoader):
     """Load rental price data from ZORI dataset.
@@ -27,9 +42,9 @@ class TimeSeriesRentalLoader(DataLoader):
             file_path: Optional path to rental data file
         """
         super().__init__(
-            "rental_data",
+            "rental_panel_data",
             file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv",
-            "Load rental price data from ZORI dataset",
+            "Load rental price data from ZORI dataset and create a panel timeseries dataframe",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
@@ -43,10 +58,34 @@ class TimeSeriesRentalLoader(DataLoader):
         rental_df = rental_df.rename(columns={"RegionName": "zip_code"})
         rental_df["zip_code"] = rental_df["zip_code"].astype(str).str.zfill(5)
 
+        #Identify date columns
+        date_cols = _identify_date_columns(rental_df)
+        logger.info("Identified %d date columns", len(date_cols))
+
         # Keep only Chicago zip codes
         zip_boundaries = context["zip_boundaries"]
         zip_rental = zip_boundaries.merge(rental_df, on="zip_code", how="inner")
 
         logger.info("Loaded %d zip codes with rental data", len(zip_rental))
 
-        return {"rental_data": zip_rental}
+        #Melt dataframe to panel dataset format
+        rental_panel_data = pd.melt(zip_rental, 
+                                    id_vars="zip_code",
+                                    value_vars=date_cols,
+                                    var_name="month",
+                                    value_name="rental_price")
+
+        logger.info("Date range: %s to %s", rental_panel_data["month"].min(), rental_panel_data["month"].max())
+        logger.info("Total observations: %d", len(rental_panel_data))
+
+        #convert to datetime dtype
+        rental_panel_data["month"] = pd.to_datetime(rental_panel_data["month"])
+
+        #sort according to formatting preference
+        rental_panel_data = rental_panel_data.sort_values(["zip_code", "month"])
+
+        #impute missing data
+        ##TODO
+        logger.info("Missing values before imputation: %d", rental_panel_data["rental_price"].isna().sum())
+
+        return {"rental_panel_data": rental_panel_data}
