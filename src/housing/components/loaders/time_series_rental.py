@@ -15,6 +15,7 @@ from pipeline.base import DataLoader
 
 logger = logging.getLogger(__name__)
 
+
 def _identify_date_columns(df: pd.DataFrame) -> list[str]:
     """Identify date columns in the rental data.
 
@@ -28,6 +29,7 @@ def _identify_date_columns(df: pd.DataFrame) -> list[str]:
         List of column names that represent date columns
     """
     return [col for col in df.columns if col.startswith("20")]
+
 
 class TimeSeriesRentalLoader(DataLoader):
     """Load rental price data from ZORI dataset.
@@ -58,7 +60,7 @@ class TimeSeriesRentalLoader(DataLoader):
         rental_df = rental_df.rename(columns={"RegionName": "zip_code"})
         rental_df["zip_code"] = rental_df["zip_code"].astype(str).str.zfill(5)
 
-        #Identify date columns
+        # Identify date columns
         date_cols = _identify_date_columns(rental_df)
         logger.info("Identified %d date columns", len(date_cols))
 
@@ -68,24 +70,33 @@ class TimeSeriesRentalLoader(DataLoader):
 
         logger.info("Loaded %d zip codes with rental data", len(zip_rental))
 
-        #Melt dataframe to panel dataset format
-        rental_panel_data = pd.melt(zip_rental, 
-                                    id_vars="zip_code",
-                                    value_vars=date_cols,
-                                    var_name="month",
-                                    value_name="rental_price")
+        # Melt dataframe to panel dataset format
+        rental_panel_data = pd.melt(
+            zip_rental,
+            id_vars="zip_code",
+            value_vars=date_cols,
+            var_name="month",
+            value_name="rental_price",
+        )
 
-        logger.info("Date range: %s to %s", rental_panel_data["month"].min(), rental_panel_data["month"].max())
+        logger.info(
+            "Date range: %s to %s",
+            rental_panel_data["month"].min(),
+            rental_panel_data["month"].max(),
+        )
         logger.info("Total observations: %d", len(rental_panel_data))
 
-        #convert to datetime dtype
+        # convert to datetime dtype
         rental_panel_data["month"] = pd.to_datetime(rental_panel_data["month"])
 
-        #sort according to formatting preference
+        # sort according to formatting preference
         rental_panel_data = rental_panel_data.sort_values(["zip_code", "month"])
 
-        #impute missing data
+        # impute missing data
         ##TODO
-        logger.info("Missing values before imputation: %d", rental_panel_data["rental_price"].isna().sum())
+        logger.info(
+            "Missing values before imputation: %d",
+            rental_panel_data["rental_price"].isna().sum(),
+        )
 
         return {"rental_panel_data": rental_panel_data}
