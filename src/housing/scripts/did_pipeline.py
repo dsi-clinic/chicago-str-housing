@@ -8,9 +8,9 @@ This script demonstrates the DiD analysis workflow:
 
 import logging
 
+from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.time_series_rental import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
-from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
 from housing.components.processors.time_series_zip_to_tract import (
     TimeSeriesZipToTractProcessor,
@@ -33,11 +33,11 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(TimeSeriesRentalLoader())
 
-    #Load point-in-time data and use it to build the crosswalk
+    # Load point-in-time data and use it to build the crosswalk
     pipeline.register_component(RentalDataLoader())
     pipeline.register_component(ZipToTractProcessor())
 
-    #Use crosswalk to convert panel data to tract-level
+    # Use crosswalk to convert panel data to tract-level
     pipeline.register_component(TimeSeriesZipToTractProcessor())
 
     results = pipeline.execute()

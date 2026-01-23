@@ -100,16 +100,14 @@ class TimeSeriesRentalLoader(DataLoader):
         rental_panel_data = rental_panel_data.sort_values(["zip_code", "month"])
 
         # Interpolate missing values within each ZIP code
-        rental_panel_data["rental_price"] = (
-            rental_panel_data.groupby("zip_code")["rental_price"]
-            .transform(lambda x: x.interpolate(method="linear"))
-        )
+        rental_panel_data["rental_price"] = rental_panel_data.groupby("zip_code")[
+            "rental_price"
+        ].transform(lambda x: x.interpolate(method="linear"))
 
         # For any remaining NaNs at the edges, forward/backward fill
-        rental_panel_data["rental_price"] = (
-            rental_panel_data.groupby("zip_code")["rental_price"]
-            .transform(lambda x: x.ffill().bfill())
-        )
+        rental_panel_data["rental_price"] = rental_panel_data.groupby("zip_code")[
+            "rental_price"
+        ].transform(lambda x: x.ffill().bfill())
 
         logger.info(
             "Missing values after imputation: %d",
