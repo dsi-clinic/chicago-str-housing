@@ -30,11 +30,7 @@ class TimeSeriesRentalLoader(DataLoader):
             file_path: Optional path to rental data file
         """
         super().__init__(
-<<<<<<< HEAD
-            "timeseries_rental_data",
-=======
             "rental_panel_data",
->>>>>>> 71bf9c3 (Updated TimeSeriesRentalLoader, added TimeSeriesZipToTractProcessor)
             file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv",
             "Load rental price time series data and reshape to panel format",
         )
@@ -114,10 +110,6 @@ class TimeSeriesRentalLoader(DataLoader):
             lambda x: x.ffill().bfill()
         )
 
-<<<<<<< HEAD
-        # Convert month to datetime
-        long_df["month"] = pd.to_datetime(long_df["month"], format="%Y-%m-%d")
-=======
         missing_after = long_df["rental_price"].isna().sum()
         if missing_after > 0:
             logger.warning("Still have %d missing values after imputation", missing_after)
@@ -129,7 +121,6 @@ class TimeSeriesRentalLoader(DataLoader):
 
         if long_df["month"].isna().any():
             logger.warning("Some month values could not be converted to datetime")
->>>>>>> 71bf9c3 (Updated TimeSeriesRentalLoader, added TimeSeriesZipToTractProcessor)
 
         logger.info("Reshaped to panel format: %d rows", len(long_df))
         logger.info("Unique zip codes: %d", long_df["zip_code"].nunique())
@@ -142,8 +133,4 @@ class TimeSeriesRentalLoader(DataLoader):
             long_df["rental_price"].max(),
         )
 
-<<<<<<< HEAD
-        return {"timeseries_rental_data": long_df}
-=======
         return {"rental_panel_data": long_df}
->>>>>>> 71bf9c3 (Updated TimeSeriesRentalLoader, added TimeSeriesZipToTractProcessor)
