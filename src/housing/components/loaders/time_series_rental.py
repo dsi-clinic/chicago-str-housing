@@ -89,13 +89,30 @@ class TimeSeriesRentalLoader(DataLoader):
         # convert to datetime dtype
         rental_panel_data["month"] = pd.to_datetime(rental_panel_data["month"])
 
-        # sort according to formatting preference
-        rental_panel_data = rental_panel_data.sort_values(["zip_code", "month"])
-
         # impute missing data
         ##TODO
         logger.info(
             "Missing values before imputation: %d",
+            rental_panel_data["rental_price"].isna().sum(),
+        )
+
+        # Sort first to ensure correct order
+        rental_panel_data = rental_panel_data.sort_values(["zip_code", "month"])
+
+        # Interpolate missing values within each ZIP code
+        rental_panel_data["rental_price"] = (
+            rental_panel_data.groupby("zip_code")["rental_price"]
+            .transform(lambda x: x.interpolate(method="linear"))
+        )
+
+        # For any remaining NaNs at the edges, forward/backward fill
+        rental_panel_data["rental_price"] = (
+            rental_panel_data.groupby("zip_code")["rental_price"]
+            .transform(lambda x: x.ffill().bfill())
+        )
+
+        logger.info(
+            "Missing values after imputation: %d",
             rental_panel_data["rental_price"].isna().sum(),
         )
 
