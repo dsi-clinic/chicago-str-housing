@@ -79,6 +79,9 @@ class TimeSeriesRentalLoader(DataLoader):
             value_name="rental_price",
         )
 
+        # convert to datetime dtype
+        rental_panel_data["month"] = pd.to_datetime(rental_panel_data["month"])
+
         logger.info(
             "Date range: %s to %s",
             rental_panel_data["month"].min(),
@@ -86,11 +89,7 @@ class TimeSeriesRentalLoader(DataLoader):
         )
         logger.info("Total observations: %d", len(rental_panel_data))
 
-        # convert to datetime dtype
-        rental_panel_data["month"] = pd.to_datetime(rental_panel_data["month"])
-
         # impute missing data
-        ##TODO
         logger.info(
             "Missing values before imputation: %d",
             rental_panel_data["rental_price"].isna().sum(),
