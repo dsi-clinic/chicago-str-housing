@@ -6,8 +6,6 @@ using a crosswalk approach with normalized area weights.
 
 from typing import Any
 
-import pandas as pd
-
 from pipeline.base import DataProcessor
 
 
@@ -21,11 +19,10 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
     4. Outputs a panel DataFrame with tract_geoid, month, rental_price
     """
 
-    def __init__(self):
+    def __init__(self, file_path: str | None = None) -> None:
         """Initialize the time series ZIP to tract processor."""
         super().__init__(
-            "zip_to_tract_panel",
-            "Convert ZIP-level rental panel to tract-level panel"
+            "zip_to_tract_panel", "Convert ZIP-level rental panel to tract-level panel"
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
@@ -46,7 +43,9 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
 
         # Step 1: Normalize crosswalk weights to sum to 1 for each ZIP code
         # Calculate total intersection area for each ZIP code
-        zip_totals = crosswalk.groupby("zip_code")["intersection_area"].sum().reset_index()
+        zip_totals = (
+            crosswalk.groupby("zip_code")["intersection_area"].sum().reset_index()
+        )
         zip_totals = zip_totals.rename(columns={"intersection_area": "total_area"})
 
         # Merge to get total area for each ZIP-tract pair
@@ -54,11 +53,14 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
 
         # Calculate normalized weight (proportion of ZIP code area in each tract)
         crosswalk_normalized["weight"] = (
-            crosswalk_normalized["intersection_area"] / crosswalk_normalized["total_area"]
+            crosswalk_normalized["intersection_area"]
+            / crosswalk_normalized["total_area"]
         )
 
         # Keep only necessary columns
-        crosswalk_normalized = crosswalk_normalized[["zip_code", "tract_geoid", "weight"]]
+        crosswalk_normalized = crosswalk_normalized[
+            ["zip_code", "tract_geoid", "weight"]
+        ]
 
         # Step 2: Merge panel data with crosswalk
         merged = zip_panel.merge(crosswalk_normalized, on="zip_code", how="inner")
@@ -69,10 +71,12 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
         # Step 4: Aggregate to tract level for each month
         tract_panel = (
             merged.groupby(["tract_geoid", "month"])
-            .agg({
-                "weighted_rent": "sum",
-                "weight": "sum"  # Total weight for normalization
-            })
+            .agg(
+                {
+                    "weighted_rent": "sum",
+                    "weight": "sum",  # Total weight for normalization
+                }
+            )
             .reset_index()
         )
 
