@@ -28,7 +28,7 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
     def __init__(self) -> None:
         """Initialize the zip to tract processor."""
         super().__init__(
-            "tract_panel_data", "Transform time-series panel rental data from zip codes to census tracts"
+            "zip_to_tract_panel", "Transform time-series panel rental data from zip codes to census tracts"
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
@@ -59,5 +59,5 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
         tract_panel = tract_panel.drop(["weighted_rental_price", "intersection_area"], axis=1)
 
         return {
-            "tract_rental_panel_data": tract_panel,
+            "tract_panel_data": tract_panel,
         }
