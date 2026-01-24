@@ -9,7 +9,9 @@ logger = logging.getLogger(__name__)
 
 
 class TreatmentIndicatorProcessor(DataProcessor):
-    """Creates a treatment indicator for the census tracts.
+    """Create a treatment indicator for census tracts
+    
+    Creates a treatment indicator for the census tracts.
     The treatment indicator is a binary variable that is 1 if the tract is treated and 0 otherwise.
     The treatment indicator is created by merging the census tracts with the STR prohibition data.
     """

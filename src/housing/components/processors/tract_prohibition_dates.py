@@ -11,7 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class TractProhibitionDatesProcessor(DataProcessor):
-    """The STR prohibition dates are aggregated to the census tracts by the tract_geoid.
+    """Aggregate STR prohibition dates to census tracts.
+    
+    The STR prohibition dates are aggregated to the census tracts by the tract_geoid.
     The STR prohibition dates are aggregated to the census tracts by the first_prohibition_date.
     The STR prohibition dates are aggregated to the census tracts by the number_of_buildings.
     """
