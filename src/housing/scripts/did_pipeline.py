@@ -46,7 +46,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     # Step 2: Aggregate time series rental data to tracts
     pipeline.register_component(ZipToTractProcessor())
     pipeline.register_component(TimeSeriesZipToTractProcessor())
-    
+
     # Step 3: STR Prohibition → Tract aggregation (using improved processor)
     pipeline.register_component(
         PointsToTractProcessor(
@@ -60,7 +60,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
             data_source_name="str_prohibition",
         )
     )
-    
+
     # Step 3.5: STR Prohibition Dates → Tract aggregation
     pipeline.register_component(TractProhibitionDatesProcessor())
     pipeline.register_component(TreatmentIndicatorProcessor())
