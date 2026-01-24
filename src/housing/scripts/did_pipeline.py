@@ -7,13 +7,21 @@ This script demonstrates the full DiD workflow:
 import logging
 
 from housing.components.loaders.rental_data import RentalDataLoader
+from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental_data import (
     TimeSeriesRentalLoader,
 )
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
+from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.processors.tract_panel import (
     TimeSeriesZipToTractProcessor,
+)
+from housing.components.processors.tract_prohibition_dates import (
+    TractProhibitionDatesProcessor,
+)
+from housing.components.processors.treatment_indicator import (
+    TreatmentIndicatorProcessor,
 )
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from pipeline import Pipeline, PipelineResult
@@ -33,10 +41,29 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(TimeSeriesRentalLoader())
     pipeline.register_component(RentalDataLoader())
-    pipeline.register_component(ZipToTractProcessor())
+    pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
 
     # Step 2: Aggregate time series rental data to tracts
+    pipeline.register_component(ZipToTractProcessor())
     pipeline.register_component(TimeSeriesZipToTractProcessor())
+    
+    # Step 3: STR Prohibition → Tract aggregation (using improved processor)
+    pipeline.register_component(
+        PointsToTractProcessor(
+            input_key="str_prohibition_data",
+            output_key="str_tract_data",
+            id_column="application_id",
+            aggregate_columns={
+                "prohibition_date": "min",
+            },
+            calculate_density=True,
+            data_source_name="str_prohibition",
+        )
+    )
+    
+    # Step 3.5: STR Prohibition Dates → Tract aggregation
+    pipeline.register_component(TractProhibitionDatesProcessor())
+    pipeline.register_component(TreatmentIndicatorProcessor())
 
     results = pipeline.execute()
 

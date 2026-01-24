@@ -59,7 +59,7 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
         ].copy()
         tract_panel = tract_panel.sort_values(["tract_geoid", "month"])
 
-        output_path = "/project/output/tract_panel_data.csv"
+        output_path = "/project/output/tract_rental_data.csv"
 
         logger.info("Total observations: %d", len(tract_panel))
         logger.info(
