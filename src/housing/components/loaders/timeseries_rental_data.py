@@ -112,7 +112,9 @@ class TimeSeriesRentalLoader(DataLoader):
 
         missing_after = long_df["rental_price"].isna().sum()
         if missing_after > 0:
-            logger.warning("Still have %d missing values after imputation", missing_after)
+            logger.warning(
+                "Still have %d missing values after imputation", missing_after
+            )
         else:
             logger.info("All missing values successfully imputed")
 
