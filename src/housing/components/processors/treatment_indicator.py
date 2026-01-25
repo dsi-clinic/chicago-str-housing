@@ -21,7 +21,7 @@ class TreatmentIndicatorProcessor(DataProcessor):
     4. Outputs a DiD-ready panel DataFrame
     """
 
-    def __init__(self):
+    def __init__(self, file_path: str | None = None) -> None:
         """Initialize the treatment indicator processor."""
         super().__init__(
             "treatment_indicator",
@@ -78,7 +78,7 @@ class TreatmentIndicatorProcessor(DataProcessor):
             (merged["month"].dt.month - merged["first_prohibition_date"].dt.month)
         )
 
-        # Step 5: Select only required columns in the specified order
+        # Step 5: Select columns
         did_panel = merged[
             [
                 "tract_geoid",

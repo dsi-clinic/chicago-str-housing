@@ -20,12 +20,12 @@ class TractProhibitionDatesProcessor(DataProcessor):
 
     This processor:
     1. Performs spatial join between STR prohibition points and tract boundaries
-    2. Finds the first prohibition date per tract (minimum prohibition_date)
-    3. Optionally counts buildings per tract
+    2. Finds the first prohibition date per tract
+    3. Counts buildings per tract
     4. Outputs tract-level prohibition dates DataFrame
     """
 
-    def __init__(self):
+    def __init__(self, file_path: str | None = None) -> None:
         """Initialize the tract prohibition dates processor."""
         super().__init__(
             "tract_prohibition_dates",
@@ -57,7 +57,7 @@ class TractProhibitionDatesProcessor(DataProcessor):
             str_data_for_join = str_data_for_join.to_crs(tract_boundaries.crs)
             logger.info("  Reprojected STR data to match tract CRS: %s", tract_boundaries.crs)
 
-        # Step 2: Spatial join - which tract is each STR prohibition point in?
+        # Step 2: Spatial join
         points_with_tract = gpd.sjoin(
             str_data_for_join,
             tract_boundaries[["tract_geoid", "geometry"]],
@@ -106,7 +106,7 @@ class TractProhibitionDatesProcessor(DataProcessor):
             }
 
         # Step 4: Aggregate by tract
-        # Find first prohibition date (minimum date) per tract
+        # Find first prohibition date per tract
         tract_dates = (
             matched_points.groupby("tract_geoid")
             .agg(

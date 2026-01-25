@@ -1,5 +1,4 @@
-"""DiD Pipeline
-"""
+"""DiD Pipeline"""
 
 import logging
 
@@ -18,8 +17,7 @@ from pipeline import Pipeline, PipelineResult
 logger = logging.getLogger(__name__)
 
 def run_did_pipeline() -> tuple[Pipeline, list[PipelineResult]]:
-    """Run DiD analysis. 
-    """
+    """Run DiD analysis."""
     logger.info("Running DiD Pipeline")
     logger.info("=" * 70)
 
