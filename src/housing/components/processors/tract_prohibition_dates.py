@@ -29,7 +29,7 @@ class TractProhibitionDatesProcessor(DataProcessor):
         """Initialize the tract prohibition dates processor."""
         super().__init__(
             "tract_prohibition_dates",
-            "Aggregate STR prohibition data to tracts and find first prohibition date"
+            "Aggregate STR prohibition data to tracts and find first prohibition date",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
@@ -55,7 +55,9 @@ class TractProhibitionDatesProcessor(DataProcessor):
         str_data_for_join = str_data.copy()
         if str_data_for_join.crs != tract_boundaries.crs:
             str_data_for_join = str_data_for_join.to_crs(tract_boundaries.crs)
-            logger.info("  Reprojected STR data to match tract CRS: %s", tract_boundaries.crs)
+            logger.info(
+                "  Reprojected STR data to match tract CRS: %s", tract_boundaries.crs
+            )
 
         # Step 2: Spatial join
         points_with_tract = gpd.sjoin(
@@ -68,14 +70,20 @@ class TractProhibitionDatesProcessor(DataProcessor):
         # Count points that didn't match any tract
         unmatched = points_with_tract["tract_geoid"].isna().sum()
         if unmatched > 0:
-            logger.warning("  %d STR prohibition points did not match any tract", unmatched)
+            logger.warning(
+                "  %d STR prohibition points did not match any tract", unmatched
+            )
 
         # Step 3: Filter to matched points and find first prohibition date per tract
-        matched_points = points_with_tract[points_with_tract["tract_geoid"].notna()].copy()
+        matched_points = points_with_tract[
+            points_with_tract["tract_geoid"].notna()
+        ].copy()
 
         # Ensure prohibition_date is datetime
         if "prohibition_date" in matched_points.columns:
-            if not pd.api.types.is_datetime64_any_dtype(matched_points["prohibition_date"]):
+            if not pd.api.types.is_datetime64_any_dtype(
+                matched_points["prohibition_date"]
+            ):
                 matched_points["prohibition_date"] = pd.to_datetime(
                     matched_points["prohibition_date"], errors="coerce"
                 )
@@ -95,7 +103,9 @@ class TractProhibitionDatesProcessor(DataProcessor):
                 )
 
         # Filter to valid dates
-        matched_points = matched_points[matched_points["prohibition_date"].notna()].copy()
+        matched_points = matched_points[
+            matched_points["prohibition_date"].notna()
+        ].copy()
 
         if len(matched_points) == 0:
             logger.warning("  No STR prohibition records with valid dates found")
@@ -131,11 +141,13 @@ class TractProhibitionDatesProcessor(DataProcessor):
         )
 
         # Sort by tract_geoid
-        tract_prohibition_dates = tract_prohibition_dates.sort_values("tract_geoid").reset_index(
-            drop=True
-        )
+        tract_prohibition_dates = tract_prohibition_dates.sort_values(
+            "tract_geoid"
+        ).reset_index(drop=True)
 
-        logger.info("  Output: %d tracts with prohibition dates", len(tract_prohibition_dates))
+        logger.info(
+            "  Output: %d tracts with prohibition dates", len(tract_prohibition_dates)
+        )
         if len(tract_prohibition_dates) > 0:
             logger.info(
                 "  Date range: %s to %s",

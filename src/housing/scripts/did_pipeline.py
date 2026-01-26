@@ -3,7 +3,6 @@
 import logging
 
 from housing.components.loaders.rental_data import RentalDataLoader
-from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.timeseries_rental_data import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
@@ -11,10 +10,10 @@ from housing.components.processors.time_series_zip_to_tract import (
     TimeSeriesZipToTractProcessor,
 )
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
-from housing.components.processors.tract_prohibition_dates import TractProhibitionDatesProcessor
 from pipeline import Pipeline, PipelineResult
 
 logger = logging.getLogger(__name__)
+
 
 def run_did_pipeline() -> tuple[Pipeline, list[PipelineResult]]:
     """Run DiD analysis."""

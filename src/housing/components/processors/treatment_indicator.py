@@ -24,8 +24,7 @@ class TreatmentIndicatorProcessor(DataProcessor):
     def __init__(self, file_path: str | None = None) -> None:
         """Initialize the treatment indicator processor."""
         super().__init__(
-            "treatment_indicator",
-            "Create treatment indicators for DiD analysis"
+            "treatment_indicator", "Create treatment indicators for DiD analysis"
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
@@ -52,7 +51,9 @@ class TreatmentIndicatorProcessor(DataProcessor):
 
         treatment_dates = treatment_dates.copy()
         if "first_prohibition_date" in treatment_dates.columns:
-            if not pd.api.types.is_datetime64_any_dtype(treatment_dates["first_prohibition_date"]):
+            if not pd.api.types.is_datetime64_any_dtype(
+                treatment_dates["first_prohibition_date"]
+            ):
                 treatment_dates["first_prohibition_date"] = pd.to_datetime(
                     treatment_dates["first_prohibition_date"], errors="coerce"
                 )
@@ -61,7 +62,7 @@ class TreatmentIndicatorProcessor(DataProcessor):
         merged = tract_panel.merge(
             treatment_dates[["tract_geoid", "first_prohibition_date"]],
             on="tract_geoid",
-            how="left"
+            how="left",
         )
 
         # Step 3: Create treated indicator
@@ -74,9 +75,8 @@ class TreatmentIndicatorProcessor(DataProcessor):
         # For never-treated tracts, this will be NaN
         # Calculate as difference in months between month and first_prohibition_date
         merged["months_since_treatment"] = (
-            (merged["month"].dt.year - merged["first_prohibition_date"].dt.year) * 12 +
-            (merged["month"].dt.month - merged["first_prohibition_date"].dt.month)
-        )
+            merged["month"].dt.year - merged["first_prohibition_date"].dt.year
+        ) * 12 + (merged["month"].dt.month - merged["first_prohibition_date"].dt.month)
 
         # Step 5: Select columns
         did_panel = merged[
@@ -90,7 +90,9 @@ class TreatmentIndicatorProcessor(DataProcessor):
             ]
         ].copy()
 
-        # Sort by tract and month 
-        did_panel = did_panel.sort_values(["tract_geoid", "month"]).reset_index(drop=True)
+        # Sort by tract and month
+        did_panel = did_panel.sort_values(["tract_geoid", "month"]).reset_index(
+            drop=True
+        )
 
         return {"did_panel": did_panel}
