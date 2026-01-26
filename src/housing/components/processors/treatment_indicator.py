@@ -49,8 +49,40 @@ class TreatmentIndicatorProcessor(DataProcessor):
         logger.info("Created DiD panel with %d observations", len(merged))
         logger.info("Sample data:\n%s", merged.head(10))
 
+        # Validation check
+        # Check never-treated tracts have treated=0 always
+        never_treated = merged[merged["first_prohibition_date"].isna()]
+        never_treated_check = (never_treated["treated"] == 0).all()
+        logger.info(
+            "Validation: never-treated tracts have treated=0: %s", never_treated_check
+        )
+
+        # Check treated tracts switch at the right time
+        treated_tracts = merged[merged["first_prohibition_date"].notna()]
+        for tract_id, group in treated_tracts.groupby("tract_geoid"):
+            first_treated_month = group.loc[group["treated"] == 1, "month"].min()
+            prohibition_date = group["first_prohibition_date"].iloc[0]
+            if first_treated_month.to_period("M") != prohibition_date.to_period("M"):
+                logger.warning("Treatment date mismatch for %s", tract_id)
+            # Check before and after treatment using year-month comparison
+            treatment_month = prohibition_date.to_period("M").to_timestamp()
+            month_normalized = group["month"].dt.to_period("M").dt.to_timestamp()
+            before_treatment = group[month_normalized < treatment_month]
+            at_after_treatment = group[month_normalized >= treatment_month]
+            # Before treatment: all should be 0
+            if (
+                len(before_treatment) > 0
+                and not (before_treatment["treated"] == 0).all()
+            ):
+                logger.warning(f"{tract_id}: treated!=0 before treatment month")
+            # At/after treatment: all should be 1
+            if (
+                len(at_after_treatment) > 0
+                and not (at_after_treatment["treated"] == 1).all()
+            ):
+                logger.warning(f"{tract_id}: treated!=1 at/after treatment month")
+
         # Count treated vs control
-        logger.info("\n3. Treatment Distribution:")
         treatment_counts = merged.groupby("treated")["tract_geoid"].nunique()
         logger.info("Tracts by treatment status:\n%s", treatment_counts)
 

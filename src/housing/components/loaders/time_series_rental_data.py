@@ -5,6 +5,7 @@ which provides zip code level rental price estimates. This also formats this int
 """
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -70,7 +71,7 @@ class TimeSeriesRentalLoader(DataLoader):
 
         # Missing value imputation
         long_df["rental_price"] = long_df.groupby("zip_code")["rental_price"].transform(
-            lambda x: x.interpolate()
+            lambda x: x.interpolate(method="linear")
         )
         long_df["rental_price"] = long_df.groupby("zip_code")["rental_price"].transform(
             lambda x: x.ffill()
@@ -99,7 +100,9 @@ class TimeSeriesRentalLoader(DataLoader):
         logger.info("Sample data:\n%s", long_df.head())
 
         # Output the data to a csv file
-        output_path = "/project/output/rental_panel_data.csv"
+        output_dir = context.get("output_dir", "/project/output")
+        output_path = Path(output_dir) / "rental_panel_data.csv"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         long_df.to_csv(output_path, index=False)
         logger.info("Saved time series data (at zip code level) to: %s", output_path)
         logger.info(
