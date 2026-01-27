@@ -31,7 +31,7 @@ class TimeSeriesRentalLoader(DataLoader):
             output_dir: Optional output directory for rental data
         """
         super().__init__(
-            "rental_data",
+            "rental_panel_data",
             file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv",
             "Load time series rental data from ZORI dataset",
         )
@@ -48,8 +48,15 @@ class TimeSeriesRentalLoader(DataLoader):
         rental_wide_df = rental_wide_df.rename(columns={"RegionName": "zip_code"})
         rental_wide_df["zip_code"] = rental_wide_df["zip_code"].astype(str).str.zfill(5)
 
+        logger.info(
+            "Loaded %d zip codes with time series rental data", len(rental_wide_df)
+        )
+
         # Convert from wide to long format
         date_cols = [col for col in rental_wide_df.columns if col.startswith("20")]
+
+        logger.info("Identified %d date columns", len(date_cols))
+
         rental_long_df = rental_wide_df.melt(
             id_vars=["zip_code"],
             value_vars=date_cols,
@@ -57,14 +64,33 @@ class TimeSeriesRentalLoader(DataLoader):
             value_name="rental_price",
         )
 
+        # Convert "month" column to datetime
+        rental_long_df["month"] = pd.to_datetime(rental_long_df["month"])
+
         logger.info(
-            "Loaded %d zip codes with time series rental data", len(rental_wide_df)
+            "Date range: %s to %s",
+            rental_long_df["month"].min(),
+            rental_long_df["month"].max(),
         )
+        logger.info("Total observations: %d", len(rental_long_df))
+
+        # Sort by ZIP code and month
+        rental_long_df = rental_long_df.sort_values(by=["zip_code", "month"])
+
+        # Linearly interpolate missing values within each ZIP code
         logger.info(
-            "Time series rental price range: $%.0f - $%.0f",
-            rental_long_df["rental_price"].min(),
-            rental_long_df["rental_price"].max(),
+            "Missing values before imputation: %d",
+            rental_long_df["rental_price"].isna().sum(),
         )
+        rental_long_df["rental_price"] = rental_long_df.groupby("zip_code")[
+            "rental_price"
+        ].transform(lambda x: x.interpolate(method="linear"))
+
+        # For any NaN values at the edges, forward or backward fill
+        rental_long_df["rental_price"] = rental_long_df.groupby("zip_code")[
+            "rental_price"
+        ].transform(lambda x: x.ffill().bfill())
+
 
         if self.output_dir is not None:
             output_path = Path(self.output_dir) / "rental_panel_data.csv"
@@ -72,4 +98,4 @@ class TimeSeriesRentalLoader(DataLoader):
             rental_long_df.to_csv(output_path, index=False)
             logger.info("Saved rental panel data to: %s", output_path)
 
-        return {"time_series_rental_data": rental_long_df}
+        return {"rental_panel_data": rental_long_df}

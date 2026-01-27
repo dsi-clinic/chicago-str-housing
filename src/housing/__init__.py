@@ -22,6 +22,9 @@ from housing.components.loaders.str_prohibition_data import STRProhibitionDataLo
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
 from housing.components.processors.points_to_tract import PointsToTractProcessor
+from housing.components.processors.time_series_zip_to_tract import (
+    TimeSeriesZipToTractProcessor,
+)
 from housing.components.processors.tract_to_community import TractToCommunityProcessor
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.airbnb_distribution import (
@@ -59,6 +62,7 @@ __all__ = [
     "STRProhibitionAnalyzer",
     "STRProhibitionDataLoader",
     "STRProhibitionVisualizer",
+    "TimeSeriesZipToTractProcessor",
     "TractBoundariesLoader",
     "TractToCommunityProcessor",
     "ZipBoundariesLoader",
