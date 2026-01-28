@@ -7,6 +7,9 @@ analysis of short-term rental (STR) prohibition effects on rental prices.
 
 import logging
 from typing import Any
+from pathlib import Path
+
+import pandas as pd
 
 from pipeline.base import DataProcessor
 
@@ -22,17 +25,22 @@ class TreatmentIndicatorProcessor(DataProcessor):
     2. Relative time variable (`months_since_treatment`): months before/after
        treatment date
 
+    Args:
+    - output_dir: Optional output directory for visualizations
+
     Returns:
     - `did_panel`: DataFrame with added `treated` and `months_since_treatment`
       columns, ready for DiD analysis.
+    - `did_panel_csv`: Path to did_panel DataFrame saved as csv 
     """
 
-    def __init__(self) -> None:
+    def __init__(self, output_dir: str | None = None) -> None:
         """Initialize the treatment indicator processor."""
         super().__init__(
             "treatment_indicator",
             "Create treatment indicators for difference-in-differences analysis",
         )
+        self.output_dir = output_dir or "/project/output"
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Create treatment indicators and relative time variables.
@@ -72,6 +80,7 @@ class TreatmentIndicatorProcessor(DataProcessor):
         )
 
         # Create relative time variable
+        # Never treated tracts will have NaN values (this is expected)
         merged["months_since_treatment"] = (
             merged["month"].dt.year - merged["first_prohibition_date"].dt.year
         ) * 12 + (merged["month"].dt.month - merged["first_prohibition_date"].dt.month)
@@ -99,4 +108,9 @@ class TreatmentIndicatorProcessor(DataProcessor):
         if passed_check == 1:
             logger.info("Treatment dates aligned for all tracts.")
 
-        return {"did_panel": merged}
+        # Create csv file output
+        output_path = Path(self.output_dir) / "did_panel_data.csv"
+        merged.to_csv(output_path)
+
+        return {"did_panel": merged,
+                "did_panel_csv": str(output_path)}
