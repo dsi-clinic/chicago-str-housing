@@ -52,41 +52,38 @@ class TreatmentIndicatorProcessor(DataProcessor):
             KeyError: If required data keys are missing from context.
             ValueError: If input data does not have expected columns.
         """
-        logger.info("Creating treatment indicators for DiD analysis...")
-
         # Get data from context
         treatments = context["tract_prohibition_dates"]
         panel_data = context["tract_panel_data"]
 
-        #Merge panel data with treatment dates
-        merged = panel_data.merge(
-            treatments,
-            on="tract_geoid",
-            how="left"
-        )
+        # Merge panel data with treatment dates
+        merged = panel_data.merge(treatments, on="tract_geoid", how="left")
 
-        #Create indicator variable
-        merged["treated"] = (merged["month"] >= merged["first_prohibition_date"]).astype(int)
+        # Create indicator variable
+        merged["treated"] = (
+            merged["month"] >= merged["first_prohibition_date"]
+        ).astype(int)
 
         treatment_counts = merged.groupby("treated")["tract_geoid"].nunique()
         logger.info(
             "Unique tracts by treatment status - Untreated (0): %d, Treated (1): %d",
             treatment_counts.get(0, 0),
-            treatment_counts.get(1, 0)
+            treatment_counts.get(1, 0),
         )
 
-        #Create relative time variable
+        # Create relative time variable
         merged["months_since_treatment"] = (
-            (merged["month"].dt.year - merged["first_prohibition_date"].dt.year) * 12 +
-            (merged["month"].dt.month - merged["first_prohibition_date"].dt.month)
-        )
+            merged["month"].dt.year - merged["first_prohibition_date"].dt.year
+        ) * 12 + (merged["month"].dt.month - merged["first_prohibition_date"].dt.month)
 
-        #Data Validation Checks
+        # Data Validation Checks
 
         # Check never-treated tracts have treated=0 always
         never_treated = merged[merged["first_prohibition_date"].isna()]
         never_treated_check = (never_treated["treated"] == 0).all()
-        logger.info("validation: never-treated tracts have treated=0: %s", never_treated_check)
+        logger.info(
+            "validation: never-treated tracts have treated=0: %s", never_treated_check
+        )
 
         # Check treated tracts switch at the right time
         passed_check = 1
@@ -94,7 +91,9 @@ class TreatmentIndicatorProcessor(DataProcessor):
         for tract_id, group in treated_tracts.groupby("tract_geoid"):
             first_treated_month = group.loc[group["treated"] == 1, "month"].min()
             prohibition_date = group["first_prohibition_date"].iloc[0]
-            if first_treated_month.month != prohibition_date.month:
+            if (first_treated_month.month != prohibition_date.month) or (
+                first_treated_month.year != prohibition_date.year
+            ):
                 logger.warning("Treatment date mismatch for %s", tract_id)
                 passed_check = 0
         if passed_check == 1:

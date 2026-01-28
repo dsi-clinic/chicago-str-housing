@@ -46,7 +46,7 @@ class TractProhibitionDatesProcessor(DataProcessor):
             KeyError: If required data keys are missing from context.
             ValueError: If input data does not have expected columns.
         """
-        #load data from context
+        # load data from context
         str_data = context["str_prohibition_data"]
         tract_boundaries = context["tract_boundaries"]
 
@@ -65,10 +65,16 @@ class TractProhibitionDatesProcessor(DataProcessor):
         logger.info("Matched %d buildings with tracts.", len(str_with_tract))
 
         # Find the first prohibition in each tract and log its date
-        tract_prohib_dates = str_with_tract.groupby("tract_geoid")[["prohibition_date"]].min().reset_index()
+        tract_prohib_dates = (
+            str_with_tract.groupby("tract_geoid")[["prohibition_date"]]
+            .min()
+            .reset_index()
+        )
 
-        tract_prohib_dates = tract_prohib_dates.rename({"prohibition_date": "first_prohibition_date"}, axis=1)
-        
+        tract_prohib_dates = tract_prohib_dates.rename(
+            {"prohibition_date": "first_prohibition_date"}, axis=1
+        )
+
         logger.info("Found prohibition dates for %d tracts", len(tract_prohib_dates))
 
         # Save output to CSV
@@ -76,5 +82,5 @@ class TractProhibitionDatesProcessor(DataProcessor):
         output_path.parent.mkdir(parents=True, exist_ok=True)
         tract_prohib_dates.to_csv(output_path, index=False)
         logger.info("Saved tract prohibition dates to: %s", output_path)
-        
+
         return {"tract_prohibition_dates": tract_prohib_dates}
