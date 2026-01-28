@@ -3,11 +3,16 @@
 import logging
 
 from housing.components.loaders.rental_data import RentalDataLoader
+from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental_data import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
+from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.processors.time_series_zip_to_tract import (
     TimeSeriesZipToTractProcessor,
+)
+from housing.components.processors.treatment_indicator import (
+    TreatmentIndicatorProcessor,
 )
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from pipeline import Pipeline, PipelineResult
@@ -24,15 +29,38 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     # Step 1: Load all boundaries and data
     pipeline.register_component(RentalDataLoader())
+    pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(TimeSeriesRentalLoader(output_dir="/project/output"))
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(ZipBoundariesLoader())
 
     # Step 2: Join rental data to boundaries
+    pipeline.register_component(
+        PointsToTractProcessor(
+            input_key="str_prohibition_data",
+            output_key="str_tract_data",
+            id_column="application_id",
+            aggregate_columns={
+                "number_of_units": ["sum", "mean", "median"],
+                "prohibition_date": ["min", "max"]
+            },
+            calculate_density=True,
+            data_source_name="str_prohibition",
+        )
+    )
     pipeline.register_component(ZipToTractProcessor())
-    pipeline.register_component(TimeSeriesZipToTractProcessor(output_dir="/project/output"))
+    pipeline.register_component(
+        TimeSeriesZipToTractProcessor(output_dir="/project/output")
+    )
+    treatment_processor = TreatmentIndicatorProcessor(output_dir="/project/output")
+    pipeline.register_component(treatment_processor)
 
     results = pipeline.execute()
+
+    # Run validation if did_panel is in context
+    if "did_panel" in pipeline.context:
+        logger.info("Running validation on treatment indicator...")
+        treatment_processor.run_validation(pipeline.context)
 
     return pipeline, results
 
