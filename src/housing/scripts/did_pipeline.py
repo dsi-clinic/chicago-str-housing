@@ -42,7 +42,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
             id_column="application_id",
             aggregate_columns={
                 "number_of_units": ["sum", "mean", "median"],
-                "prohibition_date": ["min", "max"]
+                "prohibition_date": ["min", "max"],
             },
             calculate_density=True,
             data_source_name="str_prohibition",

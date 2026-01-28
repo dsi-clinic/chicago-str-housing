@@ -74,26 +74,30 @@ class TreatmentIndicatorProcessor(DataProcessor):
 
         # 1. Check structure
         print(did_panel.columns.tolist())
-        # Expected: ['tract_geoid', 'month', 'rental_price', 'first_prohibition_date', 
+        # Expected: ['tract_geoid', 'month', 'rental_price', 'first_prohibition_date',
         #            'treated', 'months_since_treatment']
 
         # 2. Verify treated indicator
         # Pick a tract you know is treated and check the switch point
         tract = "17031010100"
-        print(did_panel[did_panel["tract_geoid"] == tract][
-            ["month", "treated", "months_since_treatment"]
-        ].head(20))
+        print(
+            did_panel[did_panel["tract_geoid"] == tract][
+                ["month", "treated", "months_since_treatment"]
+            ].head(20)
+        )
 
         # 3. Count treated vs control
         print(did_panel.groupby("treated")["tract_geoid"].nunique())
 
         # 4. Check never-treated tracts have treated=0 always
         never_treated = did_panel[did_panel["first_prohibition_date"].isna()]
-        assert (never_treated["treated"] == 0).all(), "Never-treated should have treated=0"  # noqa: S101
+        if not (never_treated["treated"] == 0).all():
+            raise ValueError("Never-treated should have treated=0")
 
         # 5. Check treated tracts switch at the right time
         treated_tracts = did_panel[did_panel["first_prohibition_date"].notna()]
         for tract_id, group in treated_tracts.groupby("tract_geoid"):
             first_treated_month = group.loc[group["treated"] == 1, "month"].min()
             prohibition_date = group["first_prohibition_date"].iloc[0]
-            assert first_treated_month.month == prohibition_date.month, f"Mismatch for {tract_id}"  # noqa: S101
+            if first_treated_month.month != prohibition_date.month:
+                raise ValueError(f"Mismatch for {tract_id}")

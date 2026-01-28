@@ -91,7 +91,6 @@ class TimeSeriesRentalLoader(DataLoader):
             "rental_price"
         ].transform(lambda x: x.ffill().bfill())
 
-
         if self.output_dir is not None:
             output_path = Path(self.output_dir) / "rental_panel_data.csv"
             output_path.parent.mkdir(parents=True, exist_ok=True)

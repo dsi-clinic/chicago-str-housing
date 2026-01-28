@@ -26,7 +26,9 @@ from housing.components.processors.time_series_zip_to_tract import (
     TimeSeriesZipToTractProcessor,
 )
 from housing.components.processors.tract_to_community import TractToCommunityProcessor
-from housing.components.processors.treatment_indicator import TreatmentIndicatorProcessor
+from housing.components.processors.treatment_indicator import (
+    TreatmentIndicatorProcessor,
+)
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.airbnb_distribution import (
     AirbnbDistributionVisualizer,
