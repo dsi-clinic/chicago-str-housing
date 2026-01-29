@@ -32,7 +32,7 @@ class TreatmentIndicatorProcessor(DataProcessor):
 
         Args:
             context: Pipeline context containing:
-                - tract_rental_panel: DataFrame with tract_geoid, month, rental_price
+                - tract_panel_data: DataFrame with tract_geoid, month, rental_price
                 - tract_prohibition_dates: DataFrame with tract_geoid, first_prohibition_date
 
         Returns:
@@ -41,7 +41,7 @@ class TreatmentIndicatorProcessor(DataProcessor):
             treated, months_since_treatment
         """
         # Get inputs from context
-        tract_panel = context["tract_rental_panel"]
+        tract_panel = context["tract_panel_data"]  # From TimeSeriesZipToTractProcessor
         treatment_dates = context["tract_prohibition_dates"]
 
         # Step 1: Ensure datetime types before merging
