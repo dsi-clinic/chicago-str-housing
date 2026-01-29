@@ -6,10 +6,8 @@ analysis of short-term rental (STR) prohibition effects on rental prices.
 """
 
 import logging
-from typing import Any
 from pathlib import Path
-
-import pandas as pd
+from typing import Any
 
 from pipeline.base import DataProcessor
 
@@ -31,7 +29,7 @@ class TreatmentIndicatorProcessor(DataProcessor):
     Returns:
     - `did_panel`: DataFrame with added `treated` and `months_since_treatment`
       columns, ready for DiD analysis.
-    - `did_panel_csv`: Path to did_panel DataFrame saved as csv 
+    - `did_panel_csv`: Path to did_panel DataFrame saved as csv
     """
 
     def __init__(self, output_dir: str | None = None) -> None:
@@ -112,5 +110,4 @@ class TreatmentIndicatorProcessor(DataProcessor):
         output_path = Path(self.output_dir) / "did_panel_data.csv"
         merged.to_csv(output_path)
 
-        return {"did_panel": merged,
-                "did_panel_csv": str(output_path)}
+        return {"did_panel": merged, "did_panel_csv": str(output_path)}

@@ -47,7 +47,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     # Use crosswalk to convert panel data to tract-level
     pipeline.register_component(TimeSeriesZipToTractProcessor())
 
-    #build treatment variable
+    # build treatment variable
     pipeline.register_component(STRProhibitionDataLoader())
     pipeline.register_component(TractProhibitionDatesProcessor())
     pipeline.register_component(TreatmentIndicatorProcessor())
