@@ -32,7 +32,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
         """Initialize the DiD descriptive analyzer."""
         super().__init__(
             "did_descriptive_analysis",
-            "Perform descriptive analysis for difference-in-differences"
+            "Perform descriptive analysis for difference-in-differences",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
@@ -52,14 +52,15 @@ class DIDDescriptiveAnalyzer(Analyzer):
                   by group (Never Treated, Eventually Treated) with columns: mean, std, count
                 - summary_stats: Summary statistics table
         """
-
         did_panel = context["did_panel"]
 
         # Identify ever-treated vs never-treated tracts
         ever_treated = did_panel.groupby("tract_geoid")["treated"].max()
         ever_treated_tracts = ever_treated[ever_treated == 1].index
 
-        did_panel["ever_treated"] = did_panel["tract_geoid"].isin(ever_treated_tracts).astype(int)
+        did_panel["ever_treated"] = (
+            did_panel["tract_geoid"].isin(ever_treated_tracts).astype(int)
+        )
 
         # Step 1: Count treated vs. never-treated tracts
         tract_counts = self._count_tracts(did_panel)
@@ -91,14 +92,16 @@ class DIDDescriptiveAnalyzer(Analyzer):
         """Count treated vs. never-treated tracts.
 
         Args:
-            did_panel: DiD panel DataFrame 
+            did_panel: DiD panel DataFrame
 
         Returns:
             Dictionary with counts
         """
         # Count unique tracts by ever_treated status
-        tract_counts_by_status = did_panel.groupby("tract_geoid")["ever_treated"].first()
-        
+        tract_counts_by_status = did_panel.groupby("tract_geoid")[
+            "ever_treated"
+        ].first()
+
         treated_tracts = (tract_counts_by_status == 1).sum()
         never_treated_tracts = (tract_counts_by_status == 0).sum()
         total_tracts = len(tract_counts_by_status)
@@ -109,13 +112,11 @@ class DIDDescriptiveAnalyzer(Analyzer):
             "total_tracts": int(total_tracts),
         }
 
-    def _compute_avg_rent_by_group_month(
-        self, did_panel: pd.DataFrame
-    ) -> pd.DataFrame:
+    def _compute_avg_rent_by_group_month(self, did_panel: pd.DataFrame) -> pd.DataFrame:
         """Compute average rental prices by group and month.
 
         Args:
-            did_panel: DiD panel DataFrame 
+            did_panel: DiD panel DataFrame
 
         Returns:
             DataFrame with month as index and columns: Never Treated, Eventually Treated
@@ -130,9 +131,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
 
         return avg_by_group
 
-    def _compute_pre_treatment_balance(
-        self, did_panel: pd.DataFrame
-    ) -> pd.DataFrame:
+    def _compute_pre_treatment_balance(self, did_panel: pd.DataFrame) -> pd.DataFrame:
         """Compute pre-treatment balance statistics.
 
         Compares treated and control groups before any treatment occurs.
@@ -143,30 +142,32 @@ class DIDDescriptiveAnalyzer(Analyzer):
         Returns:
             DataFrame with pre-treatment balance statistics by group
         """
-
         # Define pre-treatment period (before any tract is treated)
         first_treatment = did_panel.loc[did_panel["treated"] == 1, "month"].min()
         pre_period = did_panel[did_panel["month"] < first_treatment]
 
         # Compare average pre-treatment rental prices
-        pre_balance = (
-            pre_period.groupby("ever_treated")["rental_price"]
-            .agg(["mean", "std", "count"])
+        pre_balance = pre_period.groupby("ever_treated")["rental_price"].agg(
+            ["mean", "std", "count"]
         )
         pre_balance.index = ["Never Treated", "Eventually Treated"]
 
         # Perform t-test to compare groups
-        never_treated_prices = pre_period.loc[pre_period["ever_treated"] == 0, "rental_price"]
-        eventually_treated_prices = pre_period.loc[pre_period["ever_treated"] == 1, "rental_price"]
+        never_treated_prices = pre_period.loc[
+            pre_period["ever_treated"] == 0, "rental_price"
+        ]
+        eventually_treated_prices = pre_period.loc[
+            pre_period["ever_treated"] == 1, "rental_price"
+        ]
 
-        t_stat, p_value = stats.ttest_ind(never_treated_prices, eventually_treated_prices)
+        t_stat, p_value = stats.ttest_ind(
+            never_treated_prices, eventually_treated_prices
+        )
         logger.info("  t-statistic: %.2f, p-value: %.4f", t_stat, p_value)
 
         return pre_balance
 
-    def _create_summary_stats_table(
-        self, did_panel: pd.DataFrame
-    ) -> pd.DataFrame:
+    def _create_summary_stats_table(self, did_panel: pd.DataFrame) -> pd.DataFrame:
         """Create summary statistics table.
 
         Args:
@@ -175,16 +176,25 @@ class DIDDescriptiveAnalyzer(Analyzer):
         Returns:
             DataFrame with summary statistics by group
         """
-        summary = did_panel.groupby("ever_treated").agg({
-            "tract_geoid": "nunique",
-            "rental_price": ["mean", "std", "min", "max"],
-            "treated": "sum",  # Total treated tract-months
-        })
+        summary = did_panel.groupby("ever_treated").agg(
+            {
+                "tract_geoid": "nunique",
+                "rental_price": ["mean", "std", "min", "max"],
+                "treated": "sum",  # Total treated tract-months
+            }
+        )
 
         # Flatten MultiIndex columns
-        summary.columns = ["N Tracts", "Mean Rent", "Std Dev", "Min Rent", "Max Rent", "Treated Obs"]
+        summary.columns = [
+            "N Tracts",
+            "Mean Rent",
+            "Std Dev",
+            "Min Rent",
+            "Max Rent",
+            "Treated Obs",
+        ]
         summary.index = ["Never Treated", "Eventually Treated"]
-        
+
         logger.info("\n%s", summary.round(2))
 
         return summary
