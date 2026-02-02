@@ -9,11 +9,18 @@ This script demonstrates the DiD analysis workflow:
 import logging
 
 from housing.components.loaders.rental_data import RentalDataLoader
+from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
 from housing.components.processors.time_series_zip_to_tract import (
     TimeSeriesZipToTractProcessor,
+)
+from housing.components.processors.tract_prohibition_dates import (
+    TractProhibitionDatesProcessor,
+)
+from housing.components.processors.treatment_indicator import (
+    TreatmentIndicatorProcessor,
 )
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from pipeline import Pipeline, PipelineResult
@@ -39,6 +46,11 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     # Use crosswalk to convert panel data to tract-level
     pipeline.register_component(TimeSeriesZipToTractProcessor())
+
+    # build treatment variable
+    pipeline.register_component(STRProhibitionDataLoader())
+    pipeline.register_component(TractProhibitionDatesProcessor())
+    pipeline.register_component(TreatmentIndicatorProcessor())
 
     results = pipeline.execute()
 

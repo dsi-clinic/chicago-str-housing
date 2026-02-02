@@ -66,3 +66,6 @@ run-clustering-pipeline: build-only ## Prepare data for clustering
 
 run-clustering-analysis: build-only ## Run clustering data exploration
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/clustering_analysis.py $(ARGS)
+
+run-did-pipeline: build-only ## Run the DiD (Difference-in-Differences) pipeline
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline.py
