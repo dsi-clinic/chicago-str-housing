@@ -45,7 +45,6 @@ class TreatmentMapVisualizer(Visualizer):
         did_panel = context.get("did_panel_data")
         community_data = context.get("community_rental_data")
         tract_boundaries = context.get("tract_boundaries")
-        community_boundaries = context.get("community_boundaries")
         city_boundaries = context.get("city_boundaries")
 
         if did_panel is None and community_data is None:
@@ -53,9 +52,7 @@ class TreatmentMapVisualizer(Visualizer):
             return {}
 
         fig, axes = plt.subplots(1, 3, figsize=(20, 10))
-        fig.suptitle(
-            "Treatment Maps", fontsize=20, fontweight="bold", y=0.98
-        )
+        fig.suptitle("Treatment Maps", fontsize=20, fontweight="bold", y=0.98)
 
         # Get common bounds for consistent zoom
         if city_boundaries is not None:
@@ -64,21 +61,22 @@ class TreatmentMapVisualizer(Visualizer):
             common_bounds = None
 
         if did_panel is None or tract_boundaries is None:
-            logger.warning("No DID panel data or tract boundaries available for mapping")
+            logger.warning(
+                "No DID panel data or tract boundaries available for mapping"
+            )
             return {}
-        
-        from housing.components.utils import create_choropleth_map, prepare_map_data
 
-        common_bounds = city_boundaries.total_bounds if city_boundaries is not None else None
+        common_bounds = (
+            city_boundaries.total_bounds if city_boundaries is not None else None
+        )
         fig, axes = plt.subplots(1, 3, figsize=(20, 10))
         fig.suptitle("Treatment Maps", fontsize=20, fontweight="bold", y=0.98)
 
         # Map 1: First adoption date (binary map,colored if treated)
         first_treatment = did_panel.loc[did_panel["treated"] == 1, "month"].min()
-        first_snapshot = (
-            did_panel[did_panel["month"] == first_treatment][["tract_geoid", "treated"]]
-            .drop_duplicates(subset="tract_geoid")
-        )
+        first_snapshot = did_panel[did_panel["month"] == first_treatment][
+            ["tract_geoid", "treated"]
+        ].drop_duplicates(subset="tract_geoid")
         map_first = prepare_map_data(
             first_snapshot,
             tract_boundaries,
@@ -100,10 +98,9 @@ class TreatmentMapVisualizer(Visualizer):
 
         # Map 2: Most recent date (binary map, colored if treated)
         last_month = did_panel["month"].max()
-        last_snapshot = (
-            did_panel[did_panel["month"] == last_month][["tract_geoid", "treated", "months_since_treatment"]]
-            .drop_duplicates(subset="tract_geoid")
-        )
+        last_snapshot = did_panel[did_panel["month"] == last_month][
+            ["tract_geoid", "treated", "months_since_treatment"]
+        ].drop_duplicates(subset="tract_geoid")
         last_snapshot = last_snapshot.copy()
         last_snapshot["months_since_treatment"] = (
             last_snapshot["months_since_treatment"].fillna(0).clip(lower=0)
