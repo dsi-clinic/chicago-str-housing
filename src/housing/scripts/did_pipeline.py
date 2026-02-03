@@ -7,6 +7,7 @@ This script demonstrates the full DiD workflow:
 import logging
 
 from housing.components.analyzers.did_analyzer import DIDDescriptiveAnalyzer
+from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental_data import (
@@ -26,6 +27,7 @@ from housing.components.processors.treatment_indicator import (
 )
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.did_trends import DIDTrendsVisualizer
+from housing.components.visualizers.treatment_map import TreatmentMapVisualizer
 from pipeline import Pipeline, PipelineResult
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline = Pipeline("Housing DiD Analysis")
 
     # Step 1: Load all data
+    pipeline.register_component(CityBoundariesLoader())
     pipeline.register_component(ZipBoundariesLoader())
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(TimeSeriesRentalLoader())
@@ -72,6 +75,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     # Step 5: Visualizations
     pipeline.register_component(DIDTrendsVisualizer())
+    pipeline.register_component(TreatmentMapVisualizer())
 
     results = pipeline.execute()
 
