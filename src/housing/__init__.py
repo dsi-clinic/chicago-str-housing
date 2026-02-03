@@ -45,6 +45,9 @@ from housing.components.visualizers.rental_map import RentalMapVisualizer
 from housing.components.visualizers.str_distribution import STRDistributionVisualizer
 from housing.components.visualizers.str_map import STRMapVisualizer
 from housing.components.visualizers.str_prohibition_viz import STRProhibitionVisualizer
+from housing.components.visualizers.time_series_str_map import (
+    TimeSeriesSTRMapVisualizer,
+)
 
 __all__ = [
     "AirbnbDataLoader",
@@ -65,6 +68,7 @@ __all__ = [
     "STRProhibitionAnalyzer",
     "STRProhibitionDataLoader",
     "STRProhibitionVisualizer",
+    "TimeSeriesSTRMapVisualizer",
     "TimeSeriesZipToTractProcessor",
     "TractBoundariesLoader",
     "TractToCommunityProcessor",

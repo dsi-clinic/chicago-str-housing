@@ -2,6 +2,7 @@
 
 import logging
 
+from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental_data import TimeSeriesRentalLoader
@@ -15,6 +16,9 @@ from housing.components.processors.treatment_indicator import (
     TreatmentIndicatorProcessor,
 )
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
+from housing.components.visualizers.time_series_str_map import (
+    TimeSeriesSTRMapVisualizer,
+)
 from pipeline import Pipeline, PipelineResult
 
 logger = logging.getLogger(__name__)
@@ -33,6 +37,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(TimeSeriesRentalLoader(output_dir="/project/output"))
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(ZipBoundariesLoader())
+    pipeline.register_component(CityBoundariesLoader())  # Needed to filter tracts to Chicago
 
     # Step 2: Join rental data to boundaries
     pipeline.register_component(
@@ -54,6 +59,9 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     )
     treatment_processor = TreatmentIndicatorProcessor(output_dir="/project/output")
     pipeline.register_component(treatment_processor)
+
+    # Step 3: Visualize the data
+    pipeline.register_component(TimeSeriesSTRMapVisualizer(output_dir="/project/output"))
 
     results = pipeline.execute()
 

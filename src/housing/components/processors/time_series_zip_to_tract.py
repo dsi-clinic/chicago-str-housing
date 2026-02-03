@@ -43,7 +43,6 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
         merged_df = rental_panel_data.merge(
             zip_to_tract_crosswalk, on="zip_code", how="inner"
         )
-        print(merged_df.columns)
 
         # Step 2: Calculate weighted rental prices
         logger.info("Calculating weighted rental prices...")
@@ -83,6 +82,8 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
         logger.info(
             "Unique tracts in panel data: %d", tract_panel_data["tract_geoid"].nunique()
         )
+
+        tract_panel_data = tract_panel_data[["tract_geoid", "month", "rental_price"]]
 
         # Save the tract panel data to a CSV file
         if self.output_dir is not None:
