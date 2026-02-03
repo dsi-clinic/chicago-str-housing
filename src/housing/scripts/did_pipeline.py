@@ -37,7 +37,9 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(TimeSeriesRentalLoader(output_dir="/project/output"))
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(ZipBoundariesLoader())
-    pipeline.register_component(CityBoundariesLoader())  # Needed to filter tracts to Chicago
+    pipeline.register_component(
+        CityBoundariesLoader()
+    )  # Needed to filter tracts to Chicago
 
     # Step 2: Join rental data to boundaries
     pipeline.register_component(
@@ -61,7 +63,9 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(treatment_processor)
 
     # Step 3: Visualize the data
-    pipeline.register_component(TimeSeriesSTRMapVisualizer(output_dir="/project/output"))
+    pipeline.register_component(
+        TimeSeriesSTRMapVisualizer(output_dir="/project/output")
+    )
 
     results = pipeline.execute()
 

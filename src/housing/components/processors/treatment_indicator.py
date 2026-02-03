@@ -47,7 +47,9 @@ class PointsToTractProcessor(DataProcessor):
         )
         self.input_key = input_key
         self.output_key = output_key
-        self.aggregate_columns = aggregate_columns or {"prohibition_date": ["min", "max"]}
+        self.aggregate_columns = aggregate_columns or {
+            "prohibition_date": ["min", "max"]
+        }
         self.calculate_density = calculate_density
         self.output_dir = Path(output_dir) if output_dir is not None else None
 
@@ -109,9 +111,13 @@ class PointsToTractProcessor(DataProcessor):
 
         # Rename count column
         if "application_id_count" in tract_agg.columns:
-            tract_agg = tract_agg.rename(columns={"application_id_count": "str_prohibition_count"})
+            tract_agg = tract_agg.rename(
+                columns={"application_id_count": "str_prohibition_count"}
+            )
         elif "application_id" in tract_agg.columns:
-            tract_agg = tract_agg.rename(columns={"application_id": "str_prohibition_count"})
+            tract_agg = tract_agg.rename(
+                columns={"application_id": "str_prohibition_count"}
+            )
 
         # Step 4: Join with tract geometries
         tract_data = tract_boundaries[["tract_geoid", "geometry"]].merge(
@@ -119,7 +125,9 @@ class PointsToTractProcessor(DataProcessor):
         )
 
         # Fill NaN counts with 0 (tracts with no points)
-        tract_data["str_prohibition_count"] = tract_data["str_prohibition_count"].fillna(0)
+        tract_data["str_prohibition_count"] = tract_data[
+            "str_prohibition_count"
+        ].fillna(0)
 
         # Step 5: Calculate density if requested
         if self.calculate_density:
@@ -161,7 +169,9 @@ class PointsToTractProcessor(DataProcessor):
             self.output_key: tract_data,
             f"{self.output_key}_summary": {
                 "total_tracts": len(tract_data),
-                "tracts_with_prohibitions": (tract_data["str_prohibition_count"] > 0).sum(),
+                "tracts_with_prohibitions": (
+                    tract_data["str_prohibition_count"] > 0
+                ).sum(),
                 "total_prohibitions": int(tract_data["str_prohibition_count"].sum()),
             },
         }
@@ -212,27 +222,30 @@ class TreatmentIndicatorProcessor(DataProcessor):
         # When panel month is 2016-08-01 and first_prohibition_date is 2016-08-08,
         # the treatment should occur in month 2016-08
         logger.info("Creating treatment indicator...")
-        
+
         # Convert to year-month periods for comparison
         merged["month_period"] = merged["month"].dt.to_period("M")
-        merged["first_prohibition_period"] = merged["first_prohibition_date"].dt.to_period("M")
-        
+        merged["first_prohibition_period"] = merged[
+            "first_prohibition_date"
+        ].dt.to_period("M")
+
         # Treated = 1 if month >= first_prohibition_date at year-month level
         merged["treated"] = (
             merged["month_period"] >= merged["first_prohibition_period"]
         ).astype(int)
-        
+
         # Handle never-treated tracts (NaN first_prohibition_date)
         merged.loc[merged["first_prohibition_date"].isna(), "treated"] = 0
-        
+
         # Calculate months_since_treatment
         # For treated tracts, calculate difference; never-treated remain NaN
         merged["months_since_treatment"] = (
-            (merged["month"].dt.year - merged["first_prohibition_date"].dt.year) * 12
-            + (merged["month"].dt.month - merged["first_prohibition_date"].dt.month)
-        )
+            merged["month"].dt.year - merged["first_prohibition_date"].dt.year
+        ) * 12 + (merged["month"].dt.month - merged["first_prohibition_date"].dt.month)
         # Set to NaN for never-treated tracts
-        merged.loc[merged["first_prohibition_date"].isna(), "months_since_treatment"] = pd.NA
+        merged.loc[
+            merged["first_prohibition_date"].isna(), "months_since_treatment"
+        ] = pd.NA
 
         # Drop temporary period columns
         merged = merged.drop(columns=["month_period", "first_prohibition_period"])
@@ -246,7 +259,7 @@ class TreatmentIndicatorProcessor(DataProcessor):
                 tract_prohibition_path, index=False
             )
             logger.info("Tract prohibition dates saved to: %s", tract_prohibition_path)
-            
+
             # Save DiD panel data
             did_panel_path = self.output_dir / "did_panel_data.csv"
             did_panel_path.parent.mkdir(parents=True, exist_ok=True)
