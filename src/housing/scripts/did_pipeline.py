@@ -3,11 +3,13 @@
 This script demonstrates the DiD analysis workflow:
 1. Loading time-series rental data from csv file
 2. Spatial join to convert zip code data to Census tract level
-3. work in progress, future steps coming ...
+3. Build DiD panel dataset with treatment variables
+4. Analyze and visualize DiD data before experiment
 """
 
 import logging
 
+from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental import TimeSeriesRentalLoader
@@ -23,6 +25,7 @@ from housing.components.processors.treatment_indicator import (
     TreatmentIndicatorProcessor,
 )
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
+from housing.components.visualizers.did_trends import DIDTrendsVisualizer
 from pipeline import Pipeline, PipelineResult
 
 logger = logging.getLogger(__name__)
@@ -47,10 +50,14 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     # Use crosswalk to convert panel data to tract-level
     pipeline.register_component(TimeSeriesZipToTractProcessor())
 
-    # build treatment variable
+    # Build treatment variable
     pipeline.register_component(STRProhibitionDataLoader())
     pipeline.register_component(TractProhibitionDatesProcessor())
     pipeline.register_component(TreatmentIndicatorProcessor())
+
+    # Conduct pre-experiment analysis
+    pipeline.register_component(DIDDescriptiveAnalyzer())
+    pipeline.register_component(DIDTrendsVisualizer())
 
     results = pipeline.execute()
 
