@@ -48,7 +48,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
         avg_by_group = (
             did_panel.groupby(["month", "ever_treated"])["rental_price"]
             .mean()
-            .unstack()
+            .pivot_table(index="month", columns="ever_treated", values="rental_price")
         )
         avg_by_group.columns = ["Never Treated", "Eventually Treated"]
 
