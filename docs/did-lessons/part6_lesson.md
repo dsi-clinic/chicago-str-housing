@@ -177,4 +177,7 @@ If most pre-treatment coefficients are insignificant and scattered around zero, 
 
 ## Next Steps
 
-Part 7 explores robustness checks and heterogeneous effects—testing whether results hold under different specifications and whether some subgroups are affected more than others.
+Part 7 introduces **trend matching**—restricting the analysis to treated tracts and controls with similar pre-treatment rent trends. This lets us:
+- Improve comparability when pre-trends differ between groups
+- Re-run DiD on a matched sample
+- Compare matched vs. full-panel results to assess robustness
