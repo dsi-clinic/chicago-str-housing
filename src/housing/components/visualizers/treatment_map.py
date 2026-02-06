@@ -51,7 +51,7 @@ class TreatmentMapVisualizer(Visualizer):
             logger.warning("No DID panel data available for mapping")
             return {}
 
-        fig, axes = plt.subplots(1, 3, figsize=(20, 10))
+        fig, axes = plt.subplots(1, 4, figsize=(22, 10))
         fig.suptitle("Treatment Maps", fontsize=20, fontweight="bold", y=0.98)
 
         # Get common bounds for consistent zoom
@@ -69,10 +69,10 @@ class TreatmentMapVisualizer(Visualizer):
         common_bounds = (
             city_boundaries.total_bounds if city_boundaries is not None else None
         )
-        fig, axes = plt.subplots(1, 3, figsize=(20, 10))
+        fig, axes = plt.subplots(1, 4, figsize=(28, 10))
         fig.suptitle("Treatment Maps", fontsize=20, fontweight="bold", y=0.98)
 
-        # Map 1: First adoption date (binary map,colored if treated)
+        # Map 1: First adoption date (binary map, colored if treated)
         first_treatment = did_panel.loc[did_panel["treated"] == 1, "month"].min()
         first_snapshot = did_panel[did_panel["month"] == first_treatment][
             ["tract_geoid", "treated"]
@@ -88,7 +88,7 @@ class TreatmentMapVisualizer(Visualizer):
             axes[0],
             map_first,
             "treated",
-            f"First Adoption Date Snapshot ({first_treatment.strftime('%Y-%m')})",
+            "First Treatment Date (October 2015)",
             "Treated (1) vs Never Treated (0)",
             cmap="Blues",
             bounds=common_bounds,
@@ -96,7 +96,36 @@ class TreatmentMapVisualizer(Visualizer):
             logger=logger,
         )
 
-        # Map 2: Most recent date (binary map, colored if treated)
+        # Map 3: Most Adoption Date
+        first_treatment_by_tract = (
+            did_panel[did_panel["treated"] == 1].groupby("tract_geoid")["month"].min()
+        )
+        adoptions_per_month = first_treatment_by_tract.value_counts()
+        peak_month = adoptions_per_month.idxmax()
+        peak_snapshot = did_panel[did_panel["month"] == peak_month][
+            ["tract_geoid", "treated"]
+        ].drop_duplicates(subset="tract_geoid")
+        peak_binary = peak_snapshot.copy()
+        map_peak = prepare_map_data(
+            peak_binary,
+            tract_boundaries,
+            ["treated"],
+            city_boundaries,
+            logger=logger,
+        )
+        create_choropleth_map(
+            axes[1],
+            map_peak,
+            "treated",
+            "Most Treatments Added Date (August 2016)",
+            "Treated (1) vs Never Treated (0)",
+            cmap="Blues",
+            bounds=common_bounds,
+            show_stats=False,
+            logger=logger,
+        )
+
+        # Map 3: Most recent date (binary map, colored if treated)
         last_month = did_panel["month"].max()
         last_snapshot = did_panel[did_panel["month"] == last_month][
             ["tract_geoid", "treated", "months_since_treatment"]
@@ -114,10 +143,10 @@ class TreatmentMapVisualizer(Visualizer):
             logger=logger,
         )
         create_choropleth_map(
-            axes[1],
+            axes[2],
             map_last,
             "treated",
-            f"Most Recent Date Snapshot ({last_month.strftime('%Y-%m')})",
+            "Most Recent Date (December 2025)",
             "Treated (1) vs Never Treated (0)",
             cmap="Blues",
             bounds=common_bounds,
@@ -125,7 +154,7 @@ class TreatmentMapVisualizer(Visualizer):
             logger=logger,
         )
 
-        # Map 3: Months since treatment (darker = longer treated)
+        # Map 4: Months since treatment (darker = longer treated)
         map_months = prepare_map_data(
             last_snapshot,
             tract_boundaries,
@@ -134,10 +163,10 @@ class TreatmentMapVisualizer(Visualizer):
             logger=logger,
         )
         create_choropleth_map(
-            axes[2],
+            axes[3],
             map_months,
             "months_since_treatment",
-            "Months Since Treatment (0 = Never Treated)",
+            "Census Tracts by Time Since Treatment (in months)",
             "Months Since Treatment",
             cmap="Blues",
             bounds=common_bounds,

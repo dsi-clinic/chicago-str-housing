@@ -43,7 +43,7 @@ class DIDTrendsVisualizer(Visualizer):
         pre_balance = context.get("pre_balance")
 
         # Plottting visualizations
-        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 10))
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 10))
         fig.suptitle("DID Trends Visualizations", fontsize=16, fontweight="bold")
 
         treated_by_month.plot(ax=ax1, label="Treated")
