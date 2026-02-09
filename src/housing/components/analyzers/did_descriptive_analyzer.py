@@ -51,7 +51,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
         ever_treated_tracts = ever_treated[ever_treated == 1].index
 
         did_panel["ever_treated"] = did_panel["tract_geoid"].isin(ever_treated_tracts)
-           
+
         # Count of tract-months: treated vs control per month
         treatment_count = did_panel.pivot_table(
             index="month",
@@ -61,7 +61,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
             fill_value=0,
         )
         treatment_count.columns = ["Never Treated", "Eventually Treated"]
-        
+
         did_panel["ever_treated"] = did_panel["tract_geoid"].isin(ever_treated_tracts)
 
         avg_by_group = did_panel.pivot_table(

@@ -39,7 +39,10 @@ class TreatmentIndicatorProcessor(DataProcessor):
         # Tracts that are never treated are assigned a 0.
         merged["treated"] = (
             (merged["first_prohibition_date"].notna())
-            & (merged["month"].dt.to_period("M") >= merged["first_prohibition_date"].dt.to_period("M"))
+            & (
+                merged["month"].dt.to_period("M")
+                >= merged["first_prohibition_date"].dt.to_period("M")
+            )
         ).astype(int)
 
         merged["months_since_treatment"] = (
