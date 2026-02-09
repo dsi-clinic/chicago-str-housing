@@ -24,7 +24,8 @@ class DIDDescriptiveAnalyzer(Analyzer):
     def __init__(self) -> None:
         """Initialize the DID descriptive analyzer."""
         super().__init__(
-            "did_descriptive_analysis", "Analyze correlations in census tract rental data"
+            "did_descriptive_analysis",
+            "Analyze correlations in census tract rental data",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
