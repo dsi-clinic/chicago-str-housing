@@ -305,7 +305,33 @@ Before starting, you should have:
 
 ---
 
-### **Part 7: Robustness Checks & Heterogeneity**
+### **Part 7: Trend-Matched Sample Analysis**
+
+**Goal:** Build trend matching to address parallel trends violations
+
+**Tasks:**
+1. **Build TrendMatchingProcessor:**
+   - Calculate pre-treatment rent trends (slope) for each tract
+   - Match treated tracts to k nearest never-treated controls by trend slope
+   - Create matched sample panel
+
+2. **Build matched pipeline:**
+   - Run standard DiD pipeline to get `did_panel`
+   - Apply trend matching, then re-run descriptive analysis, estimation, event study, and visualizations
+   - Use `_matched` suffix for output paths
+
+3. **Compare results:**
+   - Unmatched vs. matched TWFE coefficient
+   - Event study pre-treatment coefficients (full panel vs. matched)
+
+**Deliverable:**
+- `TrendMatchingProcessor` component
+- Matched pipeline script
+- Brief interpretation: Did trend matching change the conclusion?
+
+---
+
+### **Part 8: Robustness Checks & Heterogeneity**
 
 **Goal:** Test robustness and explore heterogeneous effects
 
@@ -332,7 +358,7 @@ Before starting, you should have:
 
 ---
 
-### **Part 8: Final Analysis & Report**
+### **Part 9: Final Analysis & Report**
 
 **Goal:** Synthesize all results into a final report
 
@@ -372,17 +398,18 @@ Before starting, you should have:
 - `TimeSeriesZipToTractProcessor` - Convert ZIP panel to tract panel
 - `TractProhibitionDatesProcessor` - Aggregate prohibition dates to tract level
 - `TreatmentIndicatorProcessor` - Create treatment variables
+- `TrendMatchingProcessor` - Match treated tracts to controls by pre-treatment rent trends
 
 **Analyzers:**
 - `DIDDescriptiveAnalyzer` - Descriptive statistics
 - `DIDAnalyzer` - Main DiD estimation
-- `EventStudyAnalyzer` - Event study estimation (stretch)
-- `HeterogeneousEffectsAnalyzer` - Subgroup analysis (stretch)
+- `EventStudyAnalyzer` - Event study estimation
+- `HeterogeneousEffectsAnalyzer` - Subgroup analysis
 
 **Visualizers:**
 - `DIDTrendsVisualizer` - Pre-treatment trends
-- `EventStudyVisualizer` - Event study plot (stretch)
-- `HeterogeneityVisualizer` - Subgroup comparisons (stretch)
+- `EventStudyVisualizer` - Event study plot
+- `HeterogeneityVisualizer` - Subgroup comparisons
 
 ---
 
@@ -394,9 +421,10 @@ A successful project will:
 3. Work with panel data
 4. Estimate basic DiD model
 5. Interpret results correctly
-6. Event study (stretch)
-7. Robustness checks (stretch)
-8. Write clear report
+6. Event study
+7. Trend matching
+8. Robustness checks
+9. Write clear report
 
 ---
 
