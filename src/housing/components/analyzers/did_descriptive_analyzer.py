@@ -39,16 +39,6 @@ class DIDDescriptiveAnalyzer(Analyzer):
             did_panel.groupby("month")["treated"].sum()  # Count of treated tract-months
         )
 
-        # Count of tract-months: treated vs control per month
-        treatment_count = did_panel.pivot_table(
-            index="month",
-            columns="treated",
-            values="tract_geoid",
-            aggfunc="count",
-            fill_value=0,
-        )
-        treatment_count.columns = ["Never Treated", "Eventually Treated"]
-
         # Unique treated tracts over time
         treated_by_month = (
             did_panel[did_panel["treated"] == 1]
@@ -60,6 +50,18 @@ class DIDDescriptiveAnalyzer(Analyzer):
         ever_treated = did_panel.groupby("tract_geoid")["treated"].max()
         ever_treated_tracts = ever_treated[ever_treated == 1].index
 
+        did_panel["ever_treated"] = did_panel["tract_geoid"].isin(ever_treated_tracts)
+           
+        # Count of tract-months: treated vs control per month
+        treatment_count = did_panel.pivot_table(
+            index="month",
+            columns="ever_treated",
+            values="tract_geoid",
+            aggfunc="count",
+            fill_value=0,
+        )
+        treatment_count.columns = ["Never Treated", "Eventually Treated"]
+        
         did_panel["ever_treated"] = did_panel["tract_geoid"].isin(ever_treated_tracts)
 
         avg_by_group = did_panel.pivot_table(

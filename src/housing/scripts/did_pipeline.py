@@ -6,7 +6,7 @@ This script demonstrates the full DiD workflow:
 
 import logging
 
-from housing.components.analyzers.did_analyzer import DIDAnalzyer
+from housing.components.analyzers.did_analyzer import DIDAnalyzer
 from housing.components.analyzers.did_descriptive_analyzer import DIDDescriptiveAnalyzer
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.rental_data import RentalDataLoader
@@ -73,7 +73,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     # Step 4: Descriptive Analysis
     pipeline.register_component(DIDDescriptiveAnalyzer())
-    pipeline.register_component(DIDAnalzyer())
+    pipeline.register_component(DIDAnalyzer())
 
     # Step 5: Visualizations
     pipeline.register_component(DIDTrendsVisualizer())

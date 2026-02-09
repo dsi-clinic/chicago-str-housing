@@ -19,7 +19,7 @@ from pipeline.base import Analyzer
 logger = logging.getLogger(__name__)
 
 
-class DIDAnalzyer(Analyzer):
+class DIDAnalyzer(Analyzer):
     """Analyze difference-in-differences analysis on the panel data.
 
     This demonstrates the difference-in-differences analysis on the panel data.

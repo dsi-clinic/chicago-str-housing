@@ -35,11 +35,11 @@ class TreatmentIndicatorProcessor(DataProcessor):
             how="left",
         )
 
-        # Create treated indicator where treated = 1 if month >= first_prohibition_date, else 0
+        # Create treated indicator where treated = 1 if month is after the first prohibition date, else 0
         # Tracts that are never treated are assigned a 0.
         merged["treated"] = (
             (merged["first_prohibition_date"].notna())
-            & (merged["month"] >= merged["first_prohibition_date"])
+            & (merged["month"].dt.to_period("M") >= merged["first_prohibition_date"].dt.to_period("M"))
         ).astype(int)
 
         merged["months_since_treatment"] = (
