@@ -48,7 +48,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
         avg_by_group = (
             did_panel.groupby(["month", "ever_treated"])["rental_price"]
             .mean()
-            .pivot_table(index="month", columns="ever_treated", values="rental_price")
+            .unstack()
         )
         avg_by_group.columns = ["Never Treated", "Eventually Treated"]
 
@@ -61,7 +61,6 @@ class DIDDescriptiveAnalyzer(Analyzer):
             ["mean", "std", "count"]
         )
         pre_balance.index = ["Never Treated", "Eventually Treated"]
-        print(pre_balance)
 
         never_treated_prices = pre_period.loc[
             pre_period["ever_treated"] == 0, "rental_price"
@@ -73,7 +72,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
         t_stat, p_value = stats.ttest_ind(
             never_treated_prices, eventually_treated_prices
         )
-        print(f"t-statistics: {t_stat:.2f}, p-value: {p_value:.4f}")
+        logger.info(f"t-statistics: {t_stat:.2f}, p-value: {p_value:.4f}")
 
         summary = did_panel.groupby("ever_treated").agg(
             {
@@ -92,7 +91,6 @@ class DIDDescriptiveAnalyzer(Analyzer):
             "Treated Obs",
         ]
         summary.index = ["Never Treated", "Eventually Treated"]
-        print(summary.round(2))
 
         return {
             "treated_by_month": treated_by_month,
