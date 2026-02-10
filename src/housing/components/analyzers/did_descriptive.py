@@ -2,6 +2,7 @@
 
 This module performs descriptive analysis for the Difference-in-Differences (DiD) analysis.
 """
+# ruff: noqa: PD010
 
 import logging
 from typing import Any
@@ -48,7 +49,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
         avg_by_group = (
             did_panel.groupby(["month", "ever_treated"])["rental_price"]
             .mean()
-            .unstack()
+            .unstack()  # noqa: PD010
         )
         avg_by_group.columns = ["Never Treated", "Eventually Treated"]
 
