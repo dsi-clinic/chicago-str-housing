@@ -2,6 +2,7 @@
 
 import logging
 
+from housing.components.analyzers.did_analyzer import DIDAnalyzer
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.rental_data import RentalDataLoader
@@ -66,6 +67,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     # Step 3: Descriptive analysis
     pipeline.register_component(DIDDescriptiveAnalyzer())
+    pipeline.register_component(DIDAnalyzer())
 
     # Step 4: Visualize the data
     pipeline.register_component(

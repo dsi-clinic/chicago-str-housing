@@ -32,7 +32,7 @@ class TimeSeriesRentalLoader(DataLoader):
         """
         super().__init__(
             "rental_panel_data",
-            file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv",
+            file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_sa_month.csv",
             "Load time series rental data from ZORI dataset",
         )
         self.output_dir = output_dir

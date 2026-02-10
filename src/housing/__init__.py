@@ -11,6 +11,7 @@ Components are organized into subdirectories:
 """
 
 # Direct imports - no need to manage __init__.py files!
+from housing.components.analyzers.did_analyzer import DIDAnalyzer
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.analyzers.rental_tract import RentalTractAnalyzer
 from housing.components.analyzers.str_prohibition import STRProhibitionAnalyzer
@@ -57,6 +58,7 @@ __all__ = [
     "AirbnbMapVisualizer",
     "CityBoundariesLoader",
     "CommunityBoundariesLoader",
+    "DIDAnalyzer",
     "DIDDescriptiveAnalyzer",
     "DIDTrendsVisualizer",
     "ForeclosedDataLoader",
