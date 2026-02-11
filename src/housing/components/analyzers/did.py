@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Difference-in-Differences analyzer using PanelOLS."""
 
 import logging
 from pathlib import Path
@@ -12,18 +12,18 @@ logger = logging.getLogger(__name__)
 
 
 class DIDAnalyzer(Analyzer):
-    """Analyze DiD data prior to conducting experiment and check for the parallel trends assumption."""
+    """Estimate a two-way fixed effects DiD model and save results."""
 
     def __init__(self, output_dir: str | None = None) -> None:
-        """Initialize the DiD descriptive analyzer."""
+        """Initialize analyzer with optional output directory."""
         super().__init__(
             "did_analyzer",
-            "Analyze DiD dataset before experiment",
+            "Estimate a two-way fixed effects DiD model.",
         )
         self.output_dir = output_dir or "/project/output"
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Analyze DiD Descriptive Trends Before Conducting Experiment."""
+        """Run DiD regression and write summary report to output folder."""
         did_panel = context["did_panel"]
 
         # Set multi-index: (entity, time)
