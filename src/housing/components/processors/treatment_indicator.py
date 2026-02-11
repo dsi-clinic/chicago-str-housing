@@ -66,9 +66,10 @@ class TreatmentIndicatorProcessor(DataProcessor):
         )
 
         # Step 3: Create treated indicator
-        # treated = 1 if month >= first_prohibition_date, else 0
+        # treated = 1 starting in the *treatment month* (by year-month)
         merged["treated"] = (
-            merged["month"] >= merged["first_prohibition_date"]
+            merged["month"].dt.to_period("M")
+            >= merged["first_prohibition_date"].dt.to_period("M")
         ).astype(int)
 
         # Step 4: Calculate months since treatment
