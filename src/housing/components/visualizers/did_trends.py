@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 from scipy import stats
 
@@ -48,7 +47,9 @@ class DIDTrendsVisualizer(Visualizer):
         # Identify ever-treated vs never-treated tracts
         ever_treated = did_panel.groupby("tract_geoid")["treated"].max()
         ever_treated_tracts = ever_treated[ever_treated == 1].index
-        did_panel["ever_treated"] = did_panel["tract_geoid"].isin(ever_treated_tracts).astype(int)
+        did_panel["ever_treated"] = (
+            did_panel["tract_geoid"].isin(ever_treated_tracts).astype(int)
+        )
 
         # Create output directory
         output_path = Path(self.output_dir)
@@ -71,11 +72,15 @@ class DIDTrendsVisualizer(Visualizer):
         return {
             "adoption_curve_path": str(output_path / "did_adoption_curve.png"),
             "parallel_trends_path": str(output_path / "did_parallel_trends.png"),
-            "pre_treatment_balance_path": str(output_path / "did_pre_treatment_balance.png"),
+            "pre_treatment_balance_path": str(
+                output_path / "did_pre_treatment_balance.png"
+            ),
             "event_study_path": str(output_path / "did_event_study.png"),
         }
 
-    def _create_adoption_curve(self, did_panel: pd.DataFrame, output_path: Path) -> None:
+    def _create_adoption_curve(
+        self, did_panel: pd.DataFrame, output_path: Path
+    ) -> None:
         """Create adoption curve showing number of treated tracts over time."""
         # Count number of treated tracts by month
         treated_by_month = (
@@ -92,11 +97,17 @@ class DIDTrendsVisualizer(Visualizer):
         ax.set_title("STR Prohibition Adoption Over Time")
 
         plt.tight_layout()
-        fig.savefig(output_path / "did_adoption_curve.png", dpi=300, bbox_inches="tight")
-        logger.info("Saved adoption curve to %s", output_path / "did_adoption_curve.png")
+        fig.savefig(
+            output_path / "did_adoption_curve.png", dpi=300, bbox_inches="tight"
+        )
+        logger.info(
+            "Saved adoption curve to %s", output_path / "did_adoption_curve.png"
+        )
         plt.close(fig)
 
-    def _create_parallel_trends_plot(self, did_panel: pd.DataFrame, output_path: Path) -> None:
+    def _create_parallel_trends_plot(
+        self, did_panel: pd.DataFrame, output_path: Path
+    ) -> None:
         """Create parallel trends plot showing average rent by group over time."""
         # Calculate average rent by month and ever_treated status
         avg_by_group = (
@@ -117,7 +128,9 @@ class DIDTrendsVisualizer(Visualizer):
 
         # Add vertical line at first treatment
         if pd.notna(first_treatment):
-            ax.axvline(first_treatment, color='red', linestyle='--', label='First Treatment')
+            ax.axvline(
+                first_treatment, color="red", linestyle="--", label="First Treatment"
+            )
 
         ax.set_ylabel("Average Rental Price ($)")
         ax.set_xlabel("Date")
@@ -125,18 +138,26 @@ class DIDTrendsVisualizer(Visualizer):
         ax.legend()
 
         plt.tight_layout()
-        fig.savefig(output_path / "did_parallel_trends.png", dpi=300, bbox_inches="tight")
-        logger.info("Saved parallel trends plot to %s", output_path / "did_parallel_trends.png")
+        fig.savefig(
+            output_path / "did_parallel_trends.png", dpi=300, bbox_inches="tight"
+        )
+        logger.info(
+            "Saved parallel trends plot to %s", output_path / "did_parallel_trends.png"
+        )
         plt.close(fig)
 
-    def _create_event_study_plot(self, did_panel: pd.DataFrame, output_path: Path) -> None:
+    def _create_event_study_plot(
+        self, did_panel: pd.DataFrame, output_path: Path
+    ) -> None:
         """Create event study plot showing average rent by months since treatment."""
         # For treated tracts: use months_since_treatment
         treated_panel = did_panel[did_panel["months_since_treatment"].notna()].copy()
-        
+
         # Calculate average rent by months_since_treatment for treated tracts
-        avg_treated = treated_panel.groupby("months_since_treatment")["rental_price"].mean()
-        
+        avg_treated = treated_panel.groupby("months_since_treatment")[
+            "rental_price"
+        ].mean()
+
         # For never-treated tracts: calculate overall average as reference
         never_treated_panel = did_panel[did_panel["ever_treated"] == 0]
         never_treated_avg = never_treated_panel["rental_price"].mean()
@@ -145,13 +166,25 @@ class DIDTrendsVisualizer(Visualizer):
         fig, ax = plt.subplots(figsize=(10, 5))
 
         # Plot treated tracts by months since treatment
-        ax.plot(avg_treated.index, avg_treated.values, alpha=0.7, label='Eventually Treated', linewidth=2)
-        
+        ax.plot(
+            avg_treated.index,
+            avg_treated.values,
+            alpha=0.7,
+            label="Eventually Treated",
+            linewidth=2,
+        )
+
         # Add horizontal reference line for never-treated tracts
-        ax.axhline(never_treated_avg, color='steelblue', linestyle='--', alpha=0.7, label=f'Never Treated (Avg: ${never_treated_avg:.0f})')
+        ax.axhline(
+            never_treated_avg,
+            color="steelblue",
+            linestyle="--",
+            alpha=0.7,
+            label=f"Never Treated (Avg: ${never_treated_avg:.0f})",
+        )
 
         # Add vertical line at treatment (months_since_treatment = 0)
-        ax.axvline(0, color='red', linestyle='--', alpha=0.7, label='Treatment')
+        ax.axvline(0, color="red", linestyle="--", alpha=0.7, label="Treatment")
 
         ax.set_ylabel("Average Rental Price ($)")
         ax.set_xlabel("Months Since Treatment")
@@ -164,18 +197,26 @@ class DIDTrendsVisualizer(Visualizer):
         logger.info("Saved event study plot to %s", output_path / "did_event_study.png")
         plt.close(fig)
 
-    def _create_pre_treatment_balance_plot(self, did_panel: pd.DataFrame, output_path: Path) -> None:
+    def _create_pre_treatment_balance_plot(
+        self, did_panel: pd.DataFrame, output_path: Path
+    ) -> None:
         """Create pre-treatment balance comparison plot."""
         # Define pre-treatment period
         first_treatment = did_panel.loc[did_panel["treated"] == 1, "month"].min()
         pre_period = did_panel[did_panel["month"] < first_treatment].copy()
 
         # Get pre-treatment rental prices by group
-        never_treated_prices = pre_period.loc[pre_period["ever_treated"] == 0, "rental_price"]
-        eventually_treated_prices = pre_period.loc[pre_period["ever_treated"] == 1, "rental_price"]
+        never_treated_prices = pre_period.loc[
+            pre_period["ever_treated"] == 0, "rental_price"
+        ]
+        eventually_treated_prices = pre_period.loc[
+            pre_period["ever_treated"] == 1, "rental_price"
+        ]
 
         # Perform t-test
-        t_stat, p_value = stats.ttest_ind(never_treated_prices, eventually_treated_prices)
+        t_stat, p_value = stats.ttest_ind(
+            never_treated_prices, eventually_treated_prices
+        )
 
         # Create figure with subplots
         fig = plt.figure(figsize=(16, 6))
@@ -217,7 +258,9 @@ class DIDTrendsVisualizer(Visualizer):
         )
         ax1.set_xlabel("Rental Price ($)", fontsize=11)
         ax1.set_ylabel("Frequency", fontsize=11)
-        ax1.set_title("Pre-Treatment Rental Price Distributions", fontsize=12, fontweight="bold")
+        ax1.set_title(
+            "Pre-Treatment Rental Price Distributions", fontsize=12, fontweight="bold"
+        )
         ax1.legend(loc="best", fontsize=9)
         ax1.grid(True, alpha=0.3)
         ax1.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"${x:,.0f}"))
@@ -236,7 +279,9 @@ class DIDTrendsVisualizer(Visualizer):
         bp["boxes"][1].set_facecolor("coral")
         bp["boxes"][1].set_alpha(0.6)
         ax2.set_ylabel("Rental Price ($)", fontsize=11)
-        ax2.set_title("Pre-Treatment Rental Price Box Plots", fontsize=12, fontweight="bold")
+        ax2.set_title(
+            "Pre-Treatment Rental Price Box Plots", fontsize=12, fontweight="bold"
+        )
         ax2.grid(True, alpha=0.3, axis="y")
         ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"${x:,.0f}"))
 
@@ -271,12 +316,23 @@ class DIDTrendsVisualizer(Visualizer):
             verticalalignment="center",
             horizontalalignment="left",
             fontfamily="monospace",
-            bbox={"boxstyle": "round,pad=0.8", "facecolor": "lightyellow", "alpha": 0.8},
+            bbox={
+                "boxstyle": "round,pad=0.8",
+                "facecolor": "lightyellow",
+                "alpha": 0.8,
+            },
         )
 
-        fig.suptitle("Pre-Treatment Balance Comparison", fontsize=14, fontweight="bold", y=0.98)
+        fig.suptitle(
+            "Pre-Treatment Balance Comparison", fontsize=14, fontweight="bold", y=0.98
+        )
 
         plt.tight_layout(rect=[0, 0, 1, 0.96])
-        fig.savefig(output_path / "did_pre_treatment_balance.png", dpi=300, bbox_inches="tight")
-        logger.info("Saved pre-treatment balance plot to %s", output_path / "did_pre_treatment_balance.png")
+        fig.savefig(
+            output_path / "did_pre_treatment_balance.png", dpi=300, bbox_inches="tight"
+        )
+        logger.info(
+            "Saved pre-treatment balance plot to %s",
+            output_path / "did_pre_treatment_balance.png",
+        )
         plt.close(fig)
