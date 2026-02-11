@@ -9,6 +9,7 @@ This script demonstrates the DiD analysis workflow:
 
 import logging
 
+from housing.components.analyzers.did import DIDAnalyzer
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
@@ -30,6 +31,8 @@ from pipeline import Pipeline, PipelineResult
 
 logger = logging.getLogger(__name__)
 
+ZORI_FILE_PATH = "/project/data/Zip_zori_uc_sfrcondomfr_sm_sa_month.csv"
+
 
 def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     """Demonstrate DiD Time-Series Analysis of Rental Prices"""
@@ -41,10 +44,10 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     # Load boundaries and data
     pipeline.register_component(ZipBoundariesLoader())
     pipeline.register_component(TractBoundariesLoader())
-    pipeline.register_component(TimeSeriesRentalLoader())
+    pipeline.register_component(TimeSeriesRentalLoader(ZORI_FILE_PATH))
 
     # Load point-in-time data and use it to build the crosswalk
-    pipeline.register_component(RentalDataLoader())
+    pipeline.register_component(RentalDataLoader(ZORI_FILE_PATH))
     pipeline.register_component(ZipToTractProcessor())
 
     # Use crosswalk to convert panel data to tract-level
@@ -58,6 +61,9 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     # Conduct pre-experiment analysis
     pipeline.register_component(DIDDescriptiveAnalyzer())
     pipeline.register_component(DIDTrendsVisualizer())
+
+    # Conduct DiD experiment
+    pipeline.register_component(DIDAnalyzer())
 
     results = pipeline.execute()
 
