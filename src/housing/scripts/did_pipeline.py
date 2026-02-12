@@ -8,6 +8,8 @@ import logging
 
 from housing.components.analyzers.did_analyzer import DIDAnalyzer
 from housing.components.analyzers.did_descriptive_analyzer import DIDDescriptiveAnalyzer
+from housing.components.analyzers.event_study_analysis import EventStudyAnalyzer
+from housing.components.loaders.census_data import CensusDataLoader
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
@@ -28,6 +30,7 @@ from housing.components.processors.treatment_indicator import (
 )
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.did_trends import DIDTrendsVisualizer
+from housing.components.visualizers.event_study_plot import EventStudyVisualizer
 from housing.components.visualizers.treatment_map import TreatmentMapVisualizer
 from pipeline import Pipeline, PipelineResult
 
@@ -47,6 +50,9 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(TimeSeriesRentalLoader())
     pipeline.register_component(RentalDataLoader())
+    pipeline.register_component(
+        CensusDataLoader(api_key="2a9cd1fa2e1158252a3f3810be0589b6d9ef41a0")
+    )
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
 
     # Step 2: Aggregate time series rental data to tracts
@@ -71,13 +77,15 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(TractProhibitionDatesProcessor())
     pipeline.register_component(TreatmentIndicatorProcessor())
 
-    # Step 4: Descriptive Analysis
+    # Step 4: DID Analysis
     pipeline.register_component(DIDDescriptiveAnalyzer())
     pipeline.register_component(DIDAnalyzer())
+    pipeline.register_component(EventStudyAnalyzer())
 
     # Step 5: Visualizations
     pipeline.register_component(DIDTrendsVisualizer())
     pipeline.register_component(TreatmentMapVisualizer())
+    pipeline.register_component(EventStudyVisualizer())
 
     results = pipeline.execute()
 

@@ -55,12 +55,12 @@ class DIDDescriptiveAnalyzer(Analyzer):
         # Count of tract-months: treated vs control per month
         treatment_count = did_panel.pivot_table(
             index="month",
-            columns="ever_treated",
+            columns="treated",
             values="tract_geoid",
             aggfunc="count",
             fill_value=0,
         )
-        treatment_count.columns = ["Never Treated", "Eventually Treated"]
+        treatment_count.columns = ["Not Treated", "Treated This Month"]
 
         did_panel["ever_treated"] = did_panel["tract_geoid"].isin(ever_treated_tracts)
 
