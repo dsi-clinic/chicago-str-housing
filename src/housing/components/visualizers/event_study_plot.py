@@ -48,9 +48,9 @@ class EventStudyVisualizer(Visualizer):
             coef_df["ci_lower"],
             coef_df["ci_upper"],
             alpha=0.2,
-            color="navy",   
+            color="navy",
         )
-        
+
         # Reference lines
         ax.axhline(0, color="black", linestyle="-", linewidth=0.5)
         ax.axvline(-0.5, color="red", linestyle="--", label="Treatment")
@@ -59,7 +59,7 @@ class EventStudyVisualizer(Visualizer):
         ax.set_ylabel("Effect on Rental Price ($)")
         ax.set_title("Event Study: Effect of STR Prohibition on Rents")
         ax.legend()
-        
+
         # Save the plot
         output_path = Path(self.output_dir) / "event_study_plot.png"
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
