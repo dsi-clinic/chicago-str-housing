@@ -11,6 +11,7 @@ import logging
 
 from housing.components.analyzers.did import DIDAnalyzer
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
+from housing.components.analyzers.event_study import EventStudyAnalyzer
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental import TimeSeriesRentalLoader
@@ -27,6 +28,7 @@ from housing.components.processors.treatment_indicator import (
 )
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.did_trends import DIDTrendsVisualizer
+from housing.components.visualizers.event_study_visual import EventStudyVisualizer
 from pipeline import Pipeline, PipelineResult
 
 logger = logging.getLogger(__name__)
@@ -64,6 +66,10 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     # Conduct DiD experiment
     pipeline.register_component(DIDAnalyzer())
+
+    # Conduct parallel trends event study
+    pipeline.register_component(EventStudyAnalyzer())
+    pipeline.register_component(EventStudyVisualizer())
 
     results = pipeline.execute()
 
