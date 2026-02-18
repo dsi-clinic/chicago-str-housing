@@ -28,6 +28,7 @@ from housing.components.processors.tract_prohibition_dates import (
 from housing.components.processors.treatment_indicator import (
     TreatmentIndicatorProcessor,
 )
+from housing.components.processors.treatment_threshold import TreatmentThresholdProcessor
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.did_trends import DIDTrendsVisualizer
 from housing.components.visualizers.event_study_plot import EventStudyVisualizer
@@ -67,6 +68,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
             id_column="application_id",
             aggregate_columns={
                 "prohibition_date": "min",
+                "number_of_units": "sum",
             },
             calculate_density=True,
             data_source_name="str_prohibition",
@@ -75,7 +77,8 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
 
     # Step 3.5: STR Prohibition Dates → Tract aggregation
     pipeline.register_component(TractProhibitionDatesProcessor())
-    pipeline.register_component(TreatmentIndicatorProcessor())
+    # pipeline.register_component(TreatmentIndicatorProcessor())
+    pipeline.register_component(TreatmentThresholdProcessor())
 
     # Step 4: DID Analysis
     pipeline.register_component(DIDDescriptiveAnalyzer())

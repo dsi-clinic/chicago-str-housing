@@ -37,6 +37,7 @@ class TractProhibitionDatesProcessor(DataProcessor):
                     "tract_geoid",
                     "prohibition_date",
                     "str_prohibition_count",
+                    "number_of_units",
                 ]
             ]
             .rename(

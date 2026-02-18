@@ -166,7 +166,7 @@ class TreatmentMapVisualizer(Visualizer):
             axes[3],
             map_months,
             "months_since_treatment",
-            "Census Tracts by Time Since Treatment (in months)",
+            "Census Tracts by Time Since Treatment (months)",
             "Months Since Treatment",
             cmap="Blues",
             bounds=common_bounds,
