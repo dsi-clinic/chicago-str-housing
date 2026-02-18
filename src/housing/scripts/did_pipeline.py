@@ -4,6 +4,7 @@ import logging
 
 from housing.components.analyzers.did_analyzer import DIDAnalyzer
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
+from housing.components.analyzers.event_study import EventStudyAnalyzer
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
@@ -19,6 +20,7 @@ from housing.components.processors.treatment_indicator import (
 )
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.did_trends import DIDTrendsVisualizer
+from housing.components.visualizers.event_study import EventStudyVisualizer
 from housing.components.visualizers.time_series_str_map import (
     TimeSeriesSTRMapVisualizer,
 )
@@ -68,13 +70,15 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     # Step 3: Descriptive analysis
     pipeline.register_component(DIDDescriptiveAnalyzer())
     pipeline.register_component(DIDAnalyzer())
+    pipeline.register_component(EventStudyAnalyzer())
 
     # Step 4: Visualize the data
     pipeline.register_component(
         TimeSeriesSTRMapVisualizer(output_dir="/project/output")
     )
     pipeline.register_component(DIDTrendsVisualizer(output_dir="/project/output"))
-
+    pipeline.register_component(EventStudyVisualizer(output_dir="/project/output"))
+    
     results = pipeline.execute()
 
     # Run validation if did_panel is in context
