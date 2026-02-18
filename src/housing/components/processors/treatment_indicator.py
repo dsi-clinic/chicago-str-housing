@@ -67,7 +67,7 @@ class TreatmentIndicatorProcessor(DataProcessor):
 
         # Create indicator variable
         merged["treated"] = (
-            merged["month"] >= merged["first_prohibition_date"]
+            merged["month"].dt.to_period("M") >= merged["first_prohibition_date"].dt.to_period("M")
         ).astype(int)
 
         treatment_counts = merged.groupby("treated")["tract_geoid"].nunique()
