@@ -25,10 +25,9 @@ from housing.components.processors.tract_panel import (
 from housing.components.processors.tract_prohibition_dates import (
     TractProhibitionDatesProcessor,
 )
-from housing.components.processors.treatment_indicator import (
-    TreatmentIndicatorProcessor,
+from housing.components.processors.treatment_threshold import (
+    TreatmentThresholdProcessor,
 )
-from housing.components.processors.treatment_threshold import TreatmentThresholdProcessor
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.did_trends import DIDTrendsVisualizer
 from housing.components.visualizers.event_study_plot import EventStudyVisualizer
