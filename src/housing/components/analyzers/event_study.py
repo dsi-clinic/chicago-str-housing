@@ -1,4 +1,7 @@
-"""DOCSTRING"""
+"""Implements an event-study (dynamic DiD) estimator using two-way fixed effects.
+
+Checks for parallel trends assumption
+"""
 
 import logging
 from typing import Any
@@ -13,18 +16,23 @@ logger = logging.getLogger(__name__)
 
 
 class EventStudyAnalyzer(Analyzer):
-    """DOCSTRING"""
+    """Run a two-way fixed-effects event study around treatment timing."""
 
-    def __init__(self) -> None:
-        """DOCSTRING"""
+    def __init__(self, panel: str | None = None) -> None:
+        """Initialize the analyzer with the panel key.
+
+        Args:
+            panel: Context key containing the panel DataFrame (default: "did_panel").
+        """
         super().__init__(
             "event_study_analyzer",
-            "DESCRIPTION",
+            "Estimate dynamic treatment effects via event-study specification.",
         )
+        self.panel = panel or "did_panel"
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """DOCSTRING"""
-        did_panel = context["did_panel"]
+        """Run the event-study regression on the provided panel data."""
+        did_panel = context[self.panel]
 
         # Define the event window (e.g., 12 months before/after)
         event_window = range(-12, 13)  # -12 to +12

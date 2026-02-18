@@ -1,4 +1,4 @@
-"""DOCSTRING."""
+"""Visualize event study data to check the parallel trends assumption."""
 
 import logging
 from pathlib import Path
