@@ -32,7 +32,7 @@ class EventStudyAnalyzer(Analyzer):
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Run the event-study regression on the provided panel data."""
-        did_panel = context[self.panel]
+        did_panel = context[self.panel].copy()
 
         # Define the event window (e.g., 12 months before/after)
         event_window = range(-12, 13)  # -12 to +12
