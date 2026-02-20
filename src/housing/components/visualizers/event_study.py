@@ -1,8 +1,9 @@
 """Event study plot for Difference-in-Differences.
 
 Produces the canonical event study figure: coefficient by months since treatment
-with 95% confidence intervals and reference period at zero. X-axis limited to
-12 months pre / 36 months post to match data availability for the largest cohorts.
+with 95% confidence intervals (Stata-style whiskers) and reference period at zero.
+X-axis limited to 12 months pre / 36 months post to match data availability
+for the largest cohorts.
 """
 
 import logging
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from housing.components.utils import setup_figure_and_save
@@ -52,14 +54,14 @@ class EventStudyVisualizer(Visualizer):
             logger.warning("event_study_results is empty. Skipping plot.")
             return {}
 
-        # Restrict to ±3 years for display (hide far lead/lag bins -999 and 999)
+        # Restrict to display window (hide far lead/lag bins -999 and 999)
         plot_min = -PLOT_PRE_MONTHS
         plot_max = PLOT_POST_MONTHS
         plot_df = event_df[
             (event_df["rel_time"] >= plot_min) & (event_df["rel_time"] <= plot_max)
         ].copy()
         if plot_df.empty:
-            logger.warning("No event study coefficients in ±%d months. Skipping plot.", PLOT_POST_MONTHS)
+            logger.warning("No event study coefficients in display window. Skipping plot.")
             return {}
 
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -69,36 +71,46 @@ class EventStudyVisualizer(Visualizer):
         ref_period = int(ref_row["rel_time"].iloc[0]) if len(ref_row) > 0 else -1
 
         # Pre-treatment and post-treatment shading
-        ax.axvspan(plot_min, ref_period - 0.5, alpha=0.08, color="blue", label="Pre-treatment")
-        ax.axvspan(ref_period + 0.5, plot_max, alpha=0.08, color="green", label="Post-treatment")
+        ax.axvspan(plot_min, ref_period - 0.5, alpha=0.06, color="blue")
+        ax.axvspan(ref_period + 0.5, plot_max, alpha=0.06, color="green")
 
-        # Coefficients and 95% CI
+        # Stata-style: point estimates with whisker error bars
+        yerr_low = plot_df["coef"] - plot_df["ci_low"]
+        yerr_high = plot_df["ci_high"] - plot_df["coef"]
+        ax.errorbar(
+            plot_df["rel_time"],
+            plot_df["coef"],
+            yerr=[yerr_low.values, yerr_high.values],
+            fmt="o",
+            color="navy",
+            markersize=4,
+            capsize=2,
+            capthick=0.8,
+            elinewidth=0.8,
+            linewidth=0,
+            label="Point estimate ± 95% CI",
+        )
+        # Connect dots with a thin line
         ax.plot(
             plot_df["rel_time"],
             plot_df["coef"],
-            color="black",
-            marker="o",
-            markersize=4,
-            linewidth=1.2,
-            label="Point estimate",
-        )
-        ax.fill_between(
-            plot_df["rel_time"],
-            plot_df["ci_low"],
-            plot_df["ci_high"],
-            alpha=0.3,
-            color="gray",
-            label="95% CI",
+            color="navy",
+            linewidth=0.7,
+            alpha=0.5,
         )
 
-        # Reference line at zero (reference period)
+        # Reference line at zero
         ax.axhline(0, color="red", linestyle="--", linewidth=1, alpha=0.8)
-        ax.axvline(ref_period, color="red", linestyle=":", linewidth=1, alpha=0.6)
+        ax.axvline(ref_period, color="gray", linestyle=":", linewidth=1, alpha=0.5)
 
         ax.set_xlabel("Months since STR prohibition", fontsize=12)
         ax.set_ylabel("Effect on rental price ($)", fontsize=12)
-        ax.set_title("Event Study: Effect of STR Prohibition on Tract-Level Rental Prices\n(12 months pre / 36 months post)", fontsize=13)
-        ax.legend(loc="best", fontsize=9)
+        ax.set_title(
+            "TWFE Event Study: Effect of STR Prohibition on Rental Prices\n"
+            "(12 months pre / 36 months post)",
+            fontsize=13,
+        )
+        ax.legend(loc="upper left", fontsize=9)
         ax.grid(True, alpha=0.3)
         ax.set_xlim(plot_min - 0.5, plot_max + 0.5)
 
