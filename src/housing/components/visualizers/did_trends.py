@@ -17,17 +17,30 @@ logger = logging.getLogger(__name__)
 class DIDTrendsVisualizer(Visualizer):
     """Visualize DiD data and check for the parallel trends assumption."""
 
-    def __init__(self, output_dir: str | None = None) -> None:
-        """Initialize the DiD trends visualizer."""
+    def __init__(
+        self,
+        output_dir: str | None = None,
+        panel: str | None = None,
+        output_suffix: str | None = None,
+    ) -> None:
+        """Initialize the DiD trends visualizer.
+
+        Args:
+        output_dir: directory to store outputs
+        panel: DiD panel dataset to load from context
+        output_suffix: extra string to add to end of output name
+        """
         super().__init__(
             "did_trends_visualizer",
             "Create DiD trend visualizations",
         )
         self.output_dir = output_dir or "/project/output"
+        self.panel = panel or "did_panel"
+        self.output_name = "did_trends_plots" + (output_suffix or "") + ".png"
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Create DiD trend visualizations."""
-        did_panel = context["did_panel"]
+        did_panel = context[self.panel]
 
         fig, ax = plt.subplots(2, 2, figsize=(16, 12))
 
@@ -89,7 +102,7 @@ class DIDTrendsVisualizer(Visualizer):
         ax[1, 0].legend()
 
         # Save plots
-        output_path = Path(self.output_dir) / "did_trends_plots.png"
+        output_path = Path(self.output_dir) / self.output_name
         setup_figure_and_save(
             fig,
             output_path,

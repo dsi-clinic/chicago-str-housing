@@ -20,17 +20,33 @@ logger = logging.getLogger(__name__)
 class DIDDescriptiveAnalyzer(Analyzer):
     """Analyze DiD data prior to conducting experiment and check for the parallel trends assumption."""
 
-    def __init__(self, output_dir: str | None = None) -> None:
-        """Initialize the DiD descriptive analyzer."""
+    def __init__(
+        self,
+        output_dir: str | None = None,
+        panel: str | None = None,
+        output_suffix: str | None = None,
+    ) -> None:
+        """Initialize the DiD descriptive analyzer.
+
+        Args:
+        output_dir: directory to store outputs
+        panel: DiD panel data to fetch from context
+        output_suffix: extra string to add to end of output file names
+        """
         super().__init__(
             "did_descriptive_analyzer",
             "Analyze DiD dataset before experiment",
         )
         self.output_dir = output_dir or "/project/output"
+        self.panel = panel or "did_panel"
+        self.summary_name = (
+            "did_descriptive_summary_stats" + (output_suffix or "") + ".csv"
+        )
+        self.t_test_name = "pre_treatment_balance_test" + (output_suffix or "") + ".csv"
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Analyze DiD Descriptive Trends Before Conducting Experiment."""
-        did_panel = context["did_panel"]
+        did_panel = context[self.panel]
 
         # Identify ever-treated vs never-treated tracts
         ever_treated = did_panel.groupby("tract_geoid")["treated"].max()
@@ -117,12 +133,10 @@ class DIDDescriptiveAnalyzer(Analyzer):
         ]
         summary.index = ["Never Treated", "Eventually Treated"]
 
-        t_test_output_path = Path(self.output_dir) / "pre_treatment_balance_test.csv"
+        t_test_output_path = Path(self.output_dir) / self.t_test_name
         t_test_results_df.to_csv(t_test_output_path, index=False)
 
-        summary_output_path = (
-            Path(self.output_dir) / "did_descriptive_summary_stats.csv"
-        )
+        summary_output_path = Path(self.output_dir) / self.summary_name
         summary.to_csv(summary_output_path)
 
         return {

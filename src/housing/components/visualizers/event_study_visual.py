@@ -17,13 +17,16 @@ logger = logging.getLogger(__name__)
 class EventStudyVisualizer(Visualizer):
     """Visualize event study data to check the parallel trends assumption."""
 
-    def __init__(self, output_dir: str | None = None) -> None:
+    def __init__(
+        self, output_dir: str | None = None, output_suffix: str | None = None
+    ) -> None:
         """Initialize the event study visualizer."""
         super().__init__(
             "event_study_visualizer",
             "Create parallel trends event study visualization",
         )
         self.output_dir = output_dir or "/project/output"
+        self.output_name = "event_study_plot" + (output_suffix or "") + ".png"
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Create event study visualization to evaluate parallel trends assumption."""
@@ -53,7 +56,7 @@ class EventStudyVisualizer(Visualizer):
         ax.legend()
 
         # Save plot
-        output_path = Path(self.output_dir) / "event_study_plot.png"
+        output_path = Path(self.output_dir) / self.output_name
         setup_figure_and_save(
             fig,
             output_path,
