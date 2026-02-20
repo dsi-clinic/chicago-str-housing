@@ -1,10 +1,13 @@
-"""Difference-in-Differences Time-Series Analysis Pipeline.
+"""Difference-in-Differences Time-Series Analysis Pipeline with Trend Matching.
 
 This script demonstrates the DiD analysis workflow:
 1. Loading time-series rental data from csv file
 2. Spatial join to convert zip code data to Census tract level
 3. Build DiD panel dataset with treatment variables
-4. Analyze and visualize DiD data before experiment
+4. Conduct trend-matching to filter panel data
+5. Analyze and visualize DiD data before experiment
+6. Conduct DiD experiment and get treatment variable
+7. Conduct event study to check parallel trends assumption
 """
 
 import logging
@@ -35,6 +38,7 @@ from pipeline import Pipeline, PipelineResult
 logger = logging.getLogger(__name__)
 
 ZORI_FILE_PATH = "/project/data/Zip_zori_uc_sfrcondomfr_sm_sa_month.csv"
+MATCHED_FOLDER = "/project/output/matched"
 
 
 def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
@@ -62,18 +66,38 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(TreatmentIndicatorProcessor())
 
     # Conduct trend-matching filter
-    pipeline.register_component(TrendMatchingProcessor())
+    pipeline.register_component(TrendMatchingProcessor(k_neighbors=2))
 
     # Conduct pre-experiment analysis
-    pipeline.register_component(DIDDescriptiveAnalyzer(panel="did_panel_matched"))
-    pipeline.register_component(DIDTrendsVisualizer(panel="did_panel_matched"))
+    pipeline.register_component(
+        DIDDescriptiveAnalyzer(
+            panel="did_panel_matched",
+            output_dir=MATCHED_FOLDER,
+            output_suffix="_matched",
+        )
+    )
+    pipeline.register_component(
+        DIDTrendsVisualizer(
+            panel="did_panel_matched",
+            output_dir=MATCHED_FOLDER,
+            output_suffix="_matched",
+        )
+    )
 
     # Conduct DiD experiment
-    pipeline.register_component(DIDAnalyzer(panel="did_panel_matched"))
+    pipeline.register_component(
+        DIDAnalyzer(
+            panel="did_panel_matched",
+            output_dir=MATCHED_FOLDER,
+            output_suffix="_matched",
+        )
+    )
 
     # Conduct parallel trends event study
     pipeline.register_component(EventStudyAnalyzer(panel="did_panel_matched"))
-    pipeline.register_component(EventStudyVisualizer())
+    pipeline.register_component(
+        EventStudyVisualizer(output_dir=MATCHED_FOLDER, output_suffix="_matched")
+    )
 
     results = pipeline.execute()
 
