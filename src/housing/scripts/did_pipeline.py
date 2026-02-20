@@ -5,6 +5,8 @@ This script demonstrates the DiD analysis workflow:
 2. Spatial join to convert zip code data to Census tract level
 3. Build DiD panel dataset with treatment variables
 4. Analyze and visualize DiD data before experiment
+5. Run DiD experiment and get treatment variable
+6. Conduct event study to check parallel trends assumption
 """
 
 import logging
