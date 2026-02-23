@@ -28,8 +28,10 @@ class EventStudyAnalyzer(Analyzer):
     - returns the event study results
     """
 
-    def __init__(self) -> None:
+    def __init__(self, output_dir: str | None = None, filename_suffix: str | None = None) -> None:
         """Initialize the event study analyzer."""
+        self.output_dir = output_dir or "/project/output"
+        self.filename_suffix = filename_suffix or ""
         super().__init__(
             "event_study_analysis",
             "Estimate the event study model",
@@ -103,9 +105,11 @@ class EventStudyAnalyzer(Analyzer):
         ]
         n_significant = sum(p < alpha for p in pre_pvals)
 
-        output_dir = Path("/project/output")
+        output_dir = Path(self.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        report_path = output_dir / "event_study_analysis.txt"
+        base = "event_study_analysis"
+        name = f"{base}{self.filename_suffix}.txt" if self.filename_suffix else f"{base}.txt"
+        report_path = output_dir / name
 
         with Path(report_path).open("w") as f:
             f.write("Event Study Analysis\n")

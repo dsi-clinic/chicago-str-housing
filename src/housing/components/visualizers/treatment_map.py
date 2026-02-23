@@ -26,18 +26,19 @@ class TreatmentMapVisualizer(Visualizer):
     Shows treatment data as geographic maps at census tract level.
     """
 
-    def __init__(self, output_dir: str | None = None) -> None:
+    def __init__(self, output_dir: str | None = None, filename_suffix: str | None = None) -> None:
         """Initialize the treatment map visualizer.
 
         Args:
             output_dir: Optional output directory for visualizations
+            filename_suffix: Optional suffix for the filename
         """
         super().__init__(
             "treatment_map_visualization",
             "Create choropleth maps for treatment distributions",
         )
         self.output_dir = output_dir or "/project/output"
-
+        self.filename_suffix = filename_suffix
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Create treatment map visualizations."""
         logger.info("Creating treatment map visualizations...")
@@ -176,7 +177,9 @@ class TreatmentMapVisualizer(Visualizer):
         )
 
         # Save the plot
-        output_path = Path(self.output_dir) / "treatment_maps.png"
+        base = "treatment_maps"
+        name = f"{base}{self.filename_suffix}.png" if self.filename_suffix else f"{base}.png"
+        output_path = Path(self.output_dir) / name
         setup_figure_and_save(
             fig,
             output_path,

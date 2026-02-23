@@ -21,8 +21,10 @@ class DIDDescriptiveAnalyzer(Analyzer):
     It returns count of treated vs. never treated tracts, average rental prices by group and month, pre-treatment balance statistics, and summary statistics for the DID panel data.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, output_dir: str | None = None, filename_suffix: str | None = None) -> None:
         """Initialize the DID descriptive analyzer."""
+        self.output_dir = output_dir or "/project/output"
+        self.filename_suffix = filename_suffix or ""
         super().__init__(
             "did_descriptive_analysis",
             "Analyze correlations in census tract rental data",
@@ -116,9 +118,11 @@ class DIDDescriptiveAnalyzer(Analyzer):
         summary.index = ["Never Treated", "Eventually Treated"]
         logger.info("Calculated summary statistics")
 
-        output_dir = Path("/project/output")
+        output_dir = Path(self.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        report_path = output_dir / "did_descriptive_analysis.txt"
+        base = "did_descriptive_analysis"
+        name = f"{base}{self.filename_suffix}.txt" if self.filename_suffix else f"{base}.txt"
+        report_path = output_dir / name
 
         with Path(report_path).open("w") as f:
             f.write("DID Descriptive Analysis\n")

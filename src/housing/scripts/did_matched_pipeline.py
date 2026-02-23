@@ -29,6 +29,7 @@ from housing.components.processors.tract_prohibition_dates import (
 from housing.components.processors.treatment_threshold import (
     TreatmentThresholdProcessor,
 )
+from housing.components.processors.trend_matching import TrendMatchingProcessor
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.did_trends import DIDTrendsVisualizer
 from housing.components.visualizers.event_study_plot import EventStudyVisualizer
@@ -76,19 +77,23 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     )
 
     # Step 3.5: STR Prohibition Dates → Tract aggregation
-    # pipeline.register_component(TractProhibitionDatesProcessor())
+    pipeline.register_component(TractProhibitionDatesProcessor())
     pipeline.register_component(TreatmentIndicatorProcessor())
-    pipeline.register_component(TreatmentThresholdProcessor())
+    # pipeline.register_component(TreatmentThresholdProcessor())
+    
+    MATCHED_OUTPUT_DIR = "/project/output/matched_outputs"
+    
+    pipeline.register_component(TrendMatchingProcessor(output_dir=MATCHED_OUTPUT_DIR))
 
     # Step 4: DID Analysis
-    pipeline.register_component(DIDDescriptiveAnalyzer())
-    pipeline.register_component(DIDAnalyzer())
-    pipeline.register_component(EventStudyAnalyzer())
+    pipeline.register_component(DIDDescriptiveAnalyzer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"))
+    pipeline.register_component(DIDAnalyzer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"))
+    pipeline.register_component(EventStudyAnalyzer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"))
 
     # Step 5: Visualizations
-    pipeline.register_component(DIDTrendsVisualizer())
-    pipeline.register_component(TreatmentMapVisualizer())
-    pipeline.register_component(EventStudyVisualizer())
+    pipeline.register_component(DIDTrendsVisualizer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"))
+    pipeline.register_component(TreatmentMapVisualizer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"))
+    pipeline.register_component(EventStudyVisualizer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"))
 
     results = pipeline.execute()
 

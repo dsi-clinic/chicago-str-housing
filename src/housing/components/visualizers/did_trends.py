@@ -20,17 +20,19 @@ class DIDTrendsVisualizer(Visualizer):
     Shows adoption curve, parallel trends plot, and pre-treatment balance comparison visualizations.
     """
 
-    def __init__(self, output_dir: str | None = None) -> None:
+    def __init__(self, output_dir: str | None = None, filename_suffix: str | None = None) -> None:
         """Initialize the DID trends visualizer.
 
         Args:
             output_dir: Optional output directory for visualizations
+            filename_suffix: Optional suffix for the filename
         """
         super().__init__(
             "did_trends_visualizations",
             "Create visualizations for DID trends",
         )
         self.output_dir = output_dir or "/project/output"
+        self.filename_suffix = filename_suffix
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Create visualizations for DID trends."""
@@ -88,7 +90,9 @@ class DIDTrendsVisualizer(Visualizer):
         plt.tight_layout()
 
         # Save the plot
-        output_path = Path(self.output_dir) / "did_trends_visualizations.png"
+        base = "did_trends_visualizations"
+        name = f"{base}{self.filename_suffix}.png" if self.filename_suffix else f"{base}.png"
+        output_path = Path(self.output_dir) / name
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
         logger.info("Saved visualization to: %s", output_path)
 

@@ -26,8 +26,10 @@ class DIDAnalyzer(Analyzer):
     It returns the coefficient, SE, p-value, CI of the treatment effect.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, output_dir: str | None = None, filename_suffix: str | None = None) -> None:
         """Initialize the DID analyzer."""
+        self.output_dir = output_dir or "/project/output"
+        self.filename_suffix = filename_suffix or ""
         super().__init__(
             "did_analysis",
             "Analyze difference-in-differences analysis on the panel data",
@@ -51,9 +53,11 @@ class DIDAnalyzer(Analyzer):
         results = model.fit(cov_type="clustered", cluster_entity=True)
         logger.info("Created and fit panel OLS model")
 
-        output_dir = Path("/project/output")
+        output_dir = Path(self.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        report_path = output_dir / "did_analysis.txt"
+        base = "did_analysis"
+        name = f"{base}{self.filename_suffix}.txt" if self.filename_suffix else f"{base}.txt"
+        report_path = output_dir / name
 
         with Path(report_path).open("w") as f:
             f.write("DID Analysis\n")
