@@ -11,7 +11,6 @@ from housing.components.analyzers.did_descriptive_analyzer import DIDDescriptive
 from housing.components.analyzers.event_study_analysis import EventStudyAnalyzer
 from housing.components.loaders.census_data import CensusDataLoader
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
-from housing.components.processors.treatment_indicator import TreatmentIndicatorProcessor
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental_data import (
@@ -23,8 +22,8 @@ from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.processors.tract_panel import (
     TimeSeriesZipToTractProcessor,
 )
-from housing.components.processors.tract_prohibition_dates import (
-    TractProhibitionDatesProcessor,
+from housing.components.processors.treatment_indicator import (
+    TreatmentIndicatorProcessor,
 )
 from housing.components.processors.treatment_threshold import (
     TreatmentThresholdProcessor,

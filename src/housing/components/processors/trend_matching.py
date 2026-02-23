@@ -1,26 +1,32 @@
 """Aggregates zip codes to tract for time series rental data"""
 
 import logging
-from typing import Any
 from pathlib import Path
+from typing import Any
+
+import pandas as pd
+from scipy.stats import linregress
+from sklearn.neighbors import NearestNeighbors
 
 from pipeline.base import DataProcessor
-from scipy.stats import linregress
-import pandas as pd
-from sklearn.neighbors import NearestNeighbors
 
 logger = logging.getLogger(__name__)
 
 
 class TrendMatchingProcessor(DataProcessor):
     """Processor for time series rental data, zip codes to tracts aggregation.
-    
+
     Args:
         k_neighbors: The number of neighbors to use for the nearest neighbors model.
         min_pre_periods: The minimum number of pre-treatment periods to use for the trend matching.
     """
 
-    def __init__(self, output_dir: str | None = None, k_neighbors: int = 3, min_pre_periods: int = 6) -> None:
+    def __init__(
+        self,
+        output_dir: str | None = None,
+        k_neighbors: int = 3,
+        min_pre_periods: int = 6,
+    ) -> None:
         """Initialize the zip to tract processor."""
         super().__init__(
             "trend_matching_data",
@@ -36,10 +42,12 @@ class TrendMatchingProcessor(DataProcessor):
         did_panel = context["did_panel_data"]
 
         first_treatment = (
-            did_panel[["tract_geoid", "first_prohibition_date"]].drop_duplicates().set_index("tract_geoid")["first_prohibition_date"]
+            did_panel[["tract_geoid", "first_prohibition_date"]]
+            .drop_duplicates()
+            .set_index("tract_geoid")["first_prohibition_date"]
         )
         panel_min_month = did_panel["month"].min()
-        
+
         # Step 1: Calculate pre-treatment trends
         rows = []
         for tract_geoid, group in did_panel.groupby("tract_geoid"):
@@ -47,10 +55,20 @@ class TrendMatchingProcessor(DataProcessor):
             pre = group[group["month"] < ft] if pd.notna(ft) else group
             if len(pre) < self.min_pre_periods:
                 continue
-            months_numeric = (pre["month"] - panel_min_month).dt.total_seconds() / (30 * 24 * 3600)
+            months_numeric = (pre["month"] - panel_min_month).dt.total_seconds() / (
+                30 * 24 * 3600
+            )
             slope, _, _, _, _ = linregress(months_numeric, pre["rental_price"])
-            ever_treated = (group["treated"].max() > 0) if "treated" in group.columns else False
-            rows.append({"tract_geoid": tract_geoid, "pre_trend_slope": slope, "ever_treated": ever_treated})
+            ever_treated = (
+                (group["treated"].max() > 0) if "treated" in group.columns else False
+            )
+            rows.append(
+                {
+                    "tract_geoid": tract_geoid,
+                    "pre_trend_slope": slope,
+                    "ever_treated": ever_treated,
+                }
+            )
 
         trends = pd.DataFrame(rows)
         if len(trends) == 0:
@@ -78,15 +96,19 @@ class TrendMatchingProcessor(DataProcessor):
             for j in range(k):
                 ctrl_idx = indices[0][j]
                 ctrl_tract = control_trends.iloc[ctrl_idx]["tract_geoid"]
-                matching_rows.append({
-                    "treated_tract": row["tract_geoid"],
-                    "control_tract": ctrl_tract,
-                    "distance": distances[0][j],
-                })
+                matching_rows.append(
+                    {
+                        "treated_tract": row["tract_geoid"],
+                        "control_tract": ctrl_tract,
+                        "distance": distances[0][j],
+                    }
+                )
         matching = pd.DataFrame(matching_rows)
 
         # Step 3: Create matched sample
-        matched_tracts = pd.concat([matching["treated_tract"], matching["control_tract"]]).unique()
+        matched_tracts = pd.concat(
+            [matching["treated_tract"], matching["control_tract"]]
+        ).unique()
         matched_panel = did_panel[did_panel["tract_geoid"].isin(matched_tracts)].copy()
 
         output_dir = Path(self.output_dir)

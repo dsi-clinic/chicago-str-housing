@@ -11,7 +11,6 @@ from housing.components.analyzers.did_descriptive_analyzer import DIDDescriptive
 from housing.components.analyzers.event_study_analysis import EventStudyAnalyzer
 from housing.components.loaders.census_data import CensusDataLoader
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
-from housing.components.processors.treatment_indicator import TreatmentIndicatorProcessor
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental_data import (
@@ -26,8 +25,8 @@ from housing.components.processors.tract_panel import (
 from housing.components.processors.tract_prohibition_dates import (
     TractProhibitionDatesProcessor,
 )
-from housing.components.processors.treatment_threshold import (
-    TreatmentThresholdProcessor,
+from housing.components.processors.treatment_indicator import (
+    TreatmentIndicatorProcessor,
 )
 from housing.components.processors.trend_matching import TrendMatchingProcessor
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
@@ -80,20 +79,36 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(TractProhibitionDatesProcessor())
     pipeline.register_component(TreatmentIndicatorProcessor())
     # pipeline.register_component(TreatmentThresholdProcessor())
-    
+
     MATCHED_OUTPUT_DIR = "/project/output/matched_outputs"
-    
+
     pipeline.register_component(TrendMatchingProcessor(output_dir=MATCHED_OUTPUT_DIR))
 
     # Step 4: DID Analysis
-    pipeline.register_component(DIDDescriptiveAnalyzer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"))
-    pipeline.register_component(DIDAnalyzer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"))
-    pipeline.register_component(EventStudyAnalyzer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"))
+    pipeline.register_component(
+        DIDDescriptiveAnalyzer(
+            output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"
+        )
+    )
+    pipeline.register_component(
+        DIDAnalyzer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched")
+    )
+    pipeline.register_component(
+        EventStudyAnalyzer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched")
+    )
 
     # Step 5: Visualizations
-    pipeline.register_component(DIDTrendsVisualizer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"))
-    pipeline.register_component(TreatmentMapVisualizer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"))
-    pipeline.register_component(EventStudyVisualizer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"))
+    pipeline.register_component(
+        DIDTrendsVisualizer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched")
+    )
+    pipeline.register_component(
+        TreatmentMapVisualizer(
+            output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched"
+        )
+    )
+    pipeline.register_component(
+        EventStudyVisualizer(output_dir=MATCHED_OUTPUT_DIR, filename_suffix="_matched")
+    )
 
     results = pipeline.execute()
 
