@@ -162,4 +162,3 @@ class EventStudyAnalyzer(Analyzer):
             },
             "event_study_coef_df": coef_df,
         }
-

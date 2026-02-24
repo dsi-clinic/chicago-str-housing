@@ -15,12 +15,13 @@ logger = logging.getLogger(__name__)
 class EventStudyVisualizer(Visualizer):
     """Create an event-study coefficient plot from pre-computed coef_df."""
 
-    def __init__(self, output_dir: str | None = None) -> None:
+    def __init__(self, output_dir: str | None = None, file_suffix: str = "") -> None:
         super().__init__(
             "event_study_visualizer",
             "Visualize dynamic DiD effects from event-study coefficients",
         )
         self.output_dir = output_dir or "output"
+        self.file_suffix = file_suffix
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Create event-study plot using coef_df from EventStudyAnalyzer.
@@ -36,12 +37,15 @@ class EventStudyVisualizer(Visualizer):
 
         self._create_event_study_plot(coef_df, output_path)
 
-        plot_path = output_path / "event_study_effects.png"
+        filename = f"event_study_effects{self.file_suffix}.png"
+        plot_path = output_path / filename
         logger.info("Event study plot saved to %s", plot_path)
 
         return {"event_study_plot_path": str(plot_path)}
 
-    def _create_event_study_plot(self, coef_df: pd.DataFrame, output_path: Path) -> None:
+    def _create_event_study_plot(
+        self, coef_df: pd.DataFrame, output_path: Path
+    ) -> None:
         """Create event-study plot."""
         fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -75,6 +79,6 @@ class EventStudyVisualizer(Visualizer):
         ax.grid(True, alpha=0.3)
 
         plt.tight_layout()
-        fig.savefig(output_path / "event_study_effects.png", dpi=300, bbox_inches="tight")
+        filename = f"event_study_effects{self.file_suffix}.png"
+        fig.savefig(output_path / filename, dpi=300, bbox_inches="tight")
         plt.close(fig)
-
