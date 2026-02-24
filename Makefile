@@ -18,7 +18,7 @@ project_dir := "$(current_abs_path)"
 # Optional data directory mount (if DATA_DIR is set)
 mount_data := $(if $(DATA_DIR),-v $(DATA_DIR):/project/data,)
 
-.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis    
+.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline-cs    
 
 help: ## Show the help message
 	@echo "Available commands:"
@@ -33,6 +33,7 @@ help: ## Show the help message
 	@echo "  run-eda-pipeline         Run the housing EDA pipeline"
 	@echo "  run-clustering-pipeline  Prepare data for clustering"
 	@echo "  run-clustering-analysis  Run clustering data exploration (ARGS=\"--scatter-matrix\" to include scatter matrix)"
+	@echo "  run-did-pipeline-cs      Run DiD analysis with Callaway-Sant'Anna (2020) robust estimator"
 	@echo ""
 	@echo "Optional environment variables (.env file):"
 	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
@@ -69,3 +70,6 @@ run-clustering-analysis: build-only ## Run clustering data exploration
 
 run-did-pipeline: build-only ## Run the DiD (Difference-in-Differences) pipeline
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline.py
+
+run-did-pipeline-cs: build-only ## Run DiD analysis with Callaway-Sant'Anna (2020) robust estimator
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna.py
