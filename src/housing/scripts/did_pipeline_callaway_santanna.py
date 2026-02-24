@@ -50,11 +50,11 @@ from housing.components.loaders.str_prohibition_data import STRProhibitionDataLo
 from housing.components.loaders.time_series_rental_data import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
-from housing.components.processors.tract_prohibition_dates import (
-    TractProhibitionDatesProcessor,
-)
 from housing.components.processors.time_series_zip_to_tract import (
     TimeSeriesZipToTractProcessor,
+)
+from housing.components.processors.tract_prohibition_dates import (
+    TractProhibitionDatesProcessor,
 )
 from housing.components.processors.treatment_indicator import (
     TreatmentIndicatorProcessor,
@@ -70,11 +70,19 @@ from pipeline import Pipeline
 
 logger = logging.getLogger(__name__)
 
+# Constants for reporting / checks
+_ALPHA_005 = 0.05
+_ERRNO_RESOURCE_UNAVAILABLE = (
+    35  # EAGAIN on macOS/Linux when file on cloud-synced folder
+)
+_LARGE_CS_TWFE_DIFF_DOLLARS = 10.0
+
 # Paths
 DATA_ROOT = Path(os.environ.get("DATA_DIR", "/project/data"))
 TRACT_SHP = DATA_ROOT / "tl_2023_17_tract" / "tl_2023_17_tract.shp"
 ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
 DID_CS_OUTPUT_DIR = "/project/output/did-cs"
+
 
 def _preflight_check() -> None:
     """Verify required data files exist and are readable."""
@@ -97,7 +105,7 @@ def _preflight_check() -> None:
         with ZORI_CSV.open("rb") as f:
             f.read(1)
     except OSError as e:
-        if e.errno == 35:
+        if e.errno == _ERRNO_RESOURCE_UNAVAILABLE:
             raise RuntimeError(
                 "Could not read data file (Errno 35). "
                 "This often happens when the project is on a cloud-synced folder.\n"
@@ -118,11 +126,13 @@ def _get_twfe_event_df(results: dict) -> pd.DataFrame | None:
     coef_df = results.get("event_study_coefficients")
     if coef_df is None or coef_df.empty:
         return None
-    df = coef_df.rename(columns={
-        "relative_time": "rel_time",
-        "coefficient": "coef",
-    })[["rel_time", "coef"]].copy()
-    return df[df["rel_time"] != -1].reset_index(drop=True)
+    twfe_coef = coef_df.rename(
+        columns={
+            "relative_time": "rel_time",
+            "coefficient": "coef",
+        }
+    )[["rel_time", "coef"]].copy()
+    return twfe_coef[twfe_coef["rel_time"] != -1].reset_index(drop=True)
 
 
 def run_did_analysis_with_cs() -> tuple:
@@ -153,7 +163,9 @@ def run_did_analysis_with_cs() -> tuple:
         )
     )
     pipeline.register_component(
-        TreatmentIndicatorProcessor(output_path=f"{DID_CS_OUTPUT_DIR}/did_panel_data.csv")
+        TreatmentIndicatorProcessor(
+            output_path=f"{DID_CS_OUTPUT_DIR}/did_panel_data.csv"
+        )
     )
 
     # 3. Trend matching (restrict panel to matched treated + control tracts)
@@ -186,8 +198,12 @@ def run_did_analysis_with_cs() -> tuple:
             min_cohort_size=5,
         )
     )
-    pipeline.register_component(CallawaySantAnnaVisualizer(output_dir=DID_CS_OUTPUT_DIR))
-    pipeline.register_component(CallawaySantAnnaComparisonVisualizer(output_dir=DID_CS_OUTPUT_DIR))
+    pipeline.register_component(
+        CallawaySantAnnaVisualizer(output_dir=DID_CS_OUTPUT_DIR)
+    )
+    pipeline.register_component(
+        CallawaySantAnnaComparisonVisualizer(output_dir=DID_CS_OUTPUT_DIR)
+    )
 
     # Set execution order
     pipeline.set_execution_order(
@@ -245,14 +261,18 @@ def _print_summary(results: dict) -> None:
         logger.info("  Standard Error: $%.2f", se)
         logger.info("  95%% CI: [$%.2f, $%.2f]", ci_low, ci_high)
         logger.info("  P-value: %.4f", p_val)
-        logger.info("  Significant: %s", "Yes" if p_val < 0.05 else "No")
+        logger.info("  Significant: %s", "Yes" if p_val < _ALPHA_005 else "No")
 
     # Trend matching info
     matching_info = results.get("matching_info")
     if matching_info is not None and not matching_info.empty:
         logger.info("\nTrend Matching:")
-        logger.info("  Matched treated tracts: %d", matching_info["treated_tract"].nunique())
-        logger.info("  Matched control tracts: %d", matching_info["control_tract"].nunique())
+        logger.info(
+            "  Matched treated tracts: %d", matching_info["treated_tract"].nunique()
+        )
+        logger.info(
+            "  Matched control tracts: %d", matching_info["control_tract"].nunique()
+        )
         logger.info("  Average slope distance: %.4f", matching_info["distance"].mean())
 
     # Cohort information
@@ -279,13 +299,15 @@ def _print_summary(results: dict) -> None:
 
             logger.info("\nTWFE vs. CS Comparison (Post-Treatment):")
             logger.info("  Average difference (CS - TWFE): $%.2f", avg_diff)
-            if abs(avg_diff) > 10:
+            if abs(avg_diff) > _LARGE_CS_TWFE_DIFF_DOLLARS:
                 logger.warning(
                     "  Large difference detected! This suggests significant "
                     "heterogeneity bias in TWFE estimates."
                 )
             else:
-                logger.info("  Estimates are similar, suggesting TWFE is approximately unbiased.")
+                logger.info(
+                    "  Estimates are similar, suggesting TWFE is approximately unbiased."
+                )
 
     logger.info("\n=== OUTPUT FILES ===\n")
     logger.info("Check %s/ for:", DID_CS_OUTPUT_DIR)
