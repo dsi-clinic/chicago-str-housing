@@ -8,7 +8,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-import geopandas as gpd
 import pandas as pd
 import plotly.express as px
 
@@ -16,6 +15,7 @@ from housing.components.utils import prepare_map_panel_data
 from pipeline.base import Visualizer
 
 logger = logging.getLogger(__name__)
+
 
 class RentalTimeSeriesMapVisualizer(Visualizer):
     """Create choropleth maps for rental prices.
@@ -49,77 +49,66 @@ class RentalTimeSeriesMapVisualizer(Visualizer):
             return {}
 
         if panel_data is not None and tract_boundaries is not None:
+            map_data = prepare_map_panel_data(
+                panel_data,
+                tract_boundaries,
+                ["month", "rental_price"],
+                city_boundaries,
+                simplify=True,
+            )
 
-            map_data = prepare_map_panel_data(panel_data, tract_boundaries,
-                                              ["month", "rental_price"],
-                                              city_boundaries, simplify=True)
-           
             # Make discrete quantiles for each date (include quantile order for mapping)
             k = 4
 
-
-            def quantile_labels(s, k):
+            def quantile_labels(s: pd.Series, k: int) -> pd.DataFrame:
                 # ranks handle ties safely
                 r = s.rank(method="first")
 
                 cats, bins = pd.qcut(
-                    r,
-                    q=k,
-                    labels=False,
-                    retbins=True,
-                    duplicates="drop"
+                    r, q=k, labels=False, retbins=True, duplicates="drop"
                 )
 
                 # compute true bounds using original values
-                bounds = (
-                    s.groupby(cats)
-                    .agg(["min", "max"])
-                    .sort_index()
-                )
+                bounds = s.groupby(cats).agg(["min", "max"]).sort_index()
 
                 label_map = {}
                 for i, (lo, hi) in bounds.iterrows():
                     label_map[i] = f"${lo:,.0f} - ${hi:,.0f}"
 
-                return pd.DataFrame({
-                    "q_idx": cats.astype(int) + 1,   # 1..k
-                    "q_label": cats.map(label_map)
-                })
+                return pd.DataFrame(
+                    {
+                        "q_idx": cats.astype(int) + 1,  # 1..k
+                        "q_label": cats.map(label_map),
+                    }
+                )
 
-            labels = (
-                map_data.groupby("month", group_keys=False)["rental_price"]
-                .apply(lambda s: quantile_labels(s, k))
+            labels = map_data.groupby("month", group_keys=False)["rental_price"].apply(
+                lambda s: quantile_labels(s, k)
             )
 
             map_data = map_data.join(labels)
             logger.info("Added quantile labels to map data")
 
-            #format data for a nice slider tool
-            #sort old -> recent
+            # format data for a nice slider tool
+            # sort old -> recent
             map_data = map_data.sort_values("month")
-            #create slider labels
+            # create slider labels
             map_data["month_str"] = map_data["month"].dt.strftime("%Y-%m")
 
-            #ensure correct quantile sorting in plotly
-            label_order = (
-                map_data
-                .sort_values("q_idx")["q_label"]
-                .tolist()
-            )
+            # ensure correct quantile sorting in plotly
+            label_order = map_data.sort_values("q_idx")["q_label"].tolist()
 
-            #ensure a standard color map across dates
+            # ensure a standard color map across dates
             palette = px.colors.sequential.RdPu
             idx = [int(0.8 * i * (len(palette) - 1) / (k - 1)) for i in range(k)]
             quantile_colors = [palette[i] for i in idx]
 
             quantile_color_map = {
-                f"Q{i}": quantile_colors[i - 1]
-                for i in range(1, k + 1)
+                f"Q{i}": quantile_colors[i - 1] for i in range(1, k + 1)
             }
 
             quantile_map = (
-                map_data
-                .drop_duplicates(subset="q_label")
+                map_data.drop_duplicates(subset="q_label")
                 .set_index("q_label")["q_idx"]
                 .to_dict()
             )
@@ -129,21 +118,23 @@ class RentalTimeSeriesMapVisualizer(Visualizer):
                 for q_label in map_data["q_label"].unique()
             }
 
-            #convert geometries to geojson for plotly
+            # convert geometries to geojson for plotly
             geojson = map_data.__geo_interface__
 
-            #orient plotly map area
-            center = {"lat": float(tract_boundaries.centroid.y.mean()),
-                      "lon": float(tract_boundaries.centroid.x.mean())}
+            # orient plotly map area
+            center = {
+                "lat": float(tract_boundaries.centroid.y.mean()),
+                "lon": float(tract_boundaries.centroid.x.mean()),
+            }
 
-            #create choropleth
+            # create choropleth
 
             fig = px.choropleth_mapbox(
                 map_data,
                 geojson=geojson,
                 locations="tract_geoid",
                 featureidkey="properties.tract_geoid",
-                color="q_label",                         # DISPLAY labels
+                color="q_label",  # DISPLAY labels
                 animation_frame="month_str",
                 category_orders={"q_label": label_order},
                 color_discrete_map=color_map,
@@ -153,9 +144,7 @@ class RentalTimeSeriesMapVisualizer(Visualizer):
                 opacity=0.75,
             )
 
-            fig.update_layout(
-                legend_title_text="Monthly rental quantiles"
-            )
+            fig.update_layout(legend_title_text="Monthly rental quantiles")
 
             logger.info("Created figure")
 
@@ -163,8 +152,8 @@ class RentalTimeSeriesMapVisualizer(Visualizer):
         output_path = Path(self.output_dir) / "rental_price_time_series_map.html"
         fig.write_html(
             output_path,
-            include_plotlyjs="cdn",   # or True for offline
-            full_html=True
+            include_plotlyjs="cdn",  # or True for offline
+            full_html=True,
         )
 
         return {"rental_time_series_map_plot": str(output_path)}

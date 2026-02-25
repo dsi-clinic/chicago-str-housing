@@ -8,7 +8,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-import geopandas as gpd
 import plotly.express as px
 
 from housing.components.utils import prepare_map_panel_data
@@ -45,37 +44,42 @@ class TreatmentTimeSeriesMapVisualizer(Visualizer):
             return {}
 
         if panel_data is not None and tract_boundaries is not None:
+            map_data = prepare_map_panel_data(
+                panel_data, tract_boundaries, ["month", "treated"], city_boundaries
+            )
 
-            map_data = prepare_map_panel_data(panel_data, tract_boundaries,
-                                              ["month", "treated"],
-                                              city_boundaries)
-
-            #find the earliest treatment date to make plotly run smoothly
+            # find the earliest treatment date to make plotly run smoothly
             first_treat = map_data.loc[map_data["treated"] == 1]["month"].min()
 
-            #resample to quarterly data to make plotly run smoothly
-            map_data = map_data.loc[((map_data["month"].dt.month % 3 == 0) & (map_data["month"] >= first_treat))]
+            # resample to quarterly data to make plotly run smoothly
+            map_data = map_data.loc[
+                (
+                    (map_data["month"].dt.month % 3 == 0)
+                    & (map_data["month"] >= first_treat)
+                )
+            ]
 
-            #format data for a nice slider tool
-            #sort old -> recent
+            # format data for a nice slider tool
+            # sort old -> recent
             map_data = map_data.sort_values("month")
-            #create slider labels
+            # create slider labels
             map_data["month_str"] = map_data["month"].dt.strftime("%Y-%m")
 
-            #convert treatment indicator to interpretable strings
-            map_data["treated_str"] = map_data["treated"].map({0: "control", 1: "treatment"})
+            # convert treatment indicator to interpretable strings
+            map_data["treated_str"] = map_data["treated"].map(
+                {0: "control", 1: "treatment"}
+            )
 
-            #convert geometries to geojson for plotly
+            # convert geometries to geojson for plotly
             geojson = tract_boundaries.__geo_interface__
 
-            #orient the map
+            # orient the map
             center = {
                 "lat": float(tract_boundaries.geometry.centroid.y.mean()),
                 "lon": float(tract_boundaries.geometry.centroid.x.mean()),
             }
 
-
-            #create choropleth
+            # create choropleth
 
             fig = px.choropleth_mapbox(
                 map_data,
@@ -100,8 +104,8 @@ class TreatmentTimeSeriesMapVisualizer(Visualizer):
             output_path = Path(self.output_dir) / "treatment_time_series_map.html"
             fig.write_html(
                 output_path,
-                include_plotlyjs="cdn",   # or True for offline
-                full_html=True
+                include_plotlyjs="cdn",  # or True for offline
+                full_html=True,
             )
 
         return {"treatment_time_series_map_plot": str(output_path)}
