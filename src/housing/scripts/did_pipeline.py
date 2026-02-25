@@ -78,7 +78,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     )
     pipeline.register_component(DIDTrendsVisualizer(output_dir="/project/output"))
     pipeline.register_component(EventStudyVisualizer(output_dir="/project/output"))
-    
+
     results = pipeline.execute()
 
     # Run validation if did_panel is in context

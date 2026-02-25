@@ -41,6 +41,7 @@ class DIDTrendsVisualizer(Visualizer):
 
         # Get output directory from context if available, otherwise use instance variable
         output_dir = Path(context.get("output_dir", self.output_dir))
+        output_suffix = context.get("output_suffix", "")
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Visualization 1: STR Prohibition Adoption Over Time
@@ -51,7 +52,7 @@ class DIDTrendsVisualizer(Visualizer):
         ax1.set_title("STR Prohibition Adoption Over Time")
         ax1.grid(True, alpha=0.3)
 
-        output_path1 = output_dir / "did_str_adoption_over_time.png"
+        output_path1 = output_dir / f"did_str_adoption_over_time{output_suffix}.png"
         setup_figure_and_save(
             fig1,
             output_path1,
@@ -68,7 +69,7 @@ class DIDTrendsVisualizer(Visualizer):
         ax2.legend(title="Group")
         ax2.grid(True, alpha=0.3)
 
-        output_path2 = output_dir / "did_rental_price_trends.png"
+        output_path2 = output_dir / f"did_rental_price_trends{output_suffix}.png"
         setup_figure_and_save(
             fig2,
             output_path2,
@@ -88,7 +89,7 @@ class DIDTrendsVisualizer(Visualizer):
         ax3.legend()
         ax3.grid(True, alpha=0.3)
 
-        output_path3 = output_dir / "did_parallel_trends_check.png"
+        output_path3 = output_dir / f"did_parallel_trends_check{output_suffix}.png"
         setup_figure_and_save(
             fig3,
             output_path3,

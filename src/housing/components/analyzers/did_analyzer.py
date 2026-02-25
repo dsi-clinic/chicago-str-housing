@@ -1,13 +1,16 @@
 """Difference-in-Differences analyzer."""
 
 import logging
+from pathlib import Path
 from typing import Any
 
+import pandas as pd
 from linearmodels import PanelOLS
 
 from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
+
 
 class DIDAnalyzer(Analyzer):
     """Difference-in-Differences analyzer."""
@@ -33,5 +36,23 @@ class DIDAnalyzer(Analyzer):
 
         results = model.fit(cov_type="clustered", cluster_entity=True)
         logger.info("Summary of results: %s", results.summary)
+
+        # Optionally save key DiD estimation results to CSV
+        output_dir = Path(context.get("output_dir", "/project/output"))
+        output_suffix = context.get("output_suffix", "")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        summary_df = pd.DataFrame(
+            {
+                "parameter": results.params.index,
+                "estimate": results.params.values,
+                "std_error": results.std_errors.values,
+                "p_value": results.pvalues.values,
+            }
+        )
+
+        output_path = output_dir / f"did_estimation_results{output_suffix}.csv"
+        summary_df.to_csv(output_path, index=False)
+        logger.info("DiD estimation results saved to: %s", output_path)
 
         return {"did_results": results, "did_model": model}

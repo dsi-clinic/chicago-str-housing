@@ -11,6 +11,7 @@ from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
 
+
 class EventStudyAnalyzer(Analyzer):
     """Event study analyzer."""
 
@@ -35,9 +36,7 @@ class EventStudyAnalyzer(Analyzer):
             # Use 'm' prefix for negative numbers to avoid '-' in column names
             col_name = f"rel_time_m{abs(k)}" if k < 0 else f"rel_time_{k}"
             rel_time_col_map[k] = col_name
-            did_panel[col_name] = (
-                did_panel["months_since_treatment"] == k
-            ).astype(int)
+            did_panel[col_name] = (did_panel["months_since_treatment"] == k).astype(int)
 
         # Get list of dummy column names
         rel_time_cols = list(rel_time_col_map.values())
@@ -45,13 +44,14 @@ class EventStudyAnalyzer(Analyzer):
         panel = did_panel.set_index(["tract_geoid", "month"])
 
         # Build formula with all relative time dummies
-        formula = "rental_price ~ 1 + " + " + ".join(rel_time_cols) + " + EntityEffects + TimeEffects"
+        formula = (
+            "rental_price ~ 1 + "
+            + " + ".join(rel_time_cols)
+            + " + EntityEffects + TimeEffects"
+        )
 
         logger.info("Formula: %s", formula)
-        model = PanelOLS.from_formula(
-            formula,
-            data=panel
-        )
+        model = PanelOLS.from_formula(formula, data=panel)
 
         results = model.fit(cov_type="clustered", cluster_entity=True)
         logger.info("Event study results: %s", results.summary)
@@ -65,15 +65,19 @@ class EventStudyAnalyzer(Analyzer):
             relative_times.append(k)
             coefficients.append(results.params[col_name])
             std_errors.append(results.std_errors[col_name])
-        
-        coef_df = pd.DataFrame({
-            "relative_time": relative_times,
-            "coefficient": coefficients,
-            "std_error": std_errors,
-        })
+
+        coef_df = pd.DataFrame(
+            {
+                "relative_time": relative_times,
+                "coefficient": coefficients,
+                "std_error": std_errors,
+            }
+        )
 
         # Add reference period (coefficient = 0 by construction)
-        ref_row = pd.DataFrame({"relative_time": [-1], "coefficient": [0], "std_error": [0]})
+        ref_row = pd.DataFrame(
+            {"relative_time": [-1], "coefficient": [0], "std_error": [0]}
+        )
         coef_df = pd.concat([coef_df, ref_row]).sort_values("relative_time")
 
         # Calculate 95% CI
@@ -87,8 +91,16 @@ class EventStudyAnalyzer(Analyzer):
 
         # Simple check: How many are individually significant?
         SIGNIFICANCE_LEVEL = 0.05
-        pre_pvals = [2 * (1 - stats.norm.cdf(abs(c/s))) for c, s in zip(pre_coefs, pre_ses)]
+        pre_pvals = [
+            2 * (1 - stats.norm.cdf(abs(c / s))) for c, s in zip(pre_coefs, pre_ses)
+        ]
         n_significant = sum(p < SIGNIFICANCE_LEVEL for p in pre_pvals)
-        print(f"Pre-treatment coefficients significant at 5%: {n_significant} / {len(pre_coefs)}")
+        print(
+            f"Pre-treatment coefficients significant at 5%: {n_significant} / {len(pre_coefs)}"
+        )
 
-        return {"event_study_results": results, "event_study_model": model, "event_study_coef_df": coef_df}
+        return {
+            "event_study_results": results,
+            "event_study_model": model,
+            "event_study_coef_df": coef_df,
+        }

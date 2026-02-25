@@ -10,8 +10,6 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
-import numpy as np
-import seaborn as sns
 
 from pipeline.base import Visualizer
 
@@ -39,9 +37,7 @@ class EventStudyVisualizer(Visualizer):
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Execute the event study visualizer."""
-        logger.info(
-            "Visualizing the event study analysis..."
-        )
+        logger.info("Visualizing the event study analysis...")
         fig, ax = plt.subplots(figsize=(10, 6))
 
         coef_df = context["event_study_coef_df"]
@@ -55,7 +51,7 @@ class EventStudyVisualizer(Visualizer):
             coef_df["ci_lower"],
             coef_df["ci_upper"],
             alpha=0.2,
-            color="navy"
+            color="navy",
         )
 
         # Reference lines
@@ -68,10 +64,9 @@ class EventStudyVisualizer(Visualizer):
         ax.legend()
 
         # Save the plot
-        output_path = Path(self.output_dir) / "event_study_plot.png"
+        output_suffix = context.get("output_suffix", "")
+        output_path = Path(self.output_dir) / f"event_study_plot{output_suffix}.png"
         fig.savefig(output_path)
         logger.info(f"Event study plot saved to {output_path}")
 
-        return {
-            "event_study_plot_path": output_path
-        }
+        return {"event_study_plot_path": output_path}
