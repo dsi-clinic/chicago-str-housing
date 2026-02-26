@@ -86,7 +86,7 @@ class TrendMatchingProcessor(DataProcessor):
         matched_panel = self._create_matched_sample(did_panel, matching_info)
 
         # Log results
-        self._log_matching_results(trends_df, matching_info, matched_panel)
+        self._log_matching_results(did_panel, trends_df, matching_info, matched_panel)
 
         return {
             "did_panel": matched_panel,  # Update did_panel for subsequent components
@@ -245,6 +245,7 @@ class TrendMatchingProcessor(DataProcessor):
 
     def _log_matching_results(
         self,
+        did_panel: pd.DataFrame,
         trends_df: pd.DataFrame,
         matching_info: pd.DataFrame,
         matched_panel: pd.DataFrame,
@@ -270,17 +271,12 @@ class TrendMatchingProcessor(DataProcessor):
             "    Mean slope: $%.2f/month", control_trends["pre_trend_slope"].mean()
         )
         logger.info(
+            "    Std slope: $%.2f/month", control_trends["pre_trend_slope"].std()
+        )
+        logger.info(
             "Filtered DiD panel from %d to %d observations after trend matching.",
             len(did_panel),
             len(matched_panel),
-        )
-
-        return {
-            "did_panel": matched_panel,
-            "trend_matching_trends": trends_df,
-            "trend_matching_matches": matches_df,
-        }
-            "    Std slope: $%.2f/month", control_trends["pre_trend_slope"].std()
         )
 
         logger.info("\nMatching Quality:")
