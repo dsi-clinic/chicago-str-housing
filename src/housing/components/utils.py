@@ -1019,3 +1019,65 @@ def create_choropleth_maps(
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
 
     return f
+
+
+# =============================================================================
+# TIME - SERIES INTERACTIVE MAPPING TOOLS
+# =============================================================================
+
+
+def prepare_map_panel_data(
+    panel_data: pd.DataFrame,
+    tract_boundaries: gpd.GeoDataFrame,
+    data_columns: list[str],
+    city_boundaries: gpd.GeoDataFrame | None = None,
+    min_land_area: float = MIN_LAND_AREA_SQ_METERS,
+    logger: logging.Logger | None = None,
+    simplify: bool = False,
+    tolerance: float = 0.0005,
+) -> gpd.GeoDataFrame | None:
+    """Prepare tract-level panel data for choropleth mapping.
+
+    Args:
+        panel_data: Panel DataFrame containing tract-level variables to map. Must include ``tract_geoid``.
+        tract_boundaries: GeoDataFrame of tract geometries. Must include ``tract_geoid``, ``ALAND``, and ``geometry``.
+        data_columns: List of column names from ``panel_data`` intended for mapping.
+        city_boundaries: Optional GeoDataFrame defining the city boundary used to clip tract geometries.
+        min_land_area: Minimum land area threshold (sq. meters) to keep tracts (filters mostly-water tracts).
+        logger: Optional logger for status / warnings.
+        simplify: Whether to simplify tract geometries for ease of rendering
+        tolerance: The level of simplification for tract geometries
+
+    Returns:
+        GeoDataFrame with tract geometries (filtered, clipped, simplified) merged with ``panel_data`` on ``tract_geoid``.
+    """
+    # Remove mostly-water tracts
+    initial_count = len(tract_boundaries)
+    tract_boundaries = tract_boundaries.loc[tract_boundaries.ALAND >= min_land_area]
+    filtered_count = len(tract_boundaries)
+    if logger and initial_count != filtered_count:
+        logger.info("Filtered to %d tracts with land area", filtered_count)
+
+    # Clip to city boundaries
+    # Ensure same CRS
+    if tract_boundaries.crs != city_boundaries.crs:
+        city_boundaries = city_boundaries.to_crs(tract_boundaries.crs)
+
+    tract_boundaries = gpd.clip(tract_boundaries, city_boundaries)
+
+    if logger:
+        logger.info("Clipped tract data to city boundaries")
+
+    if simplify:
+        # Simplify geometry to avoid crashing
+        tract_boundaries["geometry"] = tract_boundaries.geometry.simplify(
+            tolerance=tolerance, preserve_topology=True
+        )
+
+    # Merge with panel data
+    map_data = panel_data[data_columns + ["tract_geoid"]].merge(
+        tract_boundaries, on="tract_geoid", how="right"
+    )
+    map_data = gpd.GeoDataFrame(map_data, geometry="geometry", crs=tract_boundaries.crs)
+
+    return map_data
