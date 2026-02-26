@@ -46,6 +46,7 @@ import pandas as pd
 from housing.components.analyzers.callaway_santanna import CallawaySantAnnaAnalyzer
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.analyzers.event_study import EventStudyAnalyzer
+from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental_data import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
@@ -60,7 +61,7 @@ from housing.components.processors.treatment_indicator import (
     TreatmentIndicatorProcessor,
 )
 from housing.components.processors.trend_matching import TrendMatchingProcessor
-from housing.components.processors.zip_tract_crosswalk import ZipTractCrosswalkProcessor
+from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.callaway_santanna import (
     CallawaySantAnnaComparisonVisualizer,
     CallawaySantAnnaVisualizer,
@@ -80,7 +81,7 @@ _LARGE_CS_TWFE_DIFF_DOLLARS = 10.0
 # Paths
 DATA_ROOT = Path(os.environ.get("DATA_DIR", "/project/data"))
 TRACT_SHP = DATA_ROOT / "tl_2023_17_tract" / "tl_2023_17_tract.shp"
-ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
+ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_sa_month.csv"
 DID_CS_OUTPUT_DIR = "/project/output/did-cs"
 
 
@@ -151,20 +152,21 @@ def run_did_analysis_with_cs() -> tuple:
     pipeline.register_component(ZipBoundariesLoader())
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
-    pipeline.register_component(TimeSeriesRentalLoader())
+    pipeline.register_component(TimeSeriesRentalLoader(file_path=ZORI_CSV))
+    pipeline.register_component(RentalDataLoader(file_path=ZORI_CSV))
 
     # 2. Process Data
     logger.info("\n[2/5] Processing panel data...")
-    pipeline.register_component(ZipTractCrosswalkProcessor())
+    pipeline.register_component(ZipToTractProcessor())
     pipeline.register_component(TimeSeriesZipToTractProcessor())
     pipeline.register_component(
         TractProhibitionDatesProcessor(
-            output_path=f"{DID_CS_OUTPUT_DIR}/tract_prohibition_dates.csv"
+            output_dir=DID_CS_OUTPUT_DIR
         )
     )
     pipeline.register_component(
         TreatmentIndicatorProcessor(
-            output_path=f"{DID_CS_OUTPUT_DIR}/did_panel_data.csv"
+            output_dir=DID_CS_OUTPUT_DIR
         )
     )
 
@@ -203,27 +205,6 @@ def run_did_analysis_with_cs() -> tuple:
     )
     pipeline.register_component(
         CallawaySantAnnaComparisonVisualizer(output_dir=DID_CS_OUTPUT_DIR)
-    )
-
-    # Set execution order
-    pipeline.set_execution_order(
-        [
-            "zip_boundaries",
-            "tract_boundaries",
-            "zip_tract_crosswalk",
-            "str_prohibition_data",
-            "rental_panel_data",
-            "zip_to_tract_panel",
-            "tract_prohibition_dates",
-            "treatment_indicator",
-            "trend_matching",
-            "did_descriptive_analysis",
-            "event_study_analysis",
-            "event_study_visualization",
-            "callaway_santanna_analysis",
-            "callaway_santanna_visualizer",
-            "cs_comparison_visualizer",
-        ]
     )
 
     # Execute pipeline
