@@ -58,12 +58,14 @@ class TripleDiffAnalyzer(Analyzer):
         # Save coefficient table
         output_dir = Path(context.get("output_dir", "/project/output"))
         output_dir.mkdir(parents=True, exist_ok=True)
-        summary_df = pd.DataFrame({
-            "parameter": results.params.index,
-            "estimate": results.params.values,
-            "std_error": results.std_errors.values,
-            "p_value": results.pvalues.values,
-        })
+        summary_df = pd.DataFrame(
+            {
+                "parameter": results.params.index,
+                "estimate": results.params.to_numpy(),
+                "std_error": results.std_errors.to_numpy(),
+                "p_value": results.pvalues.to_numpy(),
+            }
+        )
         out_path = output_dir / "triplediff_estimation_results.csv"
         summary_df.to_csv(out_path, index=False)
         logger.info("DDD results saved to: %s", out_path)

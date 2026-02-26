@@ -51,9 +51,7 @@ def run_triplediff_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(ZipBoundariesLoader())
     pipeline.register_component(CityBoundariesLoader())
-    pipeline.register_component(
-        CensusDataLoader(api_key=os.getenv("CENSUS_API_KEY"))
-    )
+    pipeline.register_component(CensusDataLoader(api_key=os.getenv("CENSUS_API_KEY")))
 
     # Step 2: Build DiD panel (STR → tracts, zip→tract, time series panel, treatment)
     pipeline.register_component(
@@ -73,7 +71,9 @@ def run_triplediff_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(
         TimeSeriesZipToTractProcessor(output_dir="/project/output")
     )
-    pipeline.register_component(TreatmentIndicatorProcessor(output_dir="/project/output"))
+    pipeline.register_component(
+        TreatmentIndicatorProcessor(output_dir="/project/output")
+    )
 
     # Step 3: Merge census into panel and create third-diff group
     pipeline.register_component(CensusPanelMerger())

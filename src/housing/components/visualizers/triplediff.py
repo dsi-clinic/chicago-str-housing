@@ -75,13 +75,11 @@ class TripleDiffVisualizer(Visualizer):
             params = results.params
             # Prefer interaction term (DDD estimator); else all non-Intercept
             interaction_params = [
-                (k, float(v)) for k, v in params.items()
-                if ":" in str(k)
+                (k, float(v)) for k, v in params.items() if ":" in str(k)
             ]
             if not interaction_params:
                 interaction_params = [
-                    (k, float(v)) for k, v in params.items()
-                    if k != "Intercept"
+                    (k, float(v)) for k, v in params.items() if k != "Intercept"
                 ]
             if interaction_params:
                 fig2, ax2 = plt.subplots(figsize=(8, 4))

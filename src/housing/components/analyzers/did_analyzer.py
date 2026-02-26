@@ -45,9 +45,9 @@ class DIDAnalyzer(Analyzer):
         summary_df = pd.DataFrame(
             {
                 "parameter": results.params.index,
-                "estimate": results.params.values,
-                "std_error": results.std_errors.values,
-                "p_value": results.pvalues.values,
+                "estimate": results.params.to_numpy(),
+                "std_error": results.std_errors.to_numpy(),
+                "p_value": results.pvalues.to_numpy(),
             }
         )
 

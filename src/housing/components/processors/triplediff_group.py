@@ -8,8 +8,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import pandas as pd
-
 from pipeline.base import DataProcessor
 
 logger = logging.getLogger(__name__)
@@ -53,7 +51,6 @@ class TripleDiffGroupProcessor(DataProcessor):
                 "Ensure CensusPanelMerger ran and included this column."
             )
 
-        vals = ddd_panel[self.group_variable]
         # One value per tract; use first non-null per tract if needed
         tract_vals = ddd_panel.groupby("tract_geoid")[self.group_variable].transform(
             "first"

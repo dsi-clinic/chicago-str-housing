@@ -270,6 +270,16 @@ class TrendMatchingProcessor(DataProcessor):
             "    Mean slope: $%.2f/month", control_trends["pre_trend_slope"].mean()
         )
         logger.info(
+            "Filtered DiD panel from %d to %d observations after trend matching.",
+            len(did_panel),
+            len(matched_panel),
+        )
+
+        return {
+            "did_panel": matched_panel,
+            "trend_matching_trends": trends_df,
+            "trend_matching_matches": matches_df,
+        }
             "    Std slope: $%.2f/month", control_trends["pre_trend_slope"].std()
         )
 

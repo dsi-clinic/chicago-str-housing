@@ -9,8 +9,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import pandas as pd
-
 from pipeline.base import DataProcessor
 
 logger = logging.getLogger(__name__)
@@ -62,15 +60,9 @@ class CensusPanelMerger(DataProcessor):
                 "pct_bachelor",
                 "pct_rented",
             ]
-            cols_to_merge = [
-                c for c in want
-                if c in census_data.columns
-            ]
+            cols_to_merge = [c for c in want if c in census_data.columns]
         else:
-            cols_to_merge = [
-                c for c in cols_to_merge
-                if c in census_data.columns
-            ]
+            cols_to_merge = [c for c in cols_to_merge if c in census_data.columns]
 
         merge_cols = [self.panel_tract_column] + cols_to_merge
         census_sub = census_data[merge_cols].drop_duplicates(

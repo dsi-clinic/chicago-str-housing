@@ -11,7 +11,6 @@ This script:
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from housing.components.analyzers.did_analyzer import DIDAnalyzer
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
@@ -89,5 +88,6 @@ if __name__ == "__main__":
     pipeline, results = run_trend_matched_analysis()
 
     logger.info("\n" + "=" * 70)
-    logger.info("Trend-matched analysis complete! Check the output/ directory for results.")
-
+    logger.info(
+        "Trend-matched analysis complete! Check the output/ directory for results."
+    )
