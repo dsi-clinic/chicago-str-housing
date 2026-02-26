@@ -11,6 +11,7 @@ Components are organized into subdirectories:
 """
 
 # Direct imports - no need to manage __init__.py files!
+from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.analyzers.rental_tract import RentalTractAnalyzer
 from housing.components.analyzers.str_prohibition import STRProhibitionAnalyzer
 from housing.components.loaders.airbnb_data import AirbnbDataLoader
@@ -26,11 +27,15 @@ from housing.components.processors.time_series_zip_to_tract import (
     TimeSeriesZipToTractProcessor,
 )
 from housing.components.processors.tract_to_community import TractToCommunityProcessor
+from housing.components.processors.treatment_indicator import (
+    TreatmentIndicatorProcessor,
+)
 from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.airbnb_distribution import (
     AirbnbDistributionVisualizer,
 )
 from housing.components.visualizers.airbnb_map import AirbnbMapVisualizer
+from housing.components.visualizers.did_trends import DIDTrendsVisualizer
 from housing.components.visualizers.foreclosed_distribution import (
     ForeclosedDistributionVisualizer,
 )
@@ -42,6 +47,9 @@ from housing.components.visualizers.rental_map import RentalMapVisualizer
 from housing.components.visualizers.str_distribution import STRDistributionVisualizer
 from housing.components.visualizers.str_map import STRMapVisualizer
 from housing.components.visualizers.str_prohibition_viz import STRProhibitionVisualizer
+from housing.components.visualizers.time_series_str_map import (
+    TimeSeriesSTRMapVisualizer,
+)
 
 __all__ = [
     "AirbnbDataLoader",
@@ -49,6 +57,8 @@ __all__ = [
     "AirbnbMapVisualizer",
     "CityBoundariesLoader",
     "CommunityBoundariesLoader",
+    "DIDDescriptiveAnalyzer",
+    "DIDTrendsVisualizer",
     "ForeclosedDataLoader",
     "ForeclosedDistributionVisualizer",
     "ForeclosedMapVisualizer",
@@ -62,9 +72,11 @@ __all__ = [
     "STRProhibitionAnalyzer",
     "STRProhibitionDataLoader",
     "STRProhibitionVisualizer",
+    "TimeSeriesSTRMapVisualizer",
     "TimeSeriesZipToTractProcessor",
     "TractBoundariesLoader",
     "TractToCommunityProcessor",
+    "TreatmentIndicatorProcessor",
     "ZipBoundariesLoader",
     "ZipToTractProcessor",
 ]

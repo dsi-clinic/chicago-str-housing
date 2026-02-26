@@ -21,7 +21,7 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
 
     def __init__(self, output_dir: str | None = None) -> None:
         """Initialize the time series ZIP to tract processor.
-        
+
         Args:
             output_dir: Optional output directory for tract panel data
         """
@@ -43,7 +43,6 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
         merged_df = rental_panel_data.merge(
             zip_to_tract_crosswalk, on="zip_code", how="inner"
         )
-        print(merged_df.columns)
 
         # Step 2: Calculate weighted rental prices
         logger.info("Calculating weighted rental prices...")
@@ -60,15 +59,31 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
         )
 
         # Step 4: Normalize to get tract-level rental price
-        tract_panel_data["rental_price"] = tract_panel_data["weighted_rent"] / tract_panel_data["intersection_area"]
+        tract_panel_data["rental_price"] = (
+            tract_panel_data["weighted_rent"] / tract_panel_data["intersection_area"]
+        )
 
         # Validation steps
-        logger.info("Missing values after imputation: %d", tract_panel_data["rental_price"].isna().sum())
-        logger.info("Maximum number of rows per tract-month combination: %d", tract_panel_data.groupby(["tract_geoid", "month"]).size().max())
-        logger.info("Minimum number of rows per tract-month combination: %d", tract_panel_data.groupby(["tract_geoid", "month"]).size().min())
-        logger.info("Total unique tracts: %d", tract_boundaries["tract_geoid"].nunique())
-        logger.info("Unique tracts in panel data: %d", tract_panel_data["tract_geoid"].nunique())
-        
+        logger.info(
+            "Missing values after imputation: %d",
+            tract_panel_data["rental_price"].isna().sum(),
+        )
+        logger.info(
+            "Maximum number of rows per tract-month combination: %d",
+            tract_panel_data.groupby(["tract_geoid", "month"]).size().max(),
+        )
+        logger.info(
+            "Minimum number of rows per tract-month combination: %d",
+            tract_panel_data.groupby(["tract_geoid", "month"]).size().min(),
+        )
+        logger.info(
+            "Total unique tracts: %d", tract_boundaries["tract_geoid"].nunique()
+        )
+        logger.info(
+            "Unique tracts in panel data: %d", tract_panel_data["tract_geoid"].nunique()
+        )
+
+        tract_panel_data = tract_panel_data[["tract_geoid", "month", "rental_price"]]
 
         # Save the tract panel data to a CSV file
         if self.output_dir is not None:
