@@ -1,8 +1,8 @@
-"""DiD Analysis Pipeline with Callaway & Sant'Anna (2020) estimator.
+"""DiD Analysis Pipeline with Callaway & Sant'Anna (2021) estimator.
 
 This pipeline runs both:
 1. Standard TWFE event study (for comparison)
-2. Callaway & Sant'Anna (2020) robust estimator
+2. Callaway & Sant'Anna (2021) robust estimator
 
 The comparison reveals whether heterogeneous treatment effects bias TWFE estimates.
 
@@ -31,6 +31,7 @@ Use CS instead of TWFE when:
 
 - TWFE event study (baseline)
 - Callaway-Sant'Anna event study (robust)
+- Callaway-Sant'Anna with controls (covariates + tract trends; optional census)
 - Side-by-side comparison plots
 - Difference plot (CS - TWFE) showing bias
 - Cohort-specific dynamics
@@ -42,19 +43,27 @@ import os
 from pathlib import Path
 
 import pandas as pd
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from housing.components.analyzers.callaway_santanna import CallawaySantAnnaAnalyzer
+from housing.components.analyzers.callaway_santanna_with_controls import (
+    CallawaySantAnnaWithControlsAnalyzer,
+)
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.analyzers.event_study import EventStudyAnalyzer
+from housing.components.loaders.census_data import CensusDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental_data import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
-from housing.components.processors.time_series_zip_to_tract import (
-    TimeSeriesZipToTractProcessor,
-)
+from housing.components.processors.did_covariate_merger import DIDCovariateProcessor
 from housing.components.processors.tract_prohibition_dates import (
     TractProhibitionDatesProcessor,
+)
+from housing.components.processors.time_series_zip_to_tract import (
+    TimeSeriesZipToTractProcessor,
 )
 from housing.components.processors.treatment_indicator import (
     TreatmentIndicatorProcessor,
@@ -70,18 +79,19 @@ from pipeline import Pipeline
 
 logger = logging.getLogger(__name__)
 
-# Constants for reporting / checks
-_ALPHA_005 = 0.05
-_ERRNO_RESOURCE_UNAVAILABLE = (
-    35  # EAGAIN on macOS/Linux when file on cloud-synced folder
-)
-_LARGE_CS_TWFE_DIFF_DOLLARS = 10.0
-
 # Paths
 DATA_ROOT = Path(os.environ.get("DATA_DIR", "/project/data"))
 TRACT_SHP = DATA_ROOT / "tl_2023_17_tract" / "tl_2023_17_tract.shp"
 ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
 DID_CS_OUTPUT_DIR = "/project/output/did-cs"
+
+DID_PREFLIGHT_MSG = (
+    "If data files exist but you see 'Resource deadlock avoided' (Errno 35) or "
+    "GDAL shapefile errors, the project may be on a cloud-synced folder (e.g. Box). "
+    "Copy the data folder to a local directory and run:\n"
+    "  cp -r data /tmp/chicago_data\n"
+    "  DATA_DIR=/tmp/chicago_data make run-did-pipeline-cs"
+)
 
 
 def _preflight_check() -> None:
@@ -90,25 +100,27 @@ def _preflight_check() -> None:
     if not TRACT_SHP.exists():
         missing.append(str(TRACT_SHP))
     elif TRACT_SHP.stat().st_size == 0:
-        logger.warning("Tract shapefile is empty (0 bytes).")
+        logger.warning("Tract shapefile is empty (0 bytes). %s", DID_PREFLIGHT_MSG)
     if not ZORI_CSV.exists():
         missing.append(str(ZORI_CSV))
     elif ZORI_CSV.stat().st_size == 0:
-        logger.warning("ZORI CSV is empty (0 bytes).")
+        logger.warning("ZORI CSV is empty (0 bytes). %s", DID_PREFLIGHT_MSG)
     if missing:
         raise FileNotFoundError(
             "DiD pipeline requires the following data files:\n  "
             + "\n  ".join(missing)
             + "\n\nDownload tract boundaries and ZORI (see README). "
+            + DID_PREFLIGHT_MSG
         )
     try:
         with ZORI_CSV.open("rb") as f:
             f.read(1)
     except OSError as e:
-        if e.errno == _ERRNO_RESOURCE_UNAVAILABLE:
+        if e.errno == 35:
             raise RuntimeError(
                 "Could not read data file (Errno 35). "
                 "This often happens when the project is on a cloud-synced folder.\n"
+                + DID_PREFLIGHT_MSG
             ) from e
         raise
     logger.info("Preflight OK: tract shapefile and ZORI CSV found")
@@ -126,19 +138,17 @@ def _get_twfe_event_df(results: dict) -> pd.DataFrame | None:
     coef_df = results.get("event_study_coefficients")
     if coef_df is None or coef_df.empty:
         return None
-    twfe_coef = coef_df.rename(
-        columns={
-            "relative_time": "rel_time",
-            "coefficient": "coef",
-        }
-    )[["rel_time", "coef"]].copy()
-    return twfe_coef[twfe_coef["rel_time"] != -1].reset_index(drop=True)
+    df = coef_df.rename(columns={
+        "relative_time": "rel_time",
+        "coefficient": "coef",
+    })[["rel_time", "coef"]].copy()
+    return df[df["rel_time"] != -1].reset_index(drop=True)
 
 
 def run_did_analysis_with_cs() -> tuple:
     """Run DiD analysis with both TWFE and Callaway-Sant'Anna estimators."""
     logger.info("=" * 80)
-    logger.info("DiD Analysis Pipeline: TWFE vs. Callaway-Sant'Anna (2020)")
+    logger.info("DiD Analysis Pipeline: TWFE vs. Callaway-Sant'Anna (2021)")
     logger.info("=" * 80)
     _preflight_check()
 
@@ -163,23 +173,32 @@ def run_did_analysis_with_cs() -> tuple:
         )
     )
     pipeline.register_component(
-        TreatmentIndicatorProcessor(
-            output_path=f"{DID_CS_OUTPUT_DIR}/did_panel_data.csv"
-        )
+        TreatmentIndicatorProcessor(output_path=f"{DID_CS_OUTPUT_DIR}/did_panel_data.csv")
     )
 
     # 3. Trend matching (restrict panel to matched treated + control tracts)
-    logger.info("\n[3/6] Trend matching for parallel trends...")
+    logger.info("\n[3/7] Trend matching for parallel trends...")
     pipeline.register_component(
         TrendMatchingProcessor(k_neighbors=3, min_pre_periods=6)
     )
 
+    # 3b. Census and covariates (for CS with controls; optional if no API key)
+    logger.info("\n[3b/7] Loading census and merging covariates (for CS with controls)...")
+    pipeline.register_component(
+        CensusDataLoader(
+            state_fips="17",
+            county_fips="031",
+            api_key=os.getenv("CENSUS_API_KEY"),
+        )
+    )
+    pipeline.register_component(DIDCovariateProcessor())
+
     # 4. Descriptive Analysis (on matched sample)
-    logger.info("\n[4/6] Running descriptive analysis...")
+    logger.info("\n[4/7] Running descriptive analysis...")
     pipeline.register_component(DIDDescriptiveAnalyzer())
 
     # 5. TWFE Event Study (on matched sample)
-    logger.info("\n[5/6] Estimating TWFE event study (matched sample)...")
+    logger.info("\n[5/7] Estimating TWFE event study (matched sample)...")
     pipeline.register_component(
         EventStudyAnalyzer(
             pre_periods=12,
@@ -190,7 +209,7 @@ def run_did_analysis_with_cs() -> tuple:
     pipeline.register_component(EventStudyVisualizer(output_dir=DID_CS_OUTPUT_DIR))
 
     # 6. Callaway-Sant'Anna (robust, on matched sample)
-    logger.info("\n[6/6] Estimating Callaway-Sant'Anna event study (robust)...")
+    logger.info("\n[6/7] Estimating Callaway-Sant'Anna event study (robust)...")
     pipeline.register_component(
         CallawaySantAnnaAnalyzer(
             comparison_group="nevertreated",
@@ -198,12 +217,28 @@ def run_did_analysis_with_cs() -> tuple:
             min_cohort_size=5,
         )
     )
+    pipeline.register_component(CallawaySantAnnaVisualizer(output_dir=DID_CS_OUTPUT_DIR))
+    pipeline.register_component(CallawaySantAnnaComparisonVisualizer(output_dir=DID_CS_OUTPUT_DIR))
+
+    # 7. Callaway-Sant'Anna with controls (covariates + tract trends)
+    logger.info("\n[7/7] Estimating Callaway-Sant'Anna with controls...")
     pipeline.register_component(
-        CallawaySantAnnaVisualizer(output_dir=DID_CS_OUTPUT_DIR)
+        CallawaySantAnnaWithControlsAnalyzer(
+            comparison_group="nevertreated",
+            anticipation=0,
+            min_cohort_size=5,
+            include_covariates=True,
+            include_tract_trends=True,
+            estimation_method="dr",
+        )
     )
-    pipeline.register_component(
-        CallawaySantAnnaComparisonVisualizer(output_dir=DID_CS_OUTPUT_DIR)
+    cs_visualizer_with_controls = CallawaySantAnnaVisualizer(
+        output_dir=DID_CS_OUTPUT_DIR,
+        context_suffix="_with_controls",
+        output_suffix="_with_controls",
     )
+    cs_visualizer_with_controls.name = "callaway_santanna_visualizer_with_controls"
+    pipeline.register_component(cs_visualizer_with_controls)
 
     # Set execution order
     pipeline.set_execution_order(
@@ -217,12 +252,16 @@ def run_did_analysis_with_cs() -> tuple:
             "tract_prohibition_dates",
             "treatment_indicator",
             "trend_matching",
+            "census_data",
+            "did_panel_with_covariates",
             "did_descriptive_analysis",
             "event_study_analysis",
             "event_study_visualization",
             "callaway_santanna_analysis",
             "callaway_santanna_visualizer",
             "cs_comparison_visualizer",
+            "callaway_santanna_with_controls",
+            "callaway_santanna_visualizer_with_controls",
         ]
     )
 
@@ -261,18 +300,34 @@ def _print_summary(results: dict) -> None:
         logger.info("  Standard Error: $%.2f", se)
         logger.info("  95%% CI: [$%.2f, $%.2f]", ci_low, ci_high)
         logger.info("  P-value: %.4f", p_val)
-        logger.info("  Significant: %s", "Yes" if p_val < _ALPHA_005 else "No")
+        logger.info("  Significant: %s", "Yes" if p_val < 0.05 else "No")
+
+    # Overall ATT from CS with controls
+    cs_overall_ctrl = results.get("cs_overall_att_with_controls", {})
+    if cs_overall_ctrl:
+        att_c = cs_overall_ctrl.get("att", float("nan"))
+        se_c = cs_overall_ctrl.get("se", float("nan"))
+        p_val_c = cs_overall_ctrl.get("p_value", float("nan"))
+        ci_low_c = cs_overall_ctrl.get("ci_low", float("nan"))
+        ci_high_c = cs_overall_ctrl.get("ci_high", float("nan"))
+
+        logger.info("\nCallaway-Sant'Anna Overall ATT (with controls):")
+        logger.info("  Point Estimate: $%.2f", att_c)
+        logger.info("  Standard Error: $%.2f", se_c)
+        logger.info("  95%% CI: [$%.2f, $%.2f]", ci_low_c, ci_high_c)
+        logger.info("  P-value: %.4f", p_val_c)
+        logger.info("  Significant: %s", "Yes" if p_val_c < 0.05 else "No")
+        if results.get("cs_include_covariates"):
+            logger.info("  Covariates: included")
+        if results.get("cs_include_tract_trends"):
+            logger.info("  Tract trends: included")
 
     # Trend matching info
     matching_info = results.get("matching_info")
     if matching_info is not None and not matching_info.empty:
         logger.info("\nTrend Matching:")
-        logger.info(
-            "  Matched treated tracts: %d", matching_info["treated_tract"].nunique()
-        )
-        logger.info(
-            "  Matched control tracts: %d", matching_info["control_tract"].nunique()
-        )
+        logger.info("  Matched treated tracts: %d", matching_info["treated_tract"].nunique())
+        logger.info("  Matched control tracts: %d", matching_info["control_tract"].nunique())
         logger.info("  Average slope distance: %.4f", matching_info["distance"].mean())
 
     # Cohort information
@@ -299,19 +354,18 @@ def _print_summary(results: dict) -> None:
 
             logger.info("\nTWFE vs. CS Comparison (Post-Treatment):")
             logger.info("  Average difference (CS - TWFE): $%.2f", avg_diff)
-            if abs(avg_diff) > _LARGE_CS_TWFE_DIFF_DOLLARS:
+            if abs(avg_diff) > 10:
                 logger.warning(
                     "  Large difference detected! This suggests significant "
                     "heterogeneity bias in TWFE estimates."
                 )
             else:
-                logger.info(
-                    "  Estimates are similar, suggesting TWFE is approximately unbiased."
-                )
+                logger.info("  Estimates are similar, suggesting TWFE is approximately unbiased.")
 
     logger.info("\n=== OUTPUT FILES ===\n")
     logger.info("Check %s/ for:", DID_CS_OUTPUT_DIR)
     logger.info("  • did_callaway_santanna_event_study.png - Main CS results")
+    logger.info("  • did_callaway_santanna_event_study_with_controls.png - CS with controls")
     logger.info("  • did_twfe_vs_cs_comparison.png - Side-by-side comparison")
     logger.info("  • did_cs_twfe_difference.png - Bias visualization")
     logger.info("  • did_cohort_dynamics.png - Cohort-specific effects")

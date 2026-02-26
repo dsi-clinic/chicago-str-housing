@@ -18,7 +18,7 @@ project_dir := "$(current_abs_path)"
 # Optional data directory mount (if DATA_DIR is set)
 mount_data := $(if $(DATA_DIR),-v $(DATA_DIR):/project/data,)
 
-.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline-cs    
+.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline run-did-pipeline-covariates run-did-pipeline-cs run-did-pipeline-cs-local run-did-matched-pipeline
 
 help: ## Show the help message
 	@echo "Available commands:"
@@ -33,7 +33,11 @@ help: ## Show the help message
 	@echo "  run-eda-pipeline         Run the housing EDA pipeline"
 	@echo "  run-clustering-pipeline  Prepare data for clustering"
 	@echo "  run-clustering-analysis  Run clustering data exploration (ARGS=\"--scatter-matrix\" to include scatter matrix)"
-	@echo "  run-did-pipeline-cs      Run DiD analysis with Callaway-Sant'Anna (2020) robust estimator"
+	@echo "  run-did-pipeline         Build DiD panel dataset for causal analysis"
+	@echo "  run-did-pipeline-covariates  Run DiD analysis with covariate controls (local data)"
+	@echo "  run-did-pipeline-cs         Run DiD with Callaway-Sant'Anna (2021) robust estimator"
+	@echo "  run-did-pipeline-cs-local   Same, with data copied to /tmp (avoids sync drive I/O)"
+	@echo "  run-did-matched-pipeline  Run DiD analysis on trend-matched sample"
 	@echo ""
 	@echo "Optional environment variables (.env file):"
 	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
@@ -68,5 +72,19 @@ run-clustering-pipeline: build-only ## Prepare data for clustering
 run-clustering-analysis: build-only ## Run clustering data exploration
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/clustering_analysis.py $(ARGS)
 
-run-did-pipeline-cs: build-only ## Run DiD analysis with Callaway-Sant'Anna (2020) robust estimator
+run-did-pipeline: build-only ## Build DiD panel dataset for causal analysis
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline.py
+
+run-did-pipeline-covariates: build-only ## Run DiD with covariate controls (local data)
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_with_covariates.py
+
+run-did-pipeline-cs: build-only ## Run DiD analysis with Callaway-Sant'Anna (2021) robust estimator
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna.py
+
+run-did-pipeline-cs-local: build-only ## Copy data to /tmp and run Callaway-Sant'Anna pipeline (avoids Errno 35 on Box/synced drives)
+	@mkdir -p /tmp/chicago_did_data && cp -r "$(current_abs_path)data/"* /tmp/chicago_did_data/ 2>/dev/null || true
+	@echo "Running Callaway-Sant'Anna pipeline with /tmp/chicago_did_data (avoids sync drive I/O issues)..."
+	docker compose run --rm -v "/tmp/chicago_did_data:/project/data" $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna.py
+
+run-did-matched-pipeline: build-only ## Run DiD analysis on trend-matched sample
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_matched_pipeline.py

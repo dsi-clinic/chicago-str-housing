@@ -1,4 +1,4 @@
-"""Callaway & Sant'Anna (2020) estimator for staggered DiD.
+"""Callaway & Sant'Anna (2021) estimator for staggered DiD.
 
 Implements the group-time average treatment effect estimator that is robust
 to heterogeneous treatment effects in staggered adoption designs.
@@ -48,14 +48,12 @@ from pipeline.base import Analyzer
 logger = logging.getLogger(__name__)
 
 # Constants
-MAX_PRE_TIME = (
-    12  # Maximum pre-treatment periods (1 year, matches data for largest cohorts)
-)
+MAX_PRE_TIME = 12   # Maximum pre-treatment periods (1 year, matches data for largest cohorts)
 MAX_POST_TIME = 36  # Maximum post-treatment periods (3 years)
 
 
 class CallawaySantAnnaAnalyzer(Analyzer):
-    """Estimate Callaway & Sant'Anna (2020) group-time ATTs for staggered DiD."""
+    """Estimate Callaway & Sant'Anna (2021) group-time ATTs for staggered DiD."""
 
     def __init__(
         self,
@@ -75,7 +73,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         """
         super().__init__(
             "callaway_santanna_analysis",
-            "Callaway & Sant'Anna (2020) group-time ATT estimator",
+            "Callaway & Sant'Anna (2021) group-time ATT estimator",
         )
         self.comparison_group = comparison_group
         self.anticipation = anticipation
@@ -91,11 +89,11 @@ class CallawaySantAnnaAnalyzer(Analyzer):
             logger.error("did_panel not found in context")
             raise ValueError("did_panel not found in context")
 
-        panel = did_panel.copy()
-        panel = panel.dropna(subset=["rental_price"]).reset_index(drop=True)
+        df = did_panel.copy()
+        df = df.dropna(subset=["rental_price"]).reset_index(drop=True)
 
         # Step 1: Identify treatment cohorts
-        cohort_info = self._identify_cohorts(panel)
+        cohort_info = self._identify_cohorts(df)
         logger.info(
             "Identified %d treatment cohorts and %d never-treated tracts",
             len(cohort_info["treated_cohorts"]),
@@ -103,11 +101,11 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         )
 
         # Step 2: Estimate group-time ATTs
-        group_time_atts = self._estimate_group_time_atts(panel, cohort_info)
+        group_time_atts = self._estimate_group_time_atts(df, cohort_info)
         logger.info("Estimated %d group-time ATTs", len(group_time_atts))
 
         # Step 3: Aggregate to event study
-        event_study_agg = self._aggregate_to_event_study(group_time_atts, panel)
+        event_study_agg = self._aggregate_to_event_study(group_time_atts, df)
         logger.info(
             "Aggregated to event study with %d relative time periods",
             len(event_study_agg),
@@ -115,9 +113,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
 
         # Step 4: Compute overall ATT (post-treatment average)
         overall_att = self._compute_overall_att(group_time_atts)
-        logger.info(
-            "Overall ATT: %.2f (SE: %.2f)", overall_att["att"], overall_att["se"]
-        )
+        logger.info("Overall ATT: %.2f (SE: %.2f)", overall_att["att"], overall_att["se"])
 
         # Step 5: Compute cohort-specific dynamic effects
         cohort_dynamics = self._compute_cohort_dynamics(group_time_atts)
@@ -183,13 +179,9 @@ class CallawaySantAnnaAnalyzer(Analyzer):
             # Get tracts in this cohort
             cohort_tracts = cohorts_df[
                 cohorts_df["first_treatment_month"] == cohort_date
-            ]["tract_geoid"].to_numpy()
+            ]["tract_geoid"].values
 
-            logger.debug(
-                "Processing cohort %s with %d tracts",
-                str(cohort_date)[:10],
-                len(cohort_tracts),
-            )
+            logger.debug("Processing cohort %s with %d tracts", str(cohort_date)[:10], len(cohort_tracts))
 
             # Base period is one month before treatment
             base_period = cohort_date - pd.DateOffset(months=1)
@@ -206,17 +198,13 @@ class CallawaySantAnnaAnalyzer(Analyzer):
                     # Not-yet-treated: never-treated + those treated after t
                     not_yet_treated = cohorts_df[
                         cohorts_df["first_treatment_month"] > t
-                    ]["tract_geoid"].to_numpy()
+                    ]["tract_geoid"].values
                     comparison_tracts = list(set(never_treated) | set(not_yet_treated))
                 else:
-                    raise ValueError(
-                        f"Unknown comparison_group: {self.comparison_group}"
-                    )
+                    raise ValueError(f"Unknown comparison_group: {self.comparison_group}")
 
                 if len(comparison_tracts) == 0:
-                    logger.warning(
-                        "No comparison units for cohort %s at time %s", cohort_date, t
-                    )
+                    logger.warning("No comparison units for cohort %s at time %s", cohort_date, t)
                     continue
 
                 # Estimate ATT(g,t) using difference-in-differences
@@ -230,21 +218,20 @@ class CallawaySantAnnaAnalyzer(Analyzer):
 
                 if att_result is not None:
                     # Calculate relative time
-                    months_diff = (t.year - cohort_date.year) * 12 + (
-                        t.month - cohort_date.month
+                    months_diff = (
+                        (t.year - cohort_date.year) * 12 +
+                        (t.month - cohort_date.month)
                     )
 
-                    results.append(
-                        {
-                            "cohort": cohort_date,
-                            "time": t,
-                            "rel_time": months_diff,
-                            "att": att_result["att"],
-                            "se": att_result["se"],
-                            "n_treated": len(cohort_tracts),
-                            "n_control": len(comparison_tracts),
-                        }
-                    )
+                    results.append({
+                        "cohort": cohort_date,
+                        "time": t,
+                        "rel_time": months_diff,
+                        "att": att_result["att"],
+                        "se": att_result["se"],
+                        "n_treated": len(cohort_tracts),
+                        "n_control": len(comparison_tracts),
+                    })
 
         return pd.DataFrame(results)
 
@@ -263,30 +250,24 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         pre_period = cohort_date - pd.DateOffset(months=1)
 
         treated_df = df[
-            (df["tract_geoid"].isin(cohort_tracts))
-            & (df["month"].isin([current_date, pre_period]))
+            (df["tract_geoid"].isin(cohort_tracts)) &
+            (df["month"].isin([current_date, pre_period]))
         ][["tract_geoid", "month", "rental_price"]]
-        treated_diff = treated_df.pivot_table(
+        treated_diff = treated_df.pivot(
             index="tract_geoid", columns="month", values="rental_price"
         )
-        if (
-            current_date not in treated_diff.columns
-            or pre_period not in treated_diff.columns
-        ):
+        if current_date not in treated_diff.columns or pre_period not in treated_diff.columns:
             return None
         treated_diff["change"] = treated_diff[current_date] - treated_diff[pre_period]
 
         control_df = df[
-            (df["tract_geoid"].isin(comparison_tracts))
-            & (df["month"].isin([current_date, pre_period]))
+            (df["tract_geoid"].isin(comparison_tracts)) &
+            (df["month"].isin([current_date, pre_period]))
         ][["tract_geoid", "month", "rental_price"]]
-        control_diff = control_df.pivot_table(
+        control_diff = control_df.pivot(
             index="tract_geoid", columns="month", values="rental_price"
         )
-        if (
-            current_date not in control_diff.columns
-            or pre_period not in control_diff.columns
-        ):
+        if current_date not in control_diff.columns or pre_period not in control_diff.columns:
             return None
         control_diff["change"] = control_diff[current_date] - control_diff[pre_period]
 
@@ -329,29 +310,27 @@ class CallawaySantAnnaAnalyzer(Analyzer):
                 continue
 
             # Weight by cohort size (number of treated units)
-            weights = atts_at_e["n_treated"].to_numpy()
+            weights = atts_at_e["n_treated"].values
             weights = weights / weights.sum()
 
             # Weighted average of ATTs
-            agg_att = np.sum(atts_at_e["att"].to_numpy() * weights)
+            agg_att = np.sum(atts_at_e["att"].values * weights)
 
             # Aggregate standard error (conservative: assumes independence)
-            agg_se = np.sqrt(np.sum((atts_at_e["se"].to_numpy() ** 2) * (weights**2)))
+            agg_se = np.sqrt(np.sum((atts_at_e["se"].values ** 2) * (weights ** 2)))
 
             # Confidence interval
             ci_low = agg_att - 1.96 * agg_se
             ci_high = agg_att + 1.96 * agg_se
 
-            results.append(
-                {
-                    "rel_time": e,
-                    "att": agg_att,
-                    "se": agg_se,
-                    "ci_low": ci_low,
-                    "ci_high": ci_high,
-                    "n_cohorts": len(atts_at_e),
-                }
-            )
+            results.append({
+                "rel_time": e,
+                "att": agg_att,
+                "se": agg_se,
+                "ci_low": ci_low,
+                "ci_high": ci_high,
+                "n_cohorts": len(atts_at_e),
+            })
 
         event_study_df = pd.DataFrame(results).sort_values("rel_time")
 
@@ -369,14 +348,12 @@ class CallawaySantAnnaAnalyzer(Analyzer):
             return {"att": np.nan, "se": np.nan, "ci_low": np.nan, "ci_high": np.nan}
 
         # Weight by cohort size
-        weights = post_treatment["n_treated"].to_numpy()
+        weights = post_treatment["n_treated"].values
         weights = weights / weights.sum()
 
         # Weighted average
-        overall_att = np.sum(post_treatment["att"].to_numpy() * weights)
-        overall_se = np.sqrt(
-            np.sum((post_treatment["se"].to_numpy() ** 2) * (weights**2))
-        )
+        overall_att = np.sum(post_treatment["att"].values * weights)
+        overall_se = np.sqrt(np.sum((post_treatment["se"].values ** 2) * (weights ** 2)))
 
         ci_low = overall_att - 1.96 * overall_se
         ci_high = overall_att + 1.96 * overall_se
@@ -401,15 +378,13 @@ class CallawaySantAnnaAnalyzer(Analyzer):
             cohort_data = cohort_data.sort_values("rel_time")
 
             for _, row in cohort_data.iterrows():
-                cohort_dynamics.append(
-                    {
-                        "cohort": cohort,
-                        "rel_time": row["rel_time"],
-                        "att": row["att"],
-                        "se": row["se"],
-                        "ci_low": row["att"] - 1.96 * row["se"],
-                        "ci_high": row["att"] + 1.96 * row["se"],
-                    }
-                )
+                cohort_dynamics.append({
+                    "cohort": cohort,
+                    "rel_time": row["rel_time"],
+                    "att": row["att"],
+                    "se": row["se"],
+                    "ci_low": row["att"] - 1.96 * row["se"],
+                    "ci_high": row["att"] + 1.96 * row["se"],
+                })
 
         return pd.DataFrame(cohort_dynamics)

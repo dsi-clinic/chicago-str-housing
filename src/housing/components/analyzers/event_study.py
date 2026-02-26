@@ -11,7 +11,7 @@ from typing import Any
 
 import pandas as pd
 from linearmodels import PanelOLS
-from linearmodels.panel.results import PanelEffectsResults
+from scipy import stats
 
 from pipeline.base import Analyzer
 
@@ -68,9 +68,7 @@ class EventStudyAnalyzer(Analyzer):
         did_panel = context["did_panel"].copy()
 
         logger.info("Estimating Event Study model...")
-        logger.info(
-            "  Event window: %d to +%d months", -self.pre_periods, self.post_periods
-        )
+        logger.info("  Event window: %d to +%d months", -self.pre_periods, self.post_periods)
         logger.info("  Reference period: k = %d", self.reference_period)
 
         # Step 1: Create relative time dummies
@@ -132,7 +130,7 @@ class EventStudyAnalyzer(Analyzer):
 
     def _estimate_event_study(
         self, panel: pd.DataFrame, rel_time_cols: list[str]
-    ) -> PanelEffectsResults:
+    ) -> Any:
         """Estimate the event study model."""
         logger.info("  Estimating model with entity and time fixed effects...")
 
@@ -148,10 +146,9 @@ class EventStudyAnalyzer(Analyzer):
         return results
 
     def _extract_coefficients(
-        self, results: PanelEffectsResults, rel_time_cols: list[str]
+        self, results: Any, rel_time_cols: list[str]
     ) -> pd.DataFrame:
         """Extract coefficients and confidence intervals."""
-
         # Parse relative time from column names
         # rel_time_m12 -> -12, rel_time_p0 -> 0, rel_time_p12 -> 12
         def parse_rel_time(col: str) -> int:
@@ -199,7 +196,7 @@ class EventStudyAnalyzer(Analyzer):
         return coef_df
 
     def _test_parallel_trends(
-        self, results: PanelEffectsResults, coef_df: pd.DataFrame
+        self, results: Any, coef_df: pd.DataFrame
     ) -> dict[str, Any]:
         """Test whether pre-treatment coefficients are jointly zero."""
         # Get pre-treatment coefficients (excluding reference period)
@@ -209,17 +206,10 @@ class EventStudyAnalyzer(Analyzer):
         ].copy()
 
         if len(pre_coefs) == 0:
-            return {
-                "n_pre_periods": 0,
-                "n_significant": 0,
-                "conclusion": "No pre-periods",
-            }
+            return {"n_pre_periods": 0, "n_significant": 0, "conclusion": "No pre-periods"}
 
         # Count individually significant coefficients
-        _ALPHA_005 = 0.05
-        _PCT_SIGNIFICANT_THRESHOLD = 0.2
-        _AVG_ABS_COEF_THRESHOLD_DOLLARS = 20.0
-        n_significant = (pre_coefs["p_value"] < _ALPHA_005).sum()
+        n_significant = (pre_coefs["p_value"] < 0.05).sum()
         n_pre_periods = len(pre_coefs)
 
         # Average absolute pre-treatment coefficient
@@ -227,11 +217,9 @@ class EventStudyAnalyzer(Analyzer):
 
         # Simple heuristic: if more than 20% of pre-treatment coefficients
         # are significant, parallel trends may be violated
-        if n_significant / n_pre_periods > _PCT_SIGNIFICANT_THRESHOLD:
-            conclusion = (
-                "Potential violation: multiple significant pre-treatment effects"
-            )
-        elif avg_abs_coef > _AVG_ABS_COEF_THRESHOLD_DOLLARS:
+        if n_significant / n_pre_periods > 0.2:
+            conclusion = "Potential violation: multiple significant pre-treatment effects"
+        elif avg_abs_coef > 20:  # More than $20 average deviation
             conclusion = "Potential violation: large pre-treatment coefficients"
         else:
             conclusion = "Parallel trends plausible: pre-treatment effects near zero"
@@ -267,10 +255,7 @@ class EventStudyAnalyzer(Analyzer):
 
         logger.info("\nPost-Treatment Coefficients (k >= 0):")
         logger.info("  Mean: $%.2f", post_coefs["coefficient"].mean())
-        logger.info(
-            "  Immediate effect (k=0): $%.2f",
-            coef_df[coef_df["relative_time"] == 0]["coefficient"].to_numpy()[0],
-        )
+        logger.info("  Immediate effect (k=0): $%.2f", coef_df[coef_df["relative_time"] == 0]["coefficient"].values[0])
 
         # Parallel trends test
         logger.info("\nParallel Trends Test:")

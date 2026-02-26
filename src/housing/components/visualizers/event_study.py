@@ -182,7 +182,6 @@ class EventStudyCovariatesVisualizer(Visualizer):
     """
 
     def __init__(self, output_dir: str | None = None) -> None:
-        """Initialize the visualizer with optional output directory."""
         super().__init__(
             "event_study_covariates_visualization",
             "Event study plot (with covariate controls)",
@@ -191,7 +190,6 @@ class EventStudyCovariatesVisualizer(Visualizer):
         self.required_data = ["event_study_results_with_covariates"]
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Create event study plot from covariate-adjusted results and save to output_dir."""
         logger.info("Creating event study visualization (with covariates)...")
 
         coef_df = context["event_study_results_with_covariates"].copy()
@@ -205,9 +203,7 @@ class EventStudyCovariatesVisualizer(Visualizer):
             (coef_df["rel_time"] >= plot_min) & (coef_df["rel_time"] <= plot_max)
         ]
         if plot_df.empty:
-            logger.warning(
-                "No coefficients in [%d, %d]. Skipping plot.", plot_min, plot_max
-            )
+            logger.warning("No coefficients in [%d, %d]. Skipping plot.", plot_min, plot_max)
             return {}
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -224,16 +220,8 @@ class EventStudyCovariatesVisualizer(Visualizer):
             ci_low = ci_high = None
 
         fig, ax = plt.subplots(figsize=(12, 6))
-        ax.axvspan(
-            plot_min, ref_period - 0.5, alpha=0.08, color="blue", label="Pre-treatment"
-        )
-        ax.axvspan(
-            ref_period + 0.5,
-            plot_max,
-            alpha=0.08,
-            color="green",
-            label="Post-treatment",
-        )
+        ax.axvspan(plot_min, ref_period - 0.5, alpha=0.08, color="blue", label="Pre-treatment")
+        ax.axvspan(ref_period + 0.5, plot_max, alpha=0.08, color="green", label="Post-treatment")
         ax.plot(
             plot_df["rel_time"],
             plot_df["coef"],
