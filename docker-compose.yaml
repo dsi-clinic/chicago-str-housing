@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/project
+    env_file:
+      - .env
     environment:
       DATA_DIR: /project/data
       PYTHONPATH: /project/src

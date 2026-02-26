@@ -6,6 +6,7 @@ and population for calculating population density by census tract.
 """
 
 import logging
+import os
 from typing import Any
 
 import pandas as pd
@@ -52,8 +53,8 @@ class CensusDataLoader(DataLoader):
         """Load 2023 ACS census data from Census API."""
         logger.info("Fetching 2023 ACS census data from Census API")
 
-        # Get API key from context or environment
-        api_key = self.api_key or context.get("census_api_key")
+        # Get API key from init arg, context, or environment variable
+        api_key = self.api_key or context.get("census_api_key") or os.getenv("CENSUS_API_KEY")
         if not api_key:
             logger.warning(
                 "No Census API key provided. Using demo mode with limited data."

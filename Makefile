@@ -18,7 +18,7 @@ project_dir := "$(current_abs_path)"
 # Optional data directory mount (if DATA_DIR is set)
 mount_data := $(if $(DATA_DIR),-v $(DATA_DIR):/project/data,)
 
-.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline run-did-pipeline-covariates run-did-pipeline-cs run-did-pipeline-deseasonalized run-did-pipeline-local run-did-pipeline-covariates-local run-did-pipeline-cs-local run-did-diagnostic run-did-deep-diagnostic
+.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline run-did-pipeline-covariates run-did-pipeline-cs run-did-pipeline-twfe run-did-pipeline-deseasonalized run-did-pipeline-local run-did-pipeline-covariates-local run-did-pipeline-cs-local run-did-diagnostic run-did-deep-diagnostic
 
 help: ## Show the help message
 	@echo "Available commands:"
@@ -36,6 +36,7 @@ help: ## Show the help message
 	@echo "  run-did-pipeline         Run DiD analysis (descriptive + event study)"
 	@echo "  run-did-pipeline-covariates  Run enhanced DiD with covariate controls + diagnostics"
 	@echo "  run-did-pipeline-cs      Run DiD with Callaway-Sant'Anna (2020) robust estimator"
+	@echo "  run-did-pipeline-twfe             Run TWFE event study (deseasonalized) for comparison with CS"
 	@echo "  run-did-pipeline-deseasonalized  Run CS with deseasonalization + tract trends (creates enhanced CS plot)"
 	@echo "  run-did-diagnostic       Run DiD data diagnostic (panel, treatment, rental prices)"
 	@echo "  run-did-deep-diagnostic  Run deep diagnostic (cohorts, trends, STR dates, CS feasibility)"
@@ -110,6 +111,11 @@ run-did-deep-diagnostic: build-only ## Run deep diagnostic (cohorts, trends, STR
 	@mkdir -p /tmp/chicago_did_data && cp -r "$(current_abs_path)data/"* /tmp/chicago_did_data/ 2>/dev/null || true
 	@echo "Running deep diagnostic with /tmp/chicago_did_data (avoids sync drive I/O issues)..."
 	docker compose run --rm -v "/tmp/chicago_did_data:/project/data" $(project_name) uv run python src/housing/scripts/did_deep_diagnostic.py
+
+run-did-pipeline-twfe: build-only ## Run TWFE event study (deseasonalized) — traditional DiD for comparison
+	@mkdir -p /tmp/chicago_did_data && cp -r "$(current_abs_path)data/"* /tmp/chicago_did_data/ 2>/dev/null || true
+	@echo "Running TWFE event study pipeline with /tmp/chicago_did_data..."
+	docker compose run --rm -v "/tmp/chicago_did_data:/project/data" $(project_name) uv run python src/housing/scripts/did_pipeline_twfe.py
 
 run-did-pipeline-deseasonalized: build-only ## Run CS with deseasonalization + tract trends + covariates (addresses parallel trends violations)
 	@mkdir -p /tmp/chicago_did_data && cp -r "$(current_abs_path)data/"* /tmp/chicago_did_data/ 2>/dev/null || true

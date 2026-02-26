@@ -28,6 +28,11 @@ import logging
 import os
 from pathlib import Path
 
+import numpy as np
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from pipeline import Pipeline
 
 # Loaders
@@ -128,7 +133,11 @@ def run_did_analysis_deseasonalized() -> tuple:
 
     # Try to load census data (optional)
     try:
-        pipeline.register_component(CensusDataLoader())
+        pipeline.register_component(CensusDataLoader(
+            api_key=os.getenv("CENSUS_API_KEY"),
+            state_fips="17",      # Illinois
+            county_fips="031",    # Cook County (Chicago)
+        ))
     except Exception as e:
         logger.warning("Could not load census data: %s. Proceeding without covariates.", e)
 
@@ -174,6 +183,7 @@ def run_did_analysis_deseasonalized() -> tuple:
             min_cohort_size=5,
             include_covariates=True,
             include_tract_trends=True,
+            estimation_method="dr",
         )
     )
     # Note: This will overwrite some context keys from the baseline CS
@@ -232,12 +242,27 @@ def _print_summary(results: dict) -> None:
 
         with_controls = results.get("cs_with_controls", False)
         if with_controls:
+            est_method = results.get("cs_estimation_method", "or")
+            method_labels = {"dr": "Doubly Robust", "ipw": "IPW", "or": "Outcome Regression"}
             logger.info("\nControls included:")
+            logger.info("  • Estimation method: %s", method_labels.get(est_method, est_method))
             logger.info("  • Deseasonalized prices: Yes")
             logger.info("  • Time-invariant covariates: %s",
                        results.get("cs_include_covariates", False))
             logger.info("  • Tract-specific linear trends: %s",
                        results.get("cs_include_tract_trends", False))
+
+            # Propensity score diagnostics (for DR/IPW)
+            ps_diag = results.get("cs_propensity_diagnostics", [])
+            if ps_diag:
+                p_means = [d["p_hat_mean"] for d in ps_diag]
+                p_mins = [d["p_hat_min"] for d in ps_diag]
+                p_maxs = [d["p_hat_max"] for d in ps_diag]
+                logger.info("\n  Propensity score diagnostics (across %d (g,t) cells):", len(ps_diag))
+                logger.info("    Mean p-hat: %.3f (range: %.3f–%.3f)",
+                           np.mean(p_means), min(p_means), max(p_means))
+                logger.info("    Min p-hat:  %.3f", min(p_mins))
+                logger.info("    Max p-hat:  %.3f", max(p_maxs))
 
     # Cohort information
     cohort_info = results.get("cs_cohort_info", {})

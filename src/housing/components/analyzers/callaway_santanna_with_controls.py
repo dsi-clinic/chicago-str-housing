@@ -4,19 +4,18 @@ Extends the basic CS estimator to include:
 1. Time-invariant covariates (census characteristics, baseline rent)
 2. Tract-specific linear time trends (to handle differential trends)
 
-**Covariate adjustment methods:**
+**Estimation methods (per Sant'Anna & Zhao 2020):**
 
-1. **Outcome regression**: Residualize Y on covariates before computing DiD
-2. **Inverse probability weighting**: Weight by propensity score
-3. **Doubly robust**: Combine both methods
-
-This implementation uses outcome regression for simplicity and interpretability.
+1. **Outcome regression (or)**: Residualize Y on covariates before computing DiD
+2. **Inverse probability weighting (ipw)**: Weight comparison tracts by propensity score
+3. **Doubly robust (dr)**: Combine both methods (default, recommended by CS 2021)
 
 **Tract-specific trends:**
 
 Including tract-specific linear trends allows for mild violations of parallel trends
 where treated and control groups have different baseline growth rates, as long as
-the difference is linear.
+the difference is linear. Trends are estimated using pre-treatment data only to
+avoid contamination from treatment effects.
 """
 
 import logging
@@ -26,8 +25,15 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from scipy import stats
+from sklearn.linear_model import LogisticRegression
 
 from pipeline.base import Analyzer
+
+# Default covariates for propensity score / outcome regression
+DEFAULT_COVARIATES = [
+    "median_income", "median_house_value", "baseline_rent",
+    "pct_bachelor", "pct_rented", "median_age", "total_population",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +53,7 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
         include_covariates: bool = True,
         include_tract_trends: bool = True,
         covariates: list[str] | None = None,
+        estimation_method: str = "dr",
     ) -> None:
         """Initialize the enhanced CS analyzer.
 
@@ -57,26 +64,36 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             include_covariates: Whether to adjust for time-invariant covariates
             include_tract_trends: Whether to include tract-specific linear time trends
             covariates: List of covariate names to include (None = use defaults)
+            estimation_method: "dr" (doubly robust, default), "ipw", or "or" (outcome regression)
         """
         super().__init__(
             "callaway_santanna_with_controls",
             "Callaway & Sant'Anna with covariate adjustment and tract trends",
         )
+        if estimation_method not in ("dr", "ipw", "or"):
+            raise ValueError(f"estimation_method must be 'dr', 'ipw', or 'or', got '{estimation_method}'")
         self.comparison_group = comparison_group
         self.anticipation = anticipation
         self.min_cohort_size = min_cohort_size
         self.include_covariates = include_covariates
         self.include_tract_trends = include_tract_trends
         self.covariates = covariates
+        self.estimation_method = estimation_method
+        self._propensity_diagnostics: list[dict] = []
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Estimate group-time ATTs with covariate adjustment."""
         logger.info("Starting Callaway & Sant'Anna with controls...")
         logger.info("Comparison group: %s", self.comparison_group)
+        logger.info("Estimation method: %s", self.estimation_method)
         logger.info("Include covariates: %s", self.include_covariates)
         logger.info("Include tract trends: %s", self.include_tract_trends)
+        self._propensity_diagnostics = []
 
-        did_panel = context.get("did_panel")
+        # Prefer the panel with covariates; fall back to base panel
+        did_panel = context.get("did_panel_with_covariates")
+        if did_panel is None:
+            did_panel = context.get("did_panel")
         if did_panel is None:
             logger.error("did_panel not found in context")
             raise ValueError("did_panel not found in context")
@@ -120,28 +137,47 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             "cs_with_controls": True,
             "cs_include_covariates": self.include_covariates,
             "cs_include_tract_trends": self.include_tract_trends,
+            "cs_estimation_method": self.estimation_method,
+            "cs_propensity_diagnostics": self._propensity_diagnostics,
         }
 
     def _residualize_outcome(
         self, df: pd.DataFrame, context: dict[str, Any]
     ) -> pd.DataFrame:
-        """Residualize rental_price on covariates and/or tract trends."""
-        logger.info("Residualizing outcome on controls...")
+        """Residualize rental_price on covariates and/or tract trends.
 
-        # Build control matrix
+        IMPORTANT: Only fits on pre-treatment data to avoid treatment effects
+        contaminating the trend estimates. For treated tracts, pre-treatment means
+        months before their first treatment. For never-treated tracts, all months
+        are used.
+        """
+        logger.info("Residualizing outcome on controls (pre-treatment fit only)...")
+
+        # --- Build pre-treatment mask ---
+        # For each treated tract, find its first treatment month
+        tract_first_treatment = (
+            df[df["treated"] == 1]
+            .groupby("tract_geoid")["month"]
+            .min()
+        )
+        # Map each row to its tract's first treatment month (NaT for never-treated)
+        df["_first_treat"] = df["tract_geoid"].map(tract_first_treatment)
+        # Pre-treatment: never-treated tracts (NaT) OR month < first treatment
+        pre_treatment_mask = df["_first_treat"].isna() | (df["month"] < df["_first_treat"])
+        logger.info(
+            "  Pre-treatment observations: %d / %d (%.1f%%)",
+            pre_treatment_mask.sum(), len(df), 100 * pre_treatment_mask.mean(),
+        )
+
+        # --- Build control matrix ---
         X_components = []
 
-        # Time-invariant covariates
         if self.include_covariates:
-            covariate_list = self.covariates or [
-                "median_income", "median_house_value", "baseline_rent",
-                "pct_bachelor", "pct_rented", "median_age", "total_population"
-            ]
+            covariate_list = self.covariates or DEFAULT_COVARIATES
 
-            covariate_data = pd.DataFrame()
+            covariate_data = pd.DataFrame(index=df.index)
             for cov in covariate_list:
                 if cov in df.columns and df[cov].notna().sum() > 0:
-                    # Standardize
                     cov_std = df[cov].std()
                     if cov_std > 0:
                         covariate_data[cov] = (df[cov] - df[cov].mean()) / cov_std
@@ -150,52 +186,53 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             if not covariate_data.empty:
                 X_components.append(covariate_data)
 
-        # Tract-specific linear time trends
         if self.include_tract_trends:
             logger.info("  Adding tract-specific linear time trends")
-
-            # Create time index (months since start of panel)
             df["time_index"] = (
                 (df["month"] - df["month"].min()).dt.days / 30.44
             ).astype(int)
 
-            # Interaction: tract × time
-            # Use dummy variables for tracts
             tract_dummies = pd.get_dummies(
                 df["tract_geoid"], prefix="tract", drop_first=True
             )
-
-            # Multiply each tract dummy by time_index
             tract_trends = tract_dummies.multiply(df["time_index"], axis=0)
             tract_trends.columns = [col + "_trend" for col in tract_trends.columns]
-
             X_components.append(tract_trends)
 
         if not X_components:
             logger.warning("No controls to residualize on")
+            df.drop(columns=["_first_treat"], inplace=True)
             return df
 
-        # Build design matrix
-        y = df["rental_price"].values
-        X = pd.concat(X_components, axis=1)
-        X = sm.add_constant(X, has_constant="add")
+        # --- Fit on pre-treatment data only, predict for full panel ---
+        y_full = df["rental_price"].values
+        X_full = pd.concat(X_components, axis=1)
+        # Fill NaN covariates with 0 (covariates are standardized, so 0 = mean)
+        n_nan = X_full.isna().sum().sum()
+        if n_nan > 0:
+            logger.info("  Filling %d NaN values in design matrix with 0 (mean-imputed)", n_nan)
+            X_full = X_full.fillna(0)
+        X_full = sm.add_constant(X_full, has_constant="add")
 
-        # Fit regression
+        X_pre = X_full.loc[pre_treatment_mask]
+        y_pre = y_full[pre_treatment_mask.values]
+
         try:
-            model = sm.OLS(y, X).fit()
-            residuals = model.resid
+            model = sm.OLS(y_pre, X_pre).fit()
+            predicted_full = model.predict(X_full)
 
-            # Replace rental_price with residuals (re-centered at original mean)
             df["rental_price_original"] = df["rental_price"]
-            df["rental_price"] = residuals + df["rental_price"].mean()
+            original_mean = df["rental_price"].mean()
+            df["rental_price"] = y_full - predicted_full + original_mean
 
             logger.info(
-                "Residualized outcome: R² = %.4f, %d controls used",
-                model.rsquared, X.shape[1] - 1  # -1 for constant
+                "Residualized outcome (pre-treatment fit): R² = %.4f, %d controls, %d pre-obs",
+                model.rsquared, X_pre.shape[1] - 1, len(X_pre),
             )
         except Exception as e:
             logger.warning("Residualization failed: %s. Using original outcome.", e)
 
+        df.drop(columns=["_first_treat"], inplace=True)
         return df
 
     def _identify_cohorts(self, df: pd.DataFrame) -> dict[str, Any]:
@@ -295,6 +332,53 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
 
         return pd.DataFrame(results)
 
+    def _compute_first_differences(
+        self,
+        df: pd.DataFrame,
+        tract_ids: list | np.ndarray,
+        current_date: pd.Timestamp,
+        pre_period: pd.Timestamp,
+    ) -> pd.DataFrame | None:
+        """Compute ΔY_i = Y_{i,t} - Y_{i,g-1} for a set of tracts.
+
+        Returns a DataFrame indexed by tract_geoid with column 'change',
+        or None if insufficient data.
+        """
+        sub = df[
+            (df["tract_geoid"].isin(tract_ids))
+            & (df["month"].isin([current_date, pre_period]))
+        ][["tract_geoid", "month", "rental_price"]]
+
+        pivoted = sub.pivot(index="tract_geoid", columns="month", values="rental_price")
+        if current_date not in pivoted.columns or pre_period not in pivoted.columns:
+            return None
+
+        pivoted["change"] = pivoted[current_date] - pivoted[pre_period]
+        pivoted = pivoted.dropna(subset=["change"])
+        if pivoted.empty:
+            return None
+        return pivoted[["change"]]
+
+    def _get_tract_covariates(self, df: pd.DataFrame, tract_ids) -> pd.DataFrame:
+        """Get time-invariant covariates for a set of tracts (one row per tract)."""
+        covariate_list = self.covariates or DEFAULT_COVARIATES
+        available = [c for c in covariate_list if c in df.columns]
+        if not available:
+            return pd.DataFrame(index=pd.Index(tract_ids, name="tract_geoid"))
+
+        tract_covs = df.groupby("tract_geoid")[available].first()
+        tract_covs = tract_covs.loc[tract_covs.index.isin(tract_ids)]
+
+        # Standardize each column
+        for col in available:
+            std = tract_covs[col].std()
+            if std > 0:
+                tract_covs[col] = (tract_covs[col] - tract_covs[col].mean()) / std
+            else:
+                tract_covs.drop(columns=[col], inplace=True)
+
+        return tract_covs.dropna()
+
     def _estimate_single_att(
         self,
         df: pd.DataFrame,
@@ -303,61 +387,216 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
         cohort_date: pd.Timestamp,
         current_date: pd.Timestamp,
     ) -> dict[str, float] | None:
-        """Estimate a single ATT(g,t) using outcome regression DiD."""
+        """Estimate a single ATT(g,t), dispatching by estimation_method."""
         pre_period = cohort_date - pd.DateOffset(months=1)
 
-        treated_current = df[
-            (df["tract_geoid"].isin(cohort_tracts)) & (df["month"] == current_date)
-        ]["rental_price"]
-        treated_pre = df[
-            (df["tract_geoid"].isin(cohort_tracts)) & (df["month"] == pre_period)
-        ]["rental_price"]
+        # Compute first differences for both groups
+        treated_diff = self._compute_first_differences(df, cohort_tracts, current_date, pre_period)
+        control_diff = self._compute_first_differences(df, comparison_tracts, current_date, pre_period)
 
-        control_current = df[
-            (df["tract_geoid"].isin(comparison_tracts)) & (df["month"] == current_date)
-        ]["rental_price"]
-        control_pre = df[
-            (df["tract_geoid"].isin(comparison_tracts)) & (df["month"] == pre_period)
-        ]["rental_price"]
-
-        if len(treated_current) == 0 or len(treated_pre) == 0:
+        if treated_diff is None or control_diff is None:
             return None
-        if len(control_current) == 0 or len(control_pre) == 0:
+        if len(treated_diff) == 0 or len(control_diff) == 0:
             return None
 
-        # Compute first differences
-        treated_df = df[
-            (df["tract_geoid"].isin(cohort_tracts)) &
-            (df["month"].isin([current_date, pre_period]))
-        ][["tract_geoid", "month", "rental_price"]]
-        treated_diff = treated_df.pivot(
-            index="tract_geoid", columns="month", values="rental_price"
-        )
-        if current_date not in treated_diff.columns or pre_period not in treated_diff.columns:
-            return None
-        treated_diff["change"] = treated_diff[current_date] - treated_diff[pre_period]
+        if self.estimation_method == "or":
+            return self._estimate_att_or(treated_diff, control_diff)
 
-        control_df = df[
-            (df["tract_geoid"].isin(comparison_tracts)) &
-            (df["month"].isin([current_date, pre_period]))
-        ][["tract_geoid", "month", "rental_price"]]
-        control_diff = control_df.pivot(
-            index="tract_geoid", columns="month", values="rental_price"
-        )
-        if current_date not in control_diff.columns or pre_period not in control_diff.columns:
-            return None
-        control_diff["change"] = control_diff[current_date] - control_diff[pre_period]
+        # For DR and IPW we need covariates
+        all_tract_ids = list(treated_diff.index) + list(control_diff.index)
+        covariates = self._get_tract_covariates(df, all_tract_ids)
 
-        # ATT is the difference in changes
+        # Fallback to OR if not enough covariates or tracts
+        n_covs = covariates.shape[1] if not covariates.empty else 0
+        n_total = len(treated_diff) + len(control_diff)
+        if n_covs == 0 or n_total < 2 * n_covs:
+            logger.debug(
+                "Falling back to OR: n_covs=%d, n_total=%d", n_covs, n_total
+            )
+            return self._estimate_att_or(treated_diff, control_diff)
+
+        if self.estimation_method == "ipw":
+            return self._estimate_att_ipw(treated_diff, control_diff, covariates)
+
+        # Default: doubly robust
+        return self._estimate_att_dr(treated_diff, control_diff, covariates)
+
+    def _estimate_att_or(
+        self,
+        treated_diff: pd.DataFrame,
+        control_diff: pd.DataFrame,
+    ) -> dict[str, float]:
+        """Outcome regression only — simple DiD (original behavior)."""
         att = treated_diff["change"].mean() - control_diff["change"].mean()
 
-        # Standard error
         treated_var = treated_diff["change"].var()
         control_var = control_diff["change"].var()
         n_treated = len(treated_diff)
         n_control = len(control_diff)
 
         se = np.sqrt(treated_var / n_treated + control_var / n_control)
+        return {"att": att, "se": se}
+
+    def _estimate_att_ipw(
+        self,
+        treated_diff: pd.DataFrame,
+        control_diff: pd.DataFrame,
+        covariates: pd.DataFrame,
+    ) -> dict[str, float]:
+        """Inverse probability weighting estimator."""
+        treated_ids = set(treated_diff.index)
+        control_ids = set(control_diff.index)
+
+        # Align covariates with tracts that have valid diffs
+        valid_ids = (treated_ids | control_ids) & set(covariates.index)
+        treated_ids = treated_ids & valid_ids
+        control_ids = control_ids & valid_ids
+
+        if len(treated_ids) == 0 or len(control_ids) == 0:
+            return self._estimate_att_or(treated_diff, control_diff)
+
+        all_ids = sorted(treated_ids | control_ids)
+        X = covariates.loc[all_ids].values
+        D = np.array([1 if tid in treated_ids else 0 for tid in all_ids])
+
+        # Fit propensity score
+        try:
+            lr = LogisticRegression(C=1.0, max_iter=1000, solver="lbfgs")
+            lr.fit(X, D)
+            p_hat = lr.predict_proba(X)[:, 1]
+        except Exception:
+            logger.debug("Logistic regression failed, falling back to OR")
+            return self._estimate_att_or(treated_diff, control_diff)
+
+        # Trim propensity scores
+        p_hat = np.clip(p_hat, 0.01, 0.99)
+
+        # Build arrays aligned to all_ids
+        delta_y = np.array([
+            treated_diff.loc[tid, "change"] if tid in treated_ids
+            else control_diff.loc[tid, "change"]
+            for tid in all_ids
+        ])
+
+        # IPW weights for comparison units
+        treated_mask = D == 1
+        control_mask = D == 0
+
+        odds = p_hat[control_mask] / (1.0 - p_hat[control_mask])
+        if odds.sum() == 0:
+            logger.debug("All-zero IPW weights, falling back to OR")
+            return self._estimate_att_or(treated_diff, control_diff)
+        w = odds / odds.sum()
+
+        n_g = treated_mask.sum()
+        att = (delta_y[treated_mask].sum() / n_g) - np.dot(w, delta_y[control_mask])
+
+        # Influence-function SE
+        p_g = n_g / len(D)
+        influence = np.zeros(len(D))
+        influence[treated_mask] = (1.0 / p_g) * (delta_y[treated_mask] - att)
+        w_full = np.zeros(len(D))
+        w_full[control_mask] = w
+        influence[control_mask] = -w_full[control_mask] * delta_y[control_mask] / p_g
+        se = np.sqrt(np.mean(influence ** 2) / len(D))
+
+        # Record diagnostics
+        self._propensity_diagnostics.append({
+            "p_hat_mean": float(p_hat.mean()),
+            "p_hat_min": float(p_hat.min()),
+            "p_hat_max": float(p_hat.max()),
+            "n_treated": int(n_g),
+            "n_control": int(control_mask.sum()),
+        })
+
+        return {"att": att, "se": se}
+
+    def _estimate_att_dr(
+        self,
+        treated_diff: pd.DataFrame,
+        control_diff: pd.DataFrame,
+        covariates: pd.DataFrame,
+    ) -> dict[str, float]:
+        """Doubly robust DiD estimator (Sant'Anna & Zhao 2020)."""
+        treated_ids = set(treated_diff.index)
+        control_ids = set(control_diff.index)
+
+        # Align covariates with tracts that have valid diffs
+        valid_ids = (treated_ids | control_ids) & set(covariates.index)
+        treated_ids = treated_ids & valid_ids
+        control_ids = control_ids & valid_ids
+
+        if len(treated_ids) == 0 or len(control_ids) == 0:
+            return self._estimate_att_or(treated_diff, control_diff)
+
+        all_ids = sorted(treated_ids | control_ids)
+        X = covariates.loc[all_ids].values
+        D = np.array([1 if tid in treated_ids else 0 for tid in all_ids])
+        delta_y = np.array([
+            treated_diff.loc[tid, "change"] if tid in treated_ids
+            else control_diff.loc[tid, "change"]
+            for tid in all_ids
+        ])
+
+        treated_mask = D == 1
+        control_mask = D == 0
+        n_g = int(treated_mask.sum())
+        n = len(D)
+
+        # --- Step 1: Propensity score ---
+        try:
+            lr = LogisticRegression(C=1.0, max_iter=1000, solver="lbfgs")
+            lr.fit(X, D)
+            p_hat = lr.predict_proba(X)[:, 1]
+        except Exception:
+            logger.debug("Logistic regression failed in DR, falling back to OR")
+            return self._estimate_att_or(treated_diff, control_diff)
+
+        p_hat = np.clip(p_hat, 0.01, 0.99)
+
+        # --- Step 2: Outcome regression on comparison tracts ---
+        X_control = X[control_mask]
+        y_control = delta_y[control_mask]
+
+        try:
+            X_control_c = sm.add_constant(X_control, has_constant="add")
+            or_model = sm.OLS(y_control, X_control_c).fit()
+            X_all_c = sm.add_constant(X, has_constant="add")
+            m_hat = or_model.predict(X_all_c)
+        except Exception:
+            logger.debug("OLS in DR failed, falling back to IPW")
+            return self._estimate_att_ipw(treated_diff, control_diff, covariates)
+
+        # --- Step 3: DR combination ---
+        # IPW weights for comparison units
+        odds = p_hat[control_mask] / (1.0 - p_hat[control_mask])
+        if odds.sum() == 0:
+            logger.debug("All-zero IPW weights in DR, falling back to OR")
+            return self._estimate_att_or(treated_diff, control_diff)
+        w = odds / odds.sum()
+
+        # ATT_DR = mean over treated of [ΔY - m̂(X)] - weighted sum over control of [ΔY - m̂(X)]
+        resid = delta_y - m_hat
+        att = resid[treated_mask].mean() - np.dot(w, resid[control_mask])
+
+        # --- Step 4: Influence function SE ---
+        p_g = n_g / n
+        w_full = np.zeros(n)
+        w_full[control_mask] = w
+
+        influence = np.zeros(n)
+        influence[treated_mask] = (1.0 / p_g) * (resid[treated_mask] - att)
+        influence[control_mask] = -w_full[control_mask] * resid[control_mask] / p_g
+        se = np.sqrt(np.mean(influence ** 2) / n)
+
+        # Record diagnostics
+        self._propensity_diagnostics.append({
+            "p_hat_mean": float(p_hat.mean()),
+            "p_hat_min": float(p_hat.min()),
+            "p_hat_max": float(p_hat.max()),
+            "n_treated": int(n_g),
+            "n_control": int(control_mask.sum()),
+        })
 
         return {"att": att, "se": se}
 
