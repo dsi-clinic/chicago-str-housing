@@ -182,6 +182,7 @@ class EventStudyCovariatesVisualizer(Visualizer):
     """
 
     def __init__(self, output_dir: str | None = None) -> None:
+        """Initialize the event study with covariates visualizer."""
         super().__init__(
             "event_study_covariates_visualization",
             "Event study plot (with covariate controls)",
@@ -190,6 +191,7 @@ class EventStudyCovariatesVisualizer(Visualizer):
         self.required_data = ["event_study_results_with_covariates"]
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Create event study visualization with covariates."""
         logger.info("Creating event study visualization (with covariates)...")
 
         coef_df = context["event_study_results_with_covariates"].copy()

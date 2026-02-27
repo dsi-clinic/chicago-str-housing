@@ -16,6 +16,10 @@ from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
 
+SIGNIFICANCE_LEVEL = 0.05
+PRE_TREND_VIOLATION_THRESHOLD = 0.2
+LARGE_PRE_COEF_THRESHOLD = 20
+
 
 class EventStudyAnalyzer(Analyzer):
     """Estimate event study model for DiD analysis.
@@ -131,7 +135,7 @@ class EventStudyAnalyzer(Analyzer):
 
     def _estimate_event_study(
         self, panel: pd.DataFrame, rel_time_cols: list[str]
-    ) -> Any:
+    ) -> Any:  # noqa: ANN401
         """Estimate the event study model."""
         logger.info("  Estimating model with entity and time fixed effects...")
 
@@ -147,7 +151,9 @@ class EventStudyAnalyzer(Analyzer):
         return results
 
     def _extract_coefficients(
-        self, results: Any, rel_time_cols: list[str]
+        self,
+        results: Any,  # noqa: ANN401
+        rel_time_cols: list[str],
     ) -> pd.DataFrame:
         """Extract coefficients and confidence intervals."""
 
@@ -198,7 +204,9 @@ class EventStudyAnalyzer(Analyzer):
         return coef_df
 
     def _test_parallel_trends(
-        self, results: Any, coef_df: pd.DataFrame
+        self,
+        results: Any,  # noqa: ANN401
+        coef_df: pd.DataFrame,
     ) -> dict[str, Any]:
         """Test whether pre-treatment coefficients are jointly zero."""
         # Get pre-treatment coefficients (excluding reference period)
@@ -215,7 +223,7 @@ class EventStudyAnalyzer(Analyzer):
             }
 
         # Count individually significant coefficients
-        n_significant = (pre_coefs["p_value"] < 0.05).sum()
+        n_significant = (pre_coefs["p_value"] < SIGNIFICANCE_LEVEL).sum()
         n_pre_periods = len(pre_coefs)
 
         # Average absolute pre-treatment coefficient
@@ -223,11 +231,11 @@ class EventStudyAnalyzer(Analyzer):
 
         # Simple heuristic: if more than 20% of pre-treatment coefficients
         # are significant, parallel trends may be violated
-        if n_significant / n_pre_periods > 0.2:
+        if n_significant / n_pre_periods > PRE_TREND_VIOLATION_THRESHOLD:
             conclusion = (
                 "Potential violation: multiple significant pre-treatment effects"
             )
-        elif avg_abs_coef > 20:  # More than $20 average deviation
+        elif avg_abs_coef > LARGE_PRE_COEF_THRESHOLD:
             conclusion = "Potential violation: large pre-treatment coefficients"
         else:
             conclusion = "Parallel trends plausible: pre-treatment effects near zero"
@@ -265,7 +273,7 @@ class EventStudyAnalyzer(Analyzer):
         logger.info("  Mean: $%.2f", post_coefs["coefficient"].mean())
         logger.info(
             "  Immediate effect (k=0): $%.2f",
-            coef_df[coef_df["relative_time"] == 0]["coefficient"].values[0],
+            coef_df[coef_df["relative_time"] == 0]["coefficient"].to_numpy()[0],
         )
 
         # Parallel trends test

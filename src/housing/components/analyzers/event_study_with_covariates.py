@@ -48,6 +48,7 @@ LAG_LIMIT = 36  # 3 years of post-treatment periods
 LEAD_BIN_LABEL = -999  # <= -LEAD_LIMIT - 1
 LAG_BIN_LABEL = 999  # >= LAG_LIMIT + 1
 REFERENCE_PERIOD = -1
+Z_CRITICAL_95 = 1.96
 
 
 class EventStudyWithCovariatesAnalyzer(Analyzer):
@@ -82,19 +83,21 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
             logger.error("No DID panel found in context")
             raise ValueError("No DID panel found in context")
 
-        df = did_panel.copy()
-        df = df.dropna(subset=["rental_price"]).reset_index(drop=True)
-        if df.empty:
+        panel = did_panel.copy()
+        panel = panel.dropna(subset=["rental_price"]).reset_index(drop=True)
+        if panel.empty:
             logger.error("No non-missing rental_price in did_panel")
             raise ValueError("No valid observations for event study")
 
         # Panel structure and balance checks
-        n_tracts = df["tract_geoid"].nunique()
-        n_months = df["month"].nunique()
-        obs_per_tract = df.groupby("tract_geoid").size()
-        n_obs = len(df)
-        is_balanced = obs_per_tract.nunique() == 1 and obs_per_tract.iloc[0] == n_months
-        month_min, month_max = df["month"].min(), df["month"].max()
+        n_tracts = panel["tract_geoid"].nunique()
+        n_months = panel["month"].nunique()
+        obs_per_tract = panel.groupby("tract_geoid").size()
+        n_obs = len(panel)
+        is_balanced = (
+            obs_per_tract.min() == obs_per_tract.max()
+        ) and obs_per_tract.iloc[0] == n_months
+        month_min, month_max = panel["month"].min(), panel["month"].max()
         logger.info(
             "Panel structure: %d tracts, %d months, %d obs; date range %s to %s",
             n_tracts,
@@ -112,7 +115,7 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
         )
 
         # Relative time range in raw data (among treated obs)
-        rel_raw = df["months_since_treatment"].dropna()
+        rel_raw = panel["months_since_treatment"].dropna()
         if len(rel_raw) > 0:
             rel_min, rel_max = int(rel_raw.min()), int(rel_raw.max())
             logger.info(
@@ -123,30 +126,34 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
             )
 
         # Build relative-time bin (reference = -1; never-treated coded as reference)
-        df["rel_time_raw"] = df["months_since_treatment"].copy()
+        panel["rel_time_raw"] = panel["months_since_treatment"].copy()
         # Never-treated: no event time -> reference period
-        df.loc[df["rel_time_raw"].isna(), "rel_time_raw"] = REFERENCE_PERIOD
+        panel.loc[panel["rel_time_raw"].isna(), "rel_time_raw"] = REFERENCE_PERIOD
         # Bin far leads/lags
-        df["rel_time_bin"] = df["rel_time_raw"].astype(float)
-        df.loc[df["rel_time_bin"] < -LEAD_LIMIT, "rel_time_bin"] = float(LEAD_BIN_LABEL)
-        df.loc[df["rel_time_bin"] > LAG_LIMIT, "rel_time_bin"] = float(LAG_BIN_LABEL)
-        df["rel_time_bin"] = df["rel_time_bin"].astype(int)
+        panel["rel_time_bin"] = panel["rel_time_raw"].astype(float)
+        panel.loc[panel["rel_time_bin"] < -LEAD_LIMIT, "rel_time_bin"] = float(
+            LEAD_BIN_LABEL
+        )
+        panel.loc[panel["rel_time_bin"] > LAG_LIMIT, "rel_time_bin"] = float(
+            LAG_BIN_LABEL
+        )
+        panel["rel_time_bin"] = panel["rel_time_bin"].astype(int)
 
         # Build design matrix: rel_time dummies (omit -1) + covariates + tract + month
-        rel_bins = sorted(df["rel_time_bin"].unique())
+        rel_bins = sorted(panel["rel_time_bin"].unique())
         ref_bin = REFERENCE_PERIOD
         if ref_bin not in rel_bins:
-            ref_bin = int(df["rel_time_bin"].mode().iloc[0])
-        rel_dummies = pd.get_dummies(df["rel_time_bin"], prefix="rel", dtype=float)
+            ref_bin = int(panel["rel_time_bin"].mode().iloc[0])
+        rel_dummies = pd.get_dummies(panel["rel_time_bin"], prefix="rel", dtype=float)
         if f"rel_{ref_bin}" in rel_dummies.columns:
             rel_dummies = rel_dummies.drop(columns=[f"rel_{ref_bin}"])
 
         # Tract and month as categorical (drop first to avoid collinearity)
         tract_dummies = pd.get_dummies(
-            df["tract_geoid"], prefix="tract", drop_first=True, dtype=float
+            panel["tract_geoid"], prefix="tract", drop_first=True, dtype=float
         )
         month_rank = (
-            df["month"].astype("datetime64[ns]").rank(method="dense").astype(int)
+            panel["month"].astype("datetime64[ns]").rank(method="dense").astype(int)
         )
         month_dummies = pd.get_dummies(
             month_rank, prefix="month", drop_first=True, dtype=float
@@ -175,9 +182,9 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
                 ]
 
         for cov in potential_covariates:
-            if cov in df.columns:
+            if cov in panel.columns:
                 # Use only finite values for checks and standardization
-                ser = df[cov].replace([np.inf, -np.inf], np.nan)
+                ser = panel[cov].replace([np.inf, -np.inf], np.nan)
                 n_ok = ser.notna().sum()
                 n_unique = ser.nunique()
                 if n_ok > 0 and n_unique > 1:
@@ -204,7 +211,7 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
             logger.warning("No valid covariates found, running without covariates")
 
         # Construct full design matrix
-        y = df["rental_price"].values
+        y = panel["rental_price"].to_numpy()
         X_components = [rel_dummies, tract_dummies, month_dummies]
         if not covariate_data.empty:
             X_components.append(covariate_data)
@@ -213,7 +220,7 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
         X = add_constant(X, has_constant="add")
 
         # Drop any column that is constant (can happen with few clusters)
-        const_cols = X.columns[X.nunique() <= 1]
+        const_cols = X.columns[X.apply(lambda col: col.min() == col.max())]
         if len(const_cols) > 0:
             X = X.drop(columns=list(const_cols))
             logger.info(
@@ -231,9 +238,9 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
             )
             X = X.loc[valid].reset_index(drop=True)
             y = y[valid]
-            groups = df.loc[valid, "tract_geoid"].values
+            groups = panel.loc[valid, "tract_geoid"].to_numpy()
         else:
-            groups = df["tract_geoid"].values
+            groups = panel["tract_geoid"].to_numpy()
 
         with warnings.catch_warnings():
             warnings.filterwarnings(
@@ -314,7 +321,9 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
                         "se": se,
                         "ci_low": ci_lo,
                         "ci_high": ci_hi,
-                        "significant": abs(coef / se) > 1.96 if se > 0 else False,
+                        "significant": abs(coef / se) > Z_CRITICAL_95
+                        if se > 0
+                        else False,
                     }
                 )
 

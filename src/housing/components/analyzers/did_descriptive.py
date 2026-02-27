@@ -14,6 +14,8 @@ from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
 
+SIGNIFICANCE_LEVEL = 0.05
+
 
 class DIDDescriptiveAnalyzer(Analyzer):
     """Compute descriptive statistics for DiD analysis.
@@ -82,17 +84,19 @@ class DIDDescriptiveAnalyzer(Analyzer):
             "first_treatment_date": adoption_stats["first_treatment_date"],
         }
 
-    def _add_ever_treated(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _add_ever_treated(self, panel: pd.DataFrame) -> pd.DataFrame:
         """Add ever_treated indicator to the panel.
 
         A tract is ever_treated if it receives treatment at any point in the sample.
         """
-        ever_treated = df.groupby("tract_geoid")["treated"].max()
+        ever_treated = panel.groupby("tract_geoid")["treated"].max()
         ever_treated_tracts = ever_treated[ever_treated == 1].index
 
-        df["ever_treated"] = df["tract_geoid"].isin(ever_treated_tracts).astype(int)
+        panel["ever_treated"] = (
+            panel["tract_geoid"].isin(ever_treated_tracts).astype(int)
+        )
 
-        return df
+        return panel
 
     def _compute_adoption_stats(self, df: pd.DataFrame) -> dict[str, Any]:
         """Compute treatment adoption statistics over time."""
@@ -128,7 +132,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
     def _compute_avg_by_group(self, df: pd.DataFrame) -> pd.DataFrame:
         """Compute average rental prices by ever_treated status and month."""
         avg_by_group = (
-            df.groupby(["month", "ever_treated"])["rental_price"].mean().unstack()
+            df.groupby(["month", "ever_treated"])["rental_price"].mean().unstack()  # noqa: PD010
         )
         avg_by_group.columns = ["Never Treated", "Eventually Treated"]
 
@@ -241,7 +245,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
                 logger.info("  t-statistic: %.2f", balance_test["t_stat"])
                 logger.info("  p-value: %.4f", balance_test["p_value"])
 
-                if balance_test["p_value"] < 0.05:
+                if balance_test["p_value"] < SIGNIFICANCE_LEVEL:
                     logger.warning(
                         "  Groups have statistically different pre-treatment rents (p < 0.05)"
                     )

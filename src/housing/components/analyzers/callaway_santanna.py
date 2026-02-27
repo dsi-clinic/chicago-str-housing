@@ -374,7 +374,9 @@ class CallawaySantAnnaAnalyzer(Analyzer):
 
         # Weighted average
         overall_att = np.sum(post_treatment["att"].to_numpy() * weights)
-        overall_se = np.sqrt(np.sum((post_treatment["se"].to_numpy() ** 2) * (weights**2)))
+        overall_se = np.sqrt(
+            np.sum((post_treatment["se"].to_numpy() ** 2) * (weights**2))
+        )
 
         ci_low = overall_att - 1.96 * overall_se
         ci_high = overall_att + 1.96 * overall_se

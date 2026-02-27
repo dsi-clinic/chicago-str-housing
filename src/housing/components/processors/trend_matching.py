@@ -186,12 +186,12 @@ class TrendMatchingProcessor(DataProcessor):
             n_neighbors=min(self.k_neighbors, len(control_trends)),
             metric="euclidean",
         )
-        nn.fit(control_trends[[matching_var]].values)
+        nn.fit(control_trends[[matching_var]].to_numpy())
 
         # Find matches for each treated tract
         matching_records = []
 
-        for idx, treated_row in treated_trends.iterrows():
+        for _idx, treated_row in treated_trends.iterrows():
             treated_slope = treated_row[matching_var]
 
             # Find k nearest neighbors

@@ -36,7 +36,7 @@ def _get_twfe_results_df(context: dict[str, Any]) -> pd.DataFrame | None:
     if coef_df is None or coef_df.empty:
         return None
     # Map housing column names to TWFE comparison format; drop k=-1 reference period
-    df = coef_df.rename(
+    twfe_data = coef_df.rename(
         columns={
             "relative_time": "rel_time",
             "coefficient": "coef",
@@ -45,7 +45,7 @@ def _get_twfe_results_df(context: dict[str, Any]) -> pd.DataFrame | None:
             "std_error": "se",
         }
     )[["rel_time", "coef", "ci_low", "ci_high", "se"]].copy()
-    return df[df["rel_time"] != -1].reset_index(drop=True)
+    return twfe_data[twfe_data["rel_time"] != -1].reset_index(drop=True)
 
 
 class CallawaySantAnnaVisualizer(Visualizer):
@@ -171,7 +171,7 @@ class CallawaySantAnnaVisualizer(Visualizer):
                 f"Overall ATT: ${att_val:.2f}\n(SE: ${se_val:.2f})",
                 transform=ax.transAxes,
                 verticalalignment="top",
-                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+                bbox={"boxstyle": "round", "facecolor": "wheat", "alpha": 0.5},
                 fontsize=9,
             )
 

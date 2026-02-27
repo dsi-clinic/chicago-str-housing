@@ -15,6 +15,9 @@ from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
 
+SIGNIFICANCE_LEVEL = 0.05
+BALANCE_THRESHOLD = 0.1  # |Cohen's d| threshold for imbalance
+
 
 class PretrendDiagnosticAnalyzer(Analyzer):
     """Diagnose pre-treatment trend divergence and test parallel trends assumption."""
@@ -37,19 +40,19 @@ class PretrendDiagnosticAnalyzer(Analyzer):
         if did_panel is None:
             raise ValueError("No DID panel found in context")
 
-        df = did_panel.copy()
+        panel = did_panel.copy()
 
         # 1. Compare tract characteristics by treatment status
-        tract_comparison = self._compare_tract_characteristics(df)
+        tract_comparison = self._compare_tract_characteristics(panel)
 
         # 2. Test for differential pre-trends
-        pretrend_test = self._test_pretrends(df)
+        pretrend_test = self._test_pretrends(panel)
 
         # 3. Analyze pre-treatment rental price divergence
-        rent_divergence = self._analyze_rent_divergence(df)
+        rent_divergence = self._analyze_rent_divergence(panel)
 
         # 4. Check balance on covariates
-        balance_check = self._check_covariate_balance(df)
+        balance_check = self._check_covariate_balance(panel)
 
         # Log key findings
         self._log_diagnostic_summary(tract_comparison, pretrend_test, rent_divergence)
@@ -124,7 +127,7 @@ class PretrendDiagnosticAnalyzer(Analyzer):
                     "t_statistic": t_stat,
                     "p_value": p_value,
                     "cohens_d": cohens_d,
-                    "significant": p_value < 0.05,
+                    "significant": p_value < SIGNIFICANCE_LEVEL,
                     "n_treated": len(treated_vals),
                     "n_control": len(control_vals),
                 }
@@ -185,12 +188,12 @@ class PretrendDiagnosticAnalyzer(Analyzer):
                 "interaction_coef": interaction_coef,
                 "interaction_se": interaction_se,
                 "p_value": interaction_pval,
-                "significant": interaction_pval < 0.05
+                "significant": interaction_pval < SIGNIFICANCE_LEVEL
                 if not pd.isna(interaction_pval)
                 else False,
                 "interpretation": (
                     "Pre-trends differ significantly (parallel trends violated)"
-                    if interaction_pval < 0.05
+                    if interaction_pval < SIGNIFICANCE_LEVEL
                     else "Pre-trends do not differ significantly (parallel trends plausible)"
                 ),
             }
@@ -224,7 +227,7 @@ class PretrendDiagnosticAnalyzer(Analyzer):
         )
 
         # Pivot to get treated and control in separate columns
-        monthly_avg = monthly_avg.pivot(
+        monthly_avg = monthly_avg.pivot_table(
             index="month", columns="ever_treated", values="rental_price"
         ).reset_index()
 
@@ -244,7 +247,7 @@ class PretrendDiagnosticAnalyzer(Analyzer):
             return {"error": "No covariates available"}
 
         # Rule of thumb: |standardized difference| > 0.1 indicates imbalance
-        imbalanced = comparison[abs(comparison["cohens_d"]) > 0.1]
+        imbalanced = comparison[abs(comparison["cohens_d"]) > BALANCE_THRESHOLD]
 
         balance_summary = {
             "n_covariates": len(comparison),

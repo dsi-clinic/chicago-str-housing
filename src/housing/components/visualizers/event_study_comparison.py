@@ -117,10 +117,11 @@ class EventStudyComparisonVisualizer(Visualizer):
         ax2.set_xlim(plot_min - 0.5, plot_max + 0.5)
 
         covariates_used = context.get("event_study_covariates_used", [])
+        max_display_covariates = 3
         if covariates_used:
-            cov_str = ", ".join(covariates_used[:3])
-            if len(covariates_used) > 3:
-                cov_str += f", +{len(covariates_used) - 3} more"
+            cov_str = ", ".join(covariates_used[:max_display_covariates])
+            if len(covariates_used) > max_display_covariates:
+                cov_str += f", +{len(covariates_used) - max_display_covariates} more"
             fig.suptitle(
                 f"Event Study Comparison\nCovariates: {cov_str}", fontsize=14, y=1.00
             )

@@ -45,8 +45,6 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 
-load_dotenv()
-
 from housing.components.analyzers.callaway_santanna import CallawaySantAnnaAnalyzer
 from housing.components.analyzers.callaway_santanna_with_controls import (
     CallawaySantAnnaWithControlsAnalyzer,
@@ -77,7 +75,12 @@ from housing.components.visualizers.callaway_santanna import (
 from housing.components.visualizers.event_study import EventStudyVisualizer
 from pipeline import Pipeline
 
+load_dotenv()
+
 logger = logging.getLogger(__name__)
+
+SIGNIFICANCE_LEVEL = 0.05
+BIAS_THRESHOLD = 10  # $ threshold for TWFE vs CS difference
 
 # Paths
 DATA_ROOT = Path(os.environ.get("DATA_DIR", "/project/data"))
@@ -116,7 +119,7 @@ def _preflight_check() -> None:
         with ZORI_CSV.open("rb") as f:
             f.read(1)
     except OSError as e:
-        if e.errno == 35:
+        if e.errno == 35:  # noqa: PLR2004
             raise RuntimeError(
                 "Could not read data file (Errno 35). "
                 "This often happens when the project is on a cloud-synced folder.\n"
@@ -138,13 +141,13 @@ def _get_twfe_event_df(results: dict) -> pd.DataFrame | None:
     coef_df = results.get("event_study_coefficients")
     if coef_df is None or coef_df.empty:
         return None
-    df = coef_df.rename(
+    twfe_data = coef_df.rename(
         columns={
             "relative_time": "rel_time",
             "coefficient": "coef",
         }
     )[["rel_time", "coef"]].copy()
-    return df[df["rel_time"] != -1].reset_index(drop=True)
+    return twfe_data[twfe_data["rel_time"] != -1].reset_index(drop=True)
 
 
 def run_did_analysis_with_cs() -> tuple:
@@ -310,7 +313,7 @@ def _print_summary(results: dict) -> None:
         logger.info("  Standard Error: $%.2f", se)
         logger.info("  95%% CI: [$%.2f, $%.2f]", ci_low, ci_high)
         logger.info("  P-value: %.4f", p_val)
-        logger.info("  Significant: %s", "Yes" if p_val < 0.05 else "No")
+        logger.info("  Significant: %s", "Yes" if p_val < SIGNIFICANCE_LEVEL else "No")
 
     # Overall ATT from CS with controls
     cs_overall_ctrl = results.get("cs_overall_att_with_controls", {})
@@ -326,7 +329,9 @@ def _print_summary(results: dict) -> None:
         logger.info("  Standard Error: $%.2f", se_c)
         logger.info("  95%% CI: [$%.2f, $%.2f]", ci_low_c, ci_high_c)
         logger.info("  P-value: %.4f", p_val_c)
-        logger.info("  Significant: %s", "Yes" if p_val_c < 0.05 else "No")
+        logger.info(
+            "  Significant: %s", "Yes" if p_val_c < SIGNIFICANCE_LEVEL else "No"
+        )
         if results.get("cs_include_covariates"):
             logger.info("  Covariates: included")
         if results.get("cs_include_tract_trends"):
@@ -368,7 +373,7 @@ def _print_summary(results: dict) -> None:
 
             logger.info("\nTWFE vs. CS Comparison (Post-Treatment):")
             logger.info("  Average difference (CS - TWFE): $%.2f", avg_diff)
-            if abs(avg_diff) > 10:
+            if abs(avg_diff) > BIAS_THRESHOLD:
                 logger.warning(
                     "  Large difference detected! This suggests significant "
                     "heterogeneity bias in TWFE estimates."
