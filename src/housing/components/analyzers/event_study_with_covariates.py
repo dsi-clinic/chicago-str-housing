@@ -42,11 +42,11 @@ from pipeline.base import Analyzer
 logger = logging.getLogger(__name__)
 
 # Relative time window: event times from -LEAD_LIMIT to +LAG_LIMIT
-LEAD_LIMIT = 12   # 1 year of pre-treatment periods (matches data availability for largest cohorts)
-LAG_LIMIT = 36    # 3 years of post-treatment periods
+LEAD_LIMIT = 12  # 1 year of pre-treatment periods (matches data availability for largest cohorts)
+LAG_LIMIT = 36  # 3 years of post-treatment periods
 # Bins for far leads/lags to avoid too many dummies
 LEAD_BIN_LABEL = -999  # <= -LEAD_LIMIT - 1
-LAG_BIN_LABEL = 999   # >= LAG_LIMIT + 1
+LAG_BIN_LABEL = 999  # >= LAG_LIMIT + 1
 REFERENCE_PERIOD = -1
 
 
@@ -142,9 +142,15 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
             rel_dummies = rel_dummies.drop(columns=[f"rel_{ref_bin}"])
 
         # Tract and month as categorical (drop first to avoid collinearity)
-        tract_dummies = pd.get_dummies(df["tract_geoid"], prefix="tract", drop_first=True, dtype=float)
-        month_rank = df["month"].astype("datetime64[ns]").rank(method="dense").astype(int)
-        month_dummies = pd.get_dummies(month_rank, prefix="month", drop_first=True, dtype=float)
+        tract_dummies = pd.get_dummies(
+            df["tract_geoid"], prefix="tract", drop_first=True, dtype=float
+        )
+        month_rank = (
+            df["month"].astype("datetime64[ns]").rank(method="dense").astype(int)
+        )
+        month_dummies = pd.get_dummies(
+            month_rank, prefix="month", drop_first=True, dtype=float
+        )
 
         # Add covariates if available
         covariate_data = pd.DataFrame()
@@ -159,8 +165,13 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
             if not potential_covariates:
                 # Default list
                 potential_covariates = [
-                    "median_income", "median_house_value", "baseline_rent",
-                    "pct_bachelor", "pct_rented", "median_age", "total_population"
+                    "median_income",
+                    "median_house_value",
+                    "baseline_rent",
+                    "pct_bachelor",
+                    "pct_rented",
+                    "median_age",
+                    "total_population",
                 ]
 
         for cov in potential_covariates:
@@ -176,12 +187,19 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
                         continue
                     covariate_data[cov] = (ser - mean_val) / std_val
                     covariates_used.append(cov)
-                    logger.info("Added covariate: %s (mean=%.2f, sd=%.2f)",
-                               cov, mean_val, std_val)
+                    logger.info(
+                        "Added covariate: %s (mean=%.2f, sd=%.2f)",
+                        cov,
+                        mean_val,
+                        std_val,
+                    )
 
         if covariates_used:
-            logger.info("Including %d covariates in regression: %s",
-                       len(covariates_used), ", ".join(covariates_used))
+            logger.info(
+                "Including %d covariates in regression: %s",
+                len(covariates_used),
+                ", ".join(covariates_used),
+            )
         else:
             logger.warning("No valid covariates found, running without covariates")
 
@@ -198,7 +216,9 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
         const_cols = X.columns[X.nunique() <= 1]
         if len(const_cols) > 0:
             X = X.drop(columns=list(const_cols))
-            logger.info("Dropped %d constant columns from design matrix", len(const_cols))
+            logger.info(
+                "Dropped %d constant columns from design matrix", len(const_cols)
+            )
 
         # Drop rows with any inf/nan in X or y so OLS does not fail
         valid = np.isfinite(X).all(axis=1) & np.isfinite(y)
@@ -206,7 +226,8 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
             n_drop = (~valid).sum()
             logger.warning(
                 "Dropping %d rows with non-finite values in design or outcome (keeping %d)",
-                n_drop, valid.sum(),
+                n_drop,
+                valid.sum(),
             )
             X = X.loc[valid].reset_index(drop=True)
             y = y[valid]
@@ -249,24 +270,34 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
             se = model.bse[p]
             ci_lo = model.conf_int().loc[p, 0]
             ci_hi = model.conf_int().loc[p, 1]
-            event_results.append({
-                "rel_time": period,
-                "coef": coef,
-                "se": se,
-                "ci_low": ci_lo,
-                "ci_high": ci_hi,
-            })
+            event_results.append(
+                {
+                    "rel_time": period,
+                    "coef": coef,
+                    "se": se,
+                    "ci_low": ci_lo,
+                    "ci_high": ci_hi,
+                }
+            )
 
         event_df = pd.DataFrame(event_results).sort_values("rel_time")
         # Add reference period as (ref, 0, 0, 0, 0)
-        ref_row = pd.DataFrame([{
-            "rel_time": REFERENCE_PERIOD,
-            "coef": 0.0,
-            "se": 0.0,
-            "ci_low": 0.0,
-            "ci_high": 0.0,
-        }])
-        event_df = pd.concat([ref_row, event_df], ignore_index=True).sort_values("rel_time").reset_index(drop=True)
+        ref_row = pd.DataFrame(
+            [
+                {
+                    "rel_time": REFERENCE_PERIOD,
+                    "coef": 0.0,
+                    "se": 0.0,
+                    "ci_low": 0.0,
+                    "ci_high": 0.0,
+                }
+            ]
+        )
+        event_df = (
+            pd.concat([ref_row, event_df], ignore_index=True)
+            .sort_values("rel_time")
+            .reset_index(drop=True)
+        )
 
         # Extract covariate coefficients for reporting
         covariate_results = []
@@ -276,14 +307,16 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
                 se = model.bse[cov]
                 ci_lo = model.conf_int().loc[cov, 0]
                 ci_hi = model.conf_int().loc[cov, 1]
-                covariate_results.append({
-                    "covariate": cov,
-                    "coef": coef,
-                    "se": se,
-                    "ci_low": ci_lo,
-                    "ci_high": ci_hi,
-                    "significant": abs(coef / se) > 1.96 if se > 0 else False
-                })
+                covariate_results.append(
+                    {
+                        "covariate": cov,
+                        "coef": coef,
+                        "se": se,
+                        "ci_low": ci_lo,
+                        "ci_high": ci_hi,
+                        "significant": abs(coef / se) > 1.96 if se > 0 else False,
+                    }
+                )
 
         covariate_df = pd.DataFrame(covariate_results)
 
@@ -301,8 +334,13 @@ class EventStudyWithCovariatesAnalyzer(Analyzer):
             logger.info("Covariate coefficients:")
             for _, row in covariate_df.iterrows():
                 sig_marker = "***" if row["significant"] else ""
-                logger.info("  %s: %.2f (SE=%.2f) %s",
-                           row["covariate"], row["coef"], row["se"], sig_marker)
+                logger.info(
+                    "  %s: %.2f (SE=%.2f) %s",
+                    row["covariate"],
+                    row["coef"],
+                    row["se"],
+                    sig_marker,
+                )
 
         return {
             "event_study_results_with_covariates": event_df,

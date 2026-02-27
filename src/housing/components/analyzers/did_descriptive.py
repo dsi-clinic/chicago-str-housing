@@ -109,9 +109,9 @@ class DIDDescriptiveAnalyzer(Analyzer):
         cumulative = []
 
         for month in all_months:
-            n_treated = df[
-                (df["month"] <= month) & (df["treated"] == 1)
-            ]["tract_geoid"].nunique()
+            n_treated = df[(df["month"] <= month) & (df["treated"] == 1)][
+                "tract_geoid"
+            ].nunique()
             cumulative.append({"month": month, "cumulative_treated": n_treated})
 
         cumulative_df = pd.DataFrame(cumulative).set_index("month")
@@ -128,9 +128,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
     def _compute_avg_by_group(self, df: pd.DataFrame) -> pd.DataFrame:
         """Compute average rental prices by ever_treated status and month."""
         avg_by_group = (
-            df.groupby(["month", "ever_treated"])["rental_price"]
-            .mean()
-            .unstack()
+            df.groupby(["month", "ever_treated"])["rental_price"].mean().unstack()
         )
         avg_by_group.columns = ["Never Treated", "Eventually Treated"]
 
@@ -149,9 +147,8 @@ class DIDDescriptiveAnalyzer(Analyzer):
             return pd.DataFrame(), {"t_stat": None, "p_value": None}
 
         # Compare average pre-treatment rental prices
-        pre_balance = (
-            pre_period.groupby("ever_treated")["rental_price"]
-            .agg(["mean", "std", "count"])
+        pre_balance = pre_period.groupby("ever_treated")["rental_price"].agg(
+            ["mean", "std", "count"]
         )
         pre_balance.index = ["Never Treated", "Eventually Treated"]
         pre_balance.columns = ["Mean Rent", "Std Dev", "N Observations"]
@@ -240,9 +237,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
                 logger.info("  %s: $%.0f average rent", group, mean_rent)
 
             if balance_test["t_stat"] is not None:
-                logger.info(
-                    "\nBalance Test (t-test):"
-                )
+                logger.info("\nBalance Test (t-test):")
                 logger.info("  t-statistic: %.2f", balance_test["t_stat"])
                 logger.info("  p-value: %.4f", balance_test["p_value"])
 

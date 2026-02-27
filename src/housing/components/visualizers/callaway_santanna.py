@@ -36,13 +36,15 @@ def _get_twfe_results_df(context: dict[str, Any]) -> pd.DataFrame | None:
     if coef_df is None or coef_df.empty:
         return None
     # Map housing column names to TWFE comparison format; drop k=-1 reference period
-    df = coef_df.rename(columns={
-        "relative_time": "rel_time",
-        "coefficient": "coef",
-        "ci_lower": "ci_low",
-        "ci_upper": "ci_high",
-        "std_error": "se",
-    })[["rel_time", "coef", "ci_low", "ci_high", "se"]].copy()
+    df = coef_df.rename(
+        columns={
+            "relative_time": "rel_time",
+            "coefficient": "coef",
+            "ci_lower": "ci_low",
+            "ci_upper": "ci_high",
+            "std_error": "se",
+        }
+    )[["rel_time", "coef", "ci_low", "ci_high", "se"]].copy()
     return df[df["rel_time"] != -1].reset_index(drop=True)
 
 
@@ -110,8 +112,8 @@ class CallawaySantAnnaVisualizer(Visualizer):
         """Create main Callaway & Sant'Anna event study plot."""
         # Restrict to display window
         plot_df = cs_event_study[
-            (cs_event_study["rel_time"] >= -PLOT_PRE_MONTHS) &
-            (cs_event_study["rel_time"] <= PLOT_POST_MONTHS)
+            (cs_event_study["rel_time"] >= -PLOT_PRE_MONTHS)
+            & (cs_event_study["rel_time"] <= PLOT_POST_MONTHS)
         ].copy()
 
         if plot_df.empty:
@@ -121,8 +123,12 @@ class CallawaySantAnnaVisualizer(Visualizer):
         fig, ax = plt.subplots(figsize=(10, 6))
 
         # Pre-treatment and post-treatment shading
-        ax.axvspan(-PLOT_PRE_MONTHS, -0.5, alpha=0.08, color="blue", label="Pre-treatment")
-        ax.axvspan(0.5, PLOT_POST_MONTHS, alpha=0.08, color="green", label="Post-treatment")
+        ax.axvspan(
+            -PLOT_PRE_MONTHS, -0.5, alpha=0.08, color="blue", label="Pre-treatment"
+        )
+        ax.axvspan(
+            0.5, PLOT_POST_MONTHS, alpha=0.08, color="green", label="Post-treatment"
+        )
 
         # Plot ATT estimates with confidence intervals
         ax.plot(
@@ -145,7 +151,14 @@ class CallawaySantAnnaVisualizer(Visualizer):
 
         # Reference lines
         ax.axhline(0, color="red", linestyle="--", linewidth=1, alpha=0.8)
-        ax.axvline(0, color="red", linestyle=":", linewidth=1, alpha=0.6, label="Treatment begins")
+        ax.axvline(
+            0,
+            color="red",
+            linestyle=":",
+            linewidth=1,
+            alpha=0.6,
+            label="Treatment begins",
+        )
 
         # Get overall ATT for annotation
         overall_att = context.get(f"cs_overall_att{self.context_suffix}", {})
@@ -153,7 +166,8 @@ class CallawaySantAnnaVisualizer(Visualizer):
             att_val = overall_att["att"]
             se_val = overall_att.get("se", 0)
             ax.text(
-                0.02, 0.98,
+                0.02,
+                0.98,
                 f"Overall ATT: ${att_val:.2f}\n(SE: ${se_val:.2f})",
                 transform=ax.transAxes,
                 verticalalignment="top",
@@ -173,7 +187,10 @@ class CallawaySantAnnaVisualizer(Visualizer):
         ax.grid(True, alpha=0.3)
         ax.set_xlim(-PLOT_PRE_MONTHS - 0.5, PLOT_POST_MONTHS + 0.5)
 
-        out_path = Path(self.output_dir) / f"did_callaway_santanna_event_study{self.output_suffix}.png"
+        out_path = (
+            Path(self.output_dir)
+            / f"did_callaway_santanna_event_study{self.output_suffix}.png"
+        )
         setup_figure_and_save(fig, out_path, "CS Event Study", logger=logger)
 
         logger.info("Saved Callaway-Sant'Anna event study to %s", out_path)
@@ -191,13 +208,13 @@ class CallawaySantAnnaVisualizer(Visualizer):
 
         # Restrict both to display window
         cs_plot = cs_event_study[
-            (cs_event_study["rel_time"] >= -PLOT_PRE_MONTHS) &
-            (cs_event_study["rel_time"] <= PLOT_POST_MONTHS)
+            (cs_event_study["rel_time"] >= -PLOT_PRE_MONTHS)
+            & (cs_event_study["rel_time"] <= PLOT_POST_MONTHS)
         ].copy()
 
         twfe_plot = twfe_results[
-            (twfe_results["rel_time"] >= -PLOT_PRE_MONTHS) &
-            (twfe_results["rel_time"] <= PLOT_POST_MONTHS)
+            (twfe_results["rel_time"] >= -PLOT_PRE_MONTHS)
+            & (twfe_results["rel_time"] <= PLOT_POST_MONTHS)
         ].copy()
 
         if cs_plot.empty or twfe_plot.empty:
@@ -209,14 +226,24 @@ class CallawaySantAnnaVisualizer(Visualizer):
 
         # TWFE plot (left)
         self._plot_single_event_study(
-            ax1, twfe_plot, "TWFE Event Study\n(May have negative weight bias)",
-            color="black", coef_col="coef", ci_low_col="ci_low", ci_high_col="ci_high"
+            ax1,
+            twfe_plot,
+            "TWFE Event Study\n(May have negative weight bias)",
+            color="black",
+            coef_col="coef",
+            ci_low_col="ci_low",
+            ci_high_col="ci_high",
         )
 
         # CS plot (right)
         self._plot_single_event_study(
-            ax2, cs_plot, "Callaway-Sant'Anna Event Study\n(Robust to heterogeneity)",
-            color="darkblue", coef_col="att", ci_low_col="ci_low", ci_high_col="ci_high"
+            ax2,
+            cs_plot,
+            "Callaway-Sant'Anna Event Study\n(Robust to heterogeneity)",
+            color="darkblue",
+            coef_col="att",
+            ci_low_col="ci_low",
+            ci_high_col="ci_high",
         )
 
         # Overall title
@@ -251,8 +278,12 @@ class CallawaySantAnnaVisualizer(Visualizer):
     ) -> None:
         """Plot a single event study on given axis."""
         # Shading
-        ax.axvspan(-PLOT_PRE_MONTHS, -0.5, alpha=0.08, color="blue", label="Pre-treatment")
-        ax.axvspan(0.5, PLOT_POST_MONTHS, alpha=0.08, color="green", label="Post-treatment")
+        ax.axvspan(
+            -PLOT_PRE_MONTHS, -0.5, alpha=0.08, color="blue", label="Pre-treatment"
+        )
+        ax.axvspan(
+            0.5, PLOT_POST_MONTHS, alpha=0.08, color="green", label="Post-treatment"
+        )
 
         # Plot estimates
         ax.plot(
@@ -284,9 +315,7 @@ class CallawaySantAnnaVisualizer(Visualizer):
         ax.grid(True, alpha=0.3)
         ax.set_xlim(-PLOT_PRE_MONTHS - 0.5, PLOT_POST_MONTHS + 0.5)
 
-    def _plot_difference(
-        self, cs_plot: pd.DataFrame, twfe_plot: pd.DataFrame
-    ) -> None:
+    def _plot_difference(self, cs_plot: pd.DataFrame, twfe_plot: pd.DataFrame) -> None:
         """Plot difference between CS and TWFE estimates."""
         # Merge on relative time
         merged = cs_plot.merge(
@@ -311,11 +340,22 @@ class CallawaySantAnnaVisualizer(Visualizer):
         )
 
         # Shading
-        ax.axvspan(-PLOT_PRE_MONTHS, -0.5, alpha=0.08, color="blue", label="Pre-treatment")
-        ax.axvspan(0.5, PLOT_POST_MONTHS, alpha=0.08, color="green", label="Post-treatment")
+        ax.axvspan(
+            -PLOT_PRE_MONTHS, -0.5, alpha=0.08, color="blue", label="Pre-treatment"
+        )
+        ax.axvspan(
+            0.5, PLOT_POST_MONTHS, alpha=0.08, color="green", label="Post-treatment"
+        )
 
         # Zero line
-        ax.axhline(0, color="red", linestyle="--", linewidth=1, alpha=0.8, label="No difference")
+        ax.axhline(
+            0,
+            color="red",
+            linestyle="--",
+            linewidth=1,
+            alpha=0.8,
+            label="No difference",
+        )
         ax.axvline(0, color="red", linestyle=":", linewidth=1, alpha=0.6)
 
         ax.set_xlabel("Months since STR prohibition", fontsize=11)
@@ -345,8 +385,8 @@ class CallawaySantAnnaVisualizer(Visualizer):
 
         # Restrict to display window
         plot_df = cohort_dynamics[
-            (cohort_dynamics["rel_time"] >= -PLOT_PRE_MONTHS) &
-            (cohort_dynamics["rel_time"] <= PLOT_POST_MONTHS)
+            (cohort_dynamics["rel_time"] >= -PLOT_PRE_MONTHS)
+            & (cohort_dynamics["rel_time"] <= PLOT_POST_MONTHS)
         ].copy()
 
         if plot_df.empty:
@@ -362,7 +402,9 @@ class CallawaySantAnnaVisualizer(Visualizer):
         n_cols = min(2, n_cohorts)
         n_rows = (n_cohorts + n_cols - 1) // n_cols
 
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(8 * n_cols, 5 * n_rows), squeeze=False)
+        fig, axes = plt.subplots(
+            n_rows, n_cols, figsize=(8 * n_cols, 5 * n_rows), squeeze=False
+        )
         axes = axes.flatten()
 
         for idx, cohort in enumerate(cohorts):
@@ -476,14 +518,23 @@ class CallawaySantAnnaComparisonVisualizer(Visualizer):
         merged["diff_se"] = merged["se_cs"] - merged["se_twfe"]
 
         # Rename columns for clarity
-        merged = merged.rename(columns={
-            "att": "CS_ATT",
-            "se_cs": "CS_SE",
-            "coef": "TWFE_Coef",
-            "se_twfe": "TWFE_SE",
-        })
+        merged = merged.rename(
+            columns={
+                "att": "CS_ATT",
+                "se_cs": "CS_SE",
+                "coef": "TWFE_Coef",
+                "se_twfe": "TWFE_SE",
+            }
+        )
 
         return merged[
-            ["rel_time", "CS_ATT", "CS_SE", "TWFE_Coef", "TWFE_SE",
-             "diff_point_estimate", "diff_se"]
+            [
+                "rel_time",
+                "CS_ATT",
+                "CS_SE",
+                "TWFE_Coef",
+                "TWFE_SE",
+                "diff_point_estimate",
+                "diff_se",
+            ]
         ]

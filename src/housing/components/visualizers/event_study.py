@@ -203,7 +203,9 @@ class EventStudyCovariatesVisualizer(Visualizer):
             (coef_df["rel_time"] >= plot_min) & (coef_df["rel_time"] <= plot_max)
         ]
         if plot_df.empty:
-            logger.warning("No coefficients in [%d, %d]. Skipping plot.", plot_min, plot_max)
+            logger.warning(
+                "No coefficients in [%d, %d]. Skipping plot.", plot_min, plot_max
+            )
             return {}
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -220,8 +222,16 @@ class EventStudyCovariatesVisualizer(Visualizer):
             ci_low = ci_high = None
 
         fig, ax = plt.subplots(figsize=(12, 6))
-        ax.axvspan(plot_min, ref_period - 0.5, alpha=0.08, color="blue", label="Pre-treatment")
-        ax.axvspan(ref_period + 0.5, plot_max, alpha=0.08, color="green", label="Post-treatment")
+        ax.axvspan(
+            plot_min, ref_period - 0.5, alpha=0.08, color="blue", label="Pre-treatment"
+        )
+        ax.axvspan(
+            ref_period + 0.5,
+            plot_max,
+            alpha=0.08,
+            color="green",
+            label="Post-treatment",
+        )
         ax.plot(
             plot_df["rel_time"],
             plot_df["coef"],

@@ -59,11 +59,11 @@ from housing.components.loaders.time_series_rental_data import TimeSeriesRentalL
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
 from housing.components.processors.did_covariate_merger import DIDCovariateProcessor
-from housing.components.processors.tract_prohibition_dates import (
-    TractProhibitionDatesProcessor,
-)
 from housing.components.processors.time_series_zip_to_tract import (
     TimeSeriesZipToTractProcessor,
+)
+from housing.components.processors.tract_prohibition_dates import (
+    TractProhibitionDatesProcessor,
 )
 from housing.components.processors.treatment_indicator import (
     TreatmentIndicatorProcessor,
@@ -138,10 +138,12 @@ def _get_twfe_event_df(results: dict) -> pd.DataFrame | None:
     coef_df = results.get("event_study_coefficients")
     if coef_df is None or coef_df.empty:
         return None
-    df = coef_df.rename(columns={
-        "relative_time": "rel_time",
-        "coefficient": "coef",
-    })[["rel_time", "coef"]].copy()
+    df = coef_df.rename(
+        columns={
+            "relative_time": "rel_time",
+            "coefficient": "coef",
+        }
+    )[["rel_time", "coef"]].copy()
     return df[df["rel_time"] != -1].reset_index(drop=True)
 
 
@@ -173,7 +175,9 @@ def run_did_analysis_with_cs() -> tuple:
         )
     )
     pipeline.register_component(
-        TreatmentIndicatorProcessor(output_path=f"{DID_CS_OUTPUT_DIR}/did_panel_data.csv")
+        TreatmentIndicatorProcessor(
+            output_path=f"{DID_CS_OUTPUT_DIR}/did_panel_data.csv"
+        )
     )
 
     # 3. Trend matching (restrict panel to matched treated + control tracts)
@@ -183,7 +187,9 @@ def run_did_analysis_with_cs() -> tuple:
     )
 
     # 3b. Census and covariates (for CS with controls; optional if no API key)
-    logger.info("\n[3b/7] Loading census and merging covariates (for CS with controls)...")
+    logger.info(
+        "\n[3b/7] Loading census and merging covariates (for CS with controls)..."
+    )
     pipeline.register_component(
         CensusDataLoader(
             state_fips="17",
@@ -217,8 +223,12 @@ def run_did_analysis_with_cs() -> tuple:
             min_cohort_size=5,
         )
     )
-    pipeline.register_component(CallawaySantAnnaVisualizer(output_dir=DID_CS_OUTPUT_DIR))
-    pipeline.register_component(CallawaySantAnnaComparisonVisualizer(output_dir=DID_CS_OUTPUT_DIR))
+    pipeline.register_component(
+        CallawaySantAnnaVisualizer(output_dir=DID_CS_OUTPUT_DIR)
+    )
+    pipeline.register_component(
+        CallawaySantAnnaComparisonVisualizer(output_dir=DID_CS_OUTPUT_DIR)
+    )
 
     # 7. Callaway-Sant'Anna with controls (covariates + tract trends)
     logger.info("\n[7/7] Estimating Callaway-Sant'Anna with controls...")
@@ -326,8 +336,12 @@ def _print_summary(results: dict) -> None:
     matching_info = results.get("matching_info")
     if matching_info is not None and not matching_info.empty:
         logger.info("\nTrend Matching:")
-        logger.info("  Matched treated tracts: %d", matching_info["treated_tract"].nunique())
-        logger.info("  Matched control tracts: %d", matching_info["control_tract"].nunique())
+        logger.info(
+            "  Matched treated tracts: %d", matching_info["treated_tract"].nunique()
+        )
+        logger.info(
+            "  Matched control tracts: %d", matching_info["control_tract"].nunique()
+        )
         logger.info("  Average slope distance: %.4f", matching_info["distance"].mean())
 
     # Cohort information
@@ -360,12 +374,16 @@ def _print_summary(results: dict) -> None:
                     "heterogeneity bias in TWFE estimates."
                 )
             else:
-                logger.info("  Estimates are similar, suggesting TWFE is approximately unbiased.")
+                logger.info(
+                    "  Estimates are similar, suggesting TWFE is approximately unbiased."
+                )
 
     logger.info("\n=== OUTPUT FILES ===\n")
     logger.info("Check %s/ for:", DID_CS_OUTPUT_DIR)
     logger.info("  • did_callaway_santanna_event_study.png - Main CS results")
-    logger.info("  • did_callaway_santanna_event_study_with_controls.png - CS with controls")
+    logger.info(
+        "  • did_callaway_santanna_event_study_with_controls.png - CS with controls"
+    )
     logger.info("  • did_twfe_vs_cs_comparison.png - Side-by-side comparison")
     logger.info("  • did_cs_twfe_difference.png - Bias visualization")
     logger.info("  • did_cohort_dynamics.png - Cohort-specific effects")

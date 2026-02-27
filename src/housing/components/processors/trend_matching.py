@@ -119,9 +119,8 @@ class TrendMatchingProcessor(DataProcessor):
             # Calculate linear trend: rent ~ time
             pre_data = pre_data.sort_values("month")
             months_numeric = (
-                (pre_data["month"] - pre_data["month"].min()).dt.total_seconds()
-                / (30 * 24 * 3600)
-            )  # Convert to months as float
+                pre_data["month"] - pre_data["month"].min()
+            ).dt.total_seconds() / (30 * 24 * 3600)  # Convert to months as float
 
             try:
                 slope, intercept, r_value, p_value, std_err = linregress(
@@ -146,7 +145,9 @@ class TrendMatchingProcessor(DataProcessor):
                     }
                 )
             except Exception as e:
-                logger.warning("  Failed to calculate trend for tract %s: %s", tract_id, e)
+                logger.warning(
+                    "  Failed to calculate trend for tract %s: %s", tract_id, e
+                )
                 continue
 
         trends_df = pd.DataFrame(pre_trends)
@@ -170,7 +171,11 @@ class TrendMatchingProcessor(DataProcessor):
         if len(control_trends) == 0:
             raise ValueError("No control tracts found for matching")
 
-        logger.info("  Matching %d treated to %d control tracts", len(treated_trends), len(control_trends))
+        logger.info(
+            "  Matching %d treated to %d control tracts",
+            len(treated_trends),
+            len(control_trends),
+        )
 
         # Prepare matching variables (just trend slope for now)
         # Could extend to multiple dimensions
@@ -230,12 +235,12 @@ class TrendMatchingProcessor(DataProcessor):
         matched_panel = did_panel[did_panel["tract_geoid"].isin(matched_tracts)].copy()
 
         # Add matching indicator
-        matched_panel["matched_treated"] = matched_panel["tract_geoid"].isin(
-            treated_tracts
-        ).astype(int)
-        matched_panel["matched_control"] = matched_panel["tract_geoid"].isin(
-            control_tracts
-        ).astype(int)
+        matched_panel["matched_treated"] = (
+            matched_panel["tract_geoid"].isin(treated_tracts).astype(int)
+        )
+        matched_panel["matched_control"] = (
+            matched_panel["tract_geoid"].isin(control_tracts).astype(int)
+        )
 
         return matched_panel
 
@@ -255,20 +260,42 @@ class TrendMatchingProcessor(DataProcessor):
 
         logger.info("\nPre-Treatment Trend Statistics:")
         logger.info("  Treated tracts:")
-        logger.info("    Mean slope: $%.2f/month", treated_trends["pre_trend_slope"].mean())
-        logger.info("    Std slope: $%.2f/month", treated_trends["pre_trend_slope"].std())
+        logger.info(
+            "    Mean slope: $%.2f/month", treated_trends["pre_trend_slope"].mean()
+        )
+        logger.info(
+            "    Std slope: $%.2f/month", treated_trends["pre_trend_slope"].std()
+        )
         logger.info("  Control tracts:")
-        logger.info("    Mean slope: $%.2f/month", control_trends["pre_trend_slope"].mean())
-        logger.info("    Std slope: $%.2f/month", control_trends["pre_trend_slope"].std())
+        logger.info(
+            "    Mean slope: $%.2f/month", control_trends["pre_trend_slope"].mean()
+        )
+        logger.info(
+            "    Std slope: $%.2f/month", control_trends["pre_trend_slope"].std()
+        )
 
         logger.info("\nMatching Quality:")
-        logger.info("  Matched treated tracts: %d", matching_info["treated_tract"].nunique())
-        logger.info("  Matched control tracts: %d", matching_info["control_tract"].nunique())
+        logger.info(
+            "  Matched treated tracts: %d", matching_info["treated_tract"].nunique()
+        )
+        logger.info(
+            "  Matched control tracts: %d", matching_info["control_tract"].nunique()
+        )
         logger.info("  Average distance: %.4f", matching_info["distance"].mean())
         logger.info("  Max distance: %.4f", matching_info["distance"].max())
 
         logger.info("\nMatched Sample:")
         logger.info("  Total tracts: %d", matched_panel["tract_geoid"].nunique())
-        logger.info("  Treated tracts: %d", matched_panel.loc[matched_panel["matched_treated"] > 0, "tract_geoid"].nunique())
-        logger.info("  Control tracts: %d", matched_panel.loc[matched_panel["matched_control"] > 0, "tract_geoid"].nunique())
+        logger.info(
+            "  Treated tracts: %d",
+            matched_panel.loc[
+                matched_panel["matched_treated"] > 0, "tract_geoid"
+            ].nunique(),
+        )
+        logger.info(
+            "  Control tracts: %d",
+            matched_panel.loc[
+                matched_panel["matched_control"] > 0, "tract_geoid"
+            ].nunique(),
+        )
         logger.info("  Observations: %d", len(matched_panel))

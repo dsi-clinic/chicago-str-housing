@@ -7,8 +7,8 @@ by analyzing observable tract characteristics and testing parallel trends formal
 import logging
 from typing import Any
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from scipy import stats
 
 from pipeline.base import Analyzer
@@ -23,7 +23,7 @@ class PretrendDiagnosticAnalyzer(Analyzer):
         """Initialize the diagnostic analyzer."""
         super().__init__(
             "pretrend_diagnostic",
-            "Analyze pre-treatment trends and test parallel trends assumption"
+            "Analyze pre-treatment trends and test parallel trends assumption",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
@@ -68,12 +68,19 @@ class PretrendDiagnosticAnalyzer(Analyzer):
 
         # Define treatment groups
         if "ever_treated" not in tract_data.columns:
-            tract_data["ever_treated"] = tract_data.groupby("tract_geoid")["treated"].transform("max")
+            tract_data["ever_treated"] = tract_data.groupby("tract_geoid")[
+                "treated"
+            ].transform("max")
 
         # Covariates to compare
         covariates = [
-            "median_income", "median_house_value", "baseline_rent",
-            "pct_bachelor", "pct_rented", "median_age", "total_population"
+            "median_income",
+            "median_house_value",
+            "baseline_rent",
+            "pct_bachelor",
+            "pct_rented",
+            "median_age",
+            "total_population",
         ]
 
         # Keep only available covariates
@@ -99,27 +106,29 @@ class PretrendDiagnosticAnalyzer(Analyzer):
             pct_diff = (diff / control_mean * 100) if control_mean != 0 else np.nan
 
             # T-test for difference in means
-            t_stat, p_value = stats.ttest_ind(treated_vals, control_vals, equal_var=False)
+            t_stat, p_value = stats.ttest_ind(
+                treated_vals, control_vals, equal_var=False
+            )
 
             # Standardized mean difference (Cohen's d)
-            pooled_std = np.sqrt(
-                (treated_vals.var() + control_vals.var()) / 2
-            )
+            pooled_std = np.sqrt((treated_vals.var() + control_vals.var()) / 2)
             cohens_d = diff / pooled_std if pooled_std > 0 else np.nan
 
-            results.append({
-                "covariate": cov,
-                "treated_mean": treated_mean,
-                "control_mean": control_mean,
-                "difference": diff,
-                "pct_difference": pct_diff,
-                "t_statistic": t_stat,
-                "p_value": p_value,
-                "cohens_d": cohens_d,
-                "significant": p_value < 0.05,
-                "n_treated": len(treated_vals),
-                "n_control": len(control_vals),
-            })
+            results.append(
+                {
+                    "covariate": cov,
+                    "treated_mean": treated_mean,
+                    "control_mean": control_mean,
+                    "difference": diff,
+                    "pct_difference": pct_diff,
+                    "t_statistic": t_stat,
+                    "p_value": p_value,
+                    "cohens_d": cohens_d,
+                    "significant": p_value < 0.05,
+                    "n_treated": len(treated_vals),
+                    "n_control": len(control_vals),
+                }
+            )
 
         comparison_df = pd.DataFrame(results)
 
@@ -158,12 +167,14 @@ class PretrendDiagnosticAnalyzer(Analyzer):
             import statsmodels.formula.api as smf
 
             # Create interaction term
-            pre_period["treated_x_time"] = pre_period["ever_treated"] * pre_period["time_trend"]
+            pre_period["treated_x_time"] = (
+                pre_period["ever_treated"] * pre_period["time_trend"]
+            )
 
             # Simple model without fixed effects for illustration
             model = smf.ols(
                 "rental_price ~ ever_treated + time_trend + treated_x_time",
-                data=pre_period
+                data=pre_period,
             ).fit()
 
             interaction_coef = model.params.get("treated_x_time", np.nan)
@@ -174,12 +185,14 @@ class PretrendDiagnosticAnalyzer(Analyzer):
                 "interaction_coef": interaction_coef,
                 "interaction_se": interaction_se,
                 "p_value": interaction_pval,
-                "significant": interaction_pval < 0.05 if not pd.isna(interaction_pval) else False,
+                "significant": interaction_pval < 0.05
+                if not pd.isna(interaction_pval)
+                else False,
                 "interpretation": (
                     "Pre-trends differ significantly (parallel trends violated)"
                     if interaction_pval < 0.05
                     else "Pre-trends do not differ significantly (parallel trends plausible)"
-                )
+                ),
             }
 
             return result
@@ -212,18 +225,14 @@ class PretrendDiagnosticAnalyzer(Analyzer):
 
         # Pivot to get treated and control in separate columns
         monthly_avg = monthly_avg.pivot(
-            index="month",
-            columns="ever_treated",
-            values="rental_price"
+            index="month", columns="ever_treated", values="rental_price"
         ).reset_index()
 
         monthly_avg.columns = ["month", "control_rent", "treated_rent"]
 
         # Calculate gap
         monthly_avg["gap"] = monthly_avg["treated_rent"] - monthly_avg["control_rent"]
-        monthly_avg["pct_gap"] = (
-            monthly_avg["gap"] / monthly_avg["control_rent"] * 100
-        )
+        monthly_avg["pct_gap"] = monthly_avg["gap"] / monthly_avg["control_rent"] * 100
 
         return monthly_avg
 
@@ -240,13 +249,17 @@ class PretrendDiagnosticAnalyzer(Analyzer):
         balance_summary = {
             "n_covariates": len(comparison),
             "n_imbalanced": len(imbalanced),
-            "max_imbalance": comparison["cohens_d"].abs().max() if not comparison.empty else np.nan,
-            "imbalanced_covariates": imbalanced["covariate"].tolist() if not imbalanced.empty else [],
+            "max_imbalance": comparison["cohens_d"].abs().max()
+            if not comparison.empty
+            else np.nan,
+            "imbalanced_covariates": imbalanced["covariate"].tolist()
+            if not imbalanced.empty
+            else [],
             "balance_assessment": (
                 "Good balance (all |d| < 0.1)"
                 if len(imbalanced) == 0
                 else f"Poor balance ({len(imbalanced)}/{len(comparison)} covariates imbalanced)"
-            )
+            ),
         }
 
         return balance_summary
@@ -255,7 +268,7 @@ class PretrendDiagnosticAnalyzer(Analyzer):
         self,
         comparison: pd.DataFrame,
         pretrend_test: dict[str, Any],
-        divergence: pd.DataFrame
+        divergence: pd.DataFrame,
     ) -> None:
         """Log summary of diagnostic findings."""
         logger.info("=" * 60)
@@ -276,7 +289,7 @@ class PretrendDiagnosticAnalyzer(Analyzer):
                         row["control_mean"],
                         row["difference"],
                         row["pct_difference"],
-                        row["p_value"]
+                        row["p_value"],
                     )
             else:
                 logger.info("   No significant differences found")
@@ -284,10 +297,12 @@ class PretrendDiagnosticAnalyzer(Analyzer):
         # 2. Pre-trend test
         if "error" not in pretrend_test:
             logger.info("\n2. PARALLEL TRENDS TEST (Pre-treatment):")
-            logger.info("   Interaction coefficient: %.4f (SE=%.4f, p=%.4f)",
-                       pretrend_test.get("interaction_coef", np.nan),
-                       pretrend_test.get("interaction_se", np.nan),
-                       pretrend_test.get("p_value", np.nan))
+            logger.info(
+                "   Interaction coefficient: %.4f (SE=%.4f, p=%.4f)",
+                pretrend_test.get("interaction_coef", np.nan),
+                pretrend_test.get("interaction_se", np.nan),
+                pretrend_test.get("p_value", np.nan),
+            )
             logger.info("   %s", pretrend_test.get("interpretation", ""))
 
         # 3. Rent gap trends
@@ -298,8 +313,10 @@ class PretrendDiagnosticAnalyzer(Analyzer):
             gap_change = last_gap - first_gap
             logger.info("   Initial gap: $%.2f", first_gap)
             logger.info("   Final gap: $%.2f", last_gap)
-            logger.info("   Change: $%.2f (%s)",
-                       gap_change,
-                       "widening" if gap_change > 0 else "narrowing")
+            logger.info(
+                "   Change: $%.2f (%s)",
+                gap_change,
+                "widening" if gap_change > 0 else "narrowing",
+            )
 
         logger.info("=" * 60)

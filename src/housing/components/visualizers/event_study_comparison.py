@@ -58,42 +58,58 @@ class EventStudyComparisonVisualizer(Visualizer):
         plot_max = PLOT_POST_MONTHS
 
         # Baseline: housing format uses relative_time
-        time_col_baseline = "relative_time" if "relative_time" in baseline_df.columns else "rel_time"
+        time_col_baseline = (
+            "relative_time" if "relative_time" in baseline_df.columns else "rel_time"
+        )
         baseline_plot = baseline_df[
-            (baseline_df[time_col_baseline] >= plot_min) & (baseline_df[time_col_baseline] <= plot_max)
+            (baseline_df[time_col_baseline] >= plot_min)
+            & (baseline_df[time_col_baseline] <= plot_max)
         ].copy()
 
         covariate_plot = covariate_df[
-            (covariate_df["rel_time"] >= plot_min) & (covariate_df["rel_time"] <= plot_max)
+            (covariate_df["rel_time"] >= plot_min)
+            & (covariate_df["rel_time"] <= plot_max)
         ].copy()
 
         if baseline_plot.empty or covariate_plot.empty:
-            logger.warning("No coefficients in ±%d months. Skipping plot.", PLOT_POST_MONTHS)
+            logger.warning(
+                "No coefficients in ±%d months. Skipping plot.", PLOT_POST_MONTHS
+            )
             return {}
 
         # Reference period: baseline has coefficient=0 (housing) or coef=0 (housing-2)
-        coef_col_baseline = "coefficient" if "coefficient" in baseline_plot.columns else "coef"
+        coef_col_baseline = (
+            "coefficient" if "coefficient" in baseline_plot.columns else "coef"
+        )
         ref_row = baseline_plot[(baseline_plot[coef_col_baseline] == 0)]
         ref_period = int(ref_row[time_col_baseline].iloc[0]) if len(ref_row) > 0 else -1
 
-        fig, (ax1, ax2) = plt.subplots(
-            1, 2, figsize=(16, 6), sharey=True, sharex=True
-        )
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6), sharey=True, sharex=True)
 
         # Plot 1: Baseline (housing column names: relative_time, coefficient, ci_lower, ci_upper)
         self._plot_event_study(
-            ax1, baseline_plot, ref_period, plot_min, plot_max,
+            ax1,
+            baseline_plot,
+            ref_period,
+            plot_min,
+            plot_max,
             title="Baseline Event Study\n(No Covariates)",
             time_col=time_col_baseline,
             coef_col=coef_col_baseline,
             ci_low_col="ci_lower" if "ci_lower" in baseline_plot.columns else "ci_low",
-            ci_high_col="ci_upper" if "ci_upper" in baseline_plot.columns else "ci_high",
+            ci_high_col="ci_upper"
+            if "ci_upper" in baseline_plot.columns
+            else "ci_high",
         )
 
         # Plot 2: With covariates (rel_time, coef, ci_low, ci_high)
         self._plot_event_study(
-            ax2, covariate_plot, ref_period, plot_min, plot_max,
-            title="Event Study with Covariate Controls\n(Adjusted for Tract Characteristics)"
+            ax2,
+            covariate_plot,
+            ref_period,
+            plot_min,
+            plot_max,
+            title="Event Study with Covariate Controls\n(Adjusted for Tract Characteristics)",
         )
 
         # Force both panels to the same x range (12m before, 36m after)
@@ -106,9 +122,7 @@ class EventStudyComparisonVisualizer(Visualizer):
             if len(covariates_used) > 3:
                 cov_str += f", +{len(covariates_used) - 3} more"
             fig.suptitle(
-                f"Event Study Comparison\nCovariates: {cov_str}",
-                fontsize=14,
-                y=1.00
+                f"Event Study Comparison\nCovariates: {cov_str}", fontsize=14, y=1.00
             )
 
         plt.tight_layout()
@@ -150,8 +164,16 @@ class EventStudyComparisonVisualizer(Visualizer):
         ci_high_col: str = "ci_high",
     ) -> None:
         """Plot a single event study on the given axis."""
-        ax.axvspan(plot_min, ref_period - 0.5, alpha=0.08, color="blue", label="Pre-treatment")
-        ax.axvspan(ref_period + 0.5, plot_max, alpha=0.08, color="green", label="Post-treatment")
+        ax.axvspan(
+            plot_min, ref_period - 0.5, alpha=0.08, color="blue", label="Pre-treatment"
+        )
+        ax.axvspan(
+            ref_period + 0.5,
+            plot_max,
+            alpha=0.08,
+            color="green",
+            label="Post-treatment",
+        )
 
         ax.plot(
             plot_df[time_col],
@@ -187,13 +209,11 @@ class EventStudyComparisonVisualizer(Visualizer):
         covariate_df: pd.DataFrame,
         ref_period: int,
         plot_min: int,
-        plot_max: int
+        plot_max: int,
     ) -> None:
         """Create a plot showing the impact of covariate adjustment."""
         merged = baseline_df.merge(
-            covariate_df,
-            on="rel_time",
-            suffixes=("_baseline", "_covariate")
+            covariate_df, on="rel_time", suffixes=("_baseline", "_covariate")
         )
 
         merged["adjustment"] = merged["coef_covariate"] - merged["coef_baseline"]
@@ -207,13 +227,28 @@ class EventStudyComparisonVisualizer(Visualizer):
             marker="o",
             markersize=4,
             linewidth=1.2,
-            label="Covariate adjustment impact"
+            label="Covariate adjustment impact",
         )
 
-        ax.axvspan(plot_min, ref_period - 0.5, alpha=0.08, color="blue", label="Pre-treatment")
-        ax.axvspan(ref_period + 0.5, plot_max, alpha=0.08, color="green", label="Post-treatment")
+        ax.axvspan(
+            plot_min, ref_period - 0.5, alpha=0.08, color="blue", label="Pre-treatment"
+        )
+        ax.axvspan(
+            ref_period + 0.5,
+            plot_max,
+            alpha=0.08,
+            color="green",
+            label="Post-treatment",
+        )
 
-        ax.axhline(0, color="red", linestyle="--", linewidth=1, alpha=0.8, label="No adjustment")
+        ax.axhline(
+            0,
+            color="red",
+            linestyle="--",
+            linewidth=1,
+            alpha=0.8,
+            label="No adjustment",
+        )
         ax.axvline(ref_period, color="red", linestyle=":", linewidth=1, alpha=0.6)
 
         ax.set_xlabel("Months since STR prohibition", fontsize=11)
@@ -221,7 +256,7 @@ class EventStudyComparisonVisualizer(Visualizer):
         ax.set_title(
             "Impact of Covariate Adjustment on Event Study Estimates\n"
             "(Positive = covariate adjustment increases effect estimate)",
-            fontsize=12
+            fontsize=12,
         )
         ax.legend(loc="best", fontsize=9)
         ax.grid(True, alpha=0.3)

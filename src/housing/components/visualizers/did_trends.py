@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
-import pandas as pd
 
 from pipeline.base import Visualizer
 
@@ -105,7 +104,9 @@ class DIDTrendsVisualizer(Visualizer):
 
         ax.set_ylabel("Cumulative Treated Tracts", fontsize=12)
         ax.set_xlabel("Month", fontsize=12)
-        ax.set_title("STR Prohibition Adoption Over Time", fontsize=14, fontweight="bold")
+        ax.set_title(
+            "STR Prohibition Adoption Over Time", fontsize=14, fontweight="bold"
+        )
         ax.legend(loc="upper left")
         ax.grid(True, alpha=0.3)
 
@@ -231,9 +232,7 @@ class DIDTrendsVisualizer(Visualizer):
             label="Eventually Treated",
         )
         ax2.axvline(first_treatment, color="gray", linestyle="--", linewidth=1.5)
-        ax2.axvspan(
-            avg_by_group.index.min(), first_treatment, alpha=0.1, color="gray"
-        )
+        ax2.axvspan(avg_by_group.index.min(), first_treatment, alpha=0.1, color="gray")
         ax2.set_ylabel("Average Rental Price ($)")
         ax2.set_xlabel("Month")
         ax2.set_title("B. Parallel Trends Check", fontweight="bold")
@@ -245,7 +244,9 @@ class DIDTrendsVisualizer(Visualizer):
         ax3 = axes[1, 0]
         pre_period = did_panel[did_panel["month"] < first_treatment]
 
-        never_treated_rents = pre_period[pre_period["ever_treated"] == 0]["rental_price"]
+        never_treated_rents = pre_period[pre_period["ever_treated"] == 0][
+            "rental_price"
+        ]
         eventually_treated_rents = pre_period[pre_period["ever_treated"] == 1][
             "rental_price"
         ]
@@ -277,12 +278,12 @@ class DIDTrendsVisualizer(Visualizer):
 
         # Get first treatment date for each tract
         treatment_dates = (
-            did_panel[did_panel["treated"] == 1]
-            .groupby("tract_geoid")["month"]
-            .min()
+            did_panel[did_panel["treated"] == 1].groupby("tract_geoid")["month"].min()
         )
 
-        ax4.hist(treatment_dates, bins=30, color="#9b59b6", alpha=0.7, edgecolor="white")
+        ax4.hist(
+            treatment_dates, bins=30, color="#9b59b6", alpha=0.7, edgecolor="white"
+        )
         ax4.set_xlabel("Treatment Date")
         ax4.set_ylabel("Number of Tracts")
         ax4.set_title("D. Distribution of Treatment Timing", fontweight="bold")

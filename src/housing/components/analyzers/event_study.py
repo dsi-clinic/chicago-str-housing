@@ -11,7 +11,6 @@ from typing import Any
 
 import pandas as pd
 from linearmodels import PanelOLS
-from scipy import stats
 
 from pipeline.base import Analyzer
 
@@ -68,7 +67,9 @@ class EventStudyAnalyzer(Analyzer):
         did_panel = context["did_panel"].copy()
 
         logger.info("Estimating Event Study model...")
-        logger.info("  Event window: %d to +%d months", -self.pre_periods, self.post_periods)
+        logger.info(
+            "  Event window: %d to +%d months", -self.pre_periods, self.post_periods
+        )
         logger.info("  Reference period: k = %d", self.reference_period)
 
         # Step 1: Create relative time dummies
@@ -149,6 +150,7 @@ class EventStudyAnalyzer(Analyzer):
         self, results: Any, rel_time_cols: list[str]
     ) -> pd.DataFrame:
         """Extract coefficients and confidence intervals."""
+
         # Parse relative time from column names
         # rel_time_m12 -> -12, rel_time_p0 -> 0, rel_time_p12 -> 12
         def parse_rel_time(col: str) -> int:
@@ -206,7 +208,11 @@ class EventStudyAnalyzer(Analyzer):
         ].copy()
 
         if len(pre_coefs) == 0:
-            return {"n_pre_periods": 0, "n_significant": 0, "conclusion": "No pre-periods"}
+            return {
+                "n_pre_periods": 0,
+                "n_significant": 0,
+                "conclusion": "No pre-periods",
+            }
 
         # Count individually significant coefficients
         n_significant = (pre_coefs["p_value"] < 0.05).sum()
@@ -218,7 +224,9 @@ class EventStudyAnalyzer(Analyzer):
         # Simple heuristic: if more than 20% of pre-treatment coefficients
         # are significant, parallel trends may be violated
         if n_significant / n_pre_periods > 0.2:
-            conclusion = "Potential violation: multiple significant pre-treatment effects"
+            conclusion = (
+                "Potential violation: multiple significant pre-treatment effects"
+            )
         elif avg_abs_coef > 20:  # More than $20 average deviation
             conclusion = "Potential violation: large pre-treatment coefficients"
         else:
@@ -255,7 +263,10 @@ class EventStudyAnalyzer(Analyzer):
 
         logger.info("\nPost-Treatment Coefficients (k >= 0):")
         logger.info("  Mean: $%.2f", post_coefs["coefficient"].mean())
-        logger.info("  Immediate effect (k=0): $%.2f", coef_df[coef_df["relative_time"] == 0]["coefficient"].values[0])
+        logger.info(
+            "  Immediate effect (k=0): $%.2f",
+            coef_df[coef_df["relative_time"] == 0]["coefficient"].values[0],
+        )
 
         # Parallel trends test
         logger.info("\nParallel Trends Test:")

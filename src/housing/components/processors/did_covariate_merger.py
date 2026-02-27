@@ -27,7 +27,7 @@ class DIDCovariateProcessor(DataProcessor):
         """Initialize the processor."""
         super().__init__(
             "did_panel_with_covariates",
-            "Merge census and tract covariates into DID panel"
+            "Merge census and tract covariates into DID panel",
         )
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
@@ -49,7 +49,9 @@ class DIDCovariateProcessor(DataProcessor):
                 panel_with_covariates, census_data
             )
         else:
-            logger.warning("census_data not found in context, skipping census covariates")
+            logger.warning(
+                "census_data not found in context, skipping census covariates"
+            )
 
         # 2. Calculate baseline rental price for each tract (pre-treatment average)
         panel_with_covariates = self._add_baseline_rent(panel_with_covariates)
@@ -63,7 +65,7 @@ class DIDCovariateProcessor(DataProcessor):
 
         return {
             "did_panel_with_covariates": panel_with_covariates,
-            "covariate_columns": self._get_covariate_columns(panel_with_covariates)
+            "covariate_columns": self._get_covariate_columns(panel_with_covariates),
         }
 
     def _merge_census_data(
@@ -73,8 +75,15 @@ class DIDCovariateProcessor(DataProcessor):
         # Standardize tract identifiers for merging
         # Panel uses 'tract_geoid', census uses 'tract_id'
 
-        census_cols = ["tract_id", "median_income", "median_house_value",
-                      "median_age", "pct_bachelor", "pct_rented", "total_population"]
+        census_cols = [
+            "tract_id",
+            "median_income",
+            "median_house_value",
+            "median_age",
+            "pct_bachelor",
+            "pct_rented",
+            "total_population",
+        ]
 
         # Keep only available columns
         available_cols = [col for col in census_cols if col in census.columns]
@@ -82,10 +91,7 @@ class DIDCovariateProcessor(DataProcessor):
 
         # Merge (many-to-one: many panel rows to one census row per tract)
         merged = panel.merge(
-            census_subset,
-            left_on="tract_geoid",
-            right_on="tract_id",
-            how="left"
+            census_subset, left_on="tract_geoid", right_on="tract_id", how="left"
         )
 
         # Drop redundant tract_id column if it exists
@@ -102,7 +108,9 @@ class DIDCovariateProcessor(DataProcessor):
 
         logger.info(
             "Merged census data: %d/%d observations matched (%.1f%%)",
-            n_matched, n_total, pct_matched
+            n_matched,
+            n_total,
+            pct_matched,
         )
 
         return merged
@@ -113,7 +121,9 @@ class DIDCovariateProcessor(DataProcessor):
         first_treatment = panel.loc[panel["treated"] == 1, "month"].min()
 
         if pd.isna(first_treatment):
-            logger.warning("No treated observations found, cannot calculate baseline rent")
+            logger.warning(
+                "No treated observations found, cannot calculate baseline rent"
+            )
             panel["baseline_rent"] = panel["rental_price"]
             return panel
 
@@ -142,8 +152,10 @@ class DIDCovariateProcessor(DataProcessor):
             panel["baseline_rent"] = panel["baseline_rent"].fillna(panel["first_rent"])
             panel = panel.drop(columns=["first_rent"])
 
-        logger.info("Added baseline_rent covariate for %d tracts",
-                   panel["tract_geoid"].nunique())
+        logger.info(
+            "Added baseline_rent covariate for %d tracts",
+            panel["tract_geoid"].nunique(),
+        )
 
         return panel
 
@@ -157,7 +169,8 @@ class DIDCovariateProcessor(DataProcessor):
 
         logger.info(
             "Treatment groups: %d ever-treated obs, %d never-treated obs",
-            n_ever_treated, n_never_treated
+            n_ever_treated,
+            n_never_treated,
         )
 
         return panel
@@ -171,7 +184,7 @@ class DIDCovariateProcessor(DataProcessor):
             "pct_bachelor",
             "pct_rented",
             "total_population",
-            "baseline_rent"
+            "baseline_rent",
         ]
 
         return [col for col in potential_covariates if col in panel.columns]
@@ -193,17 +206,17 @@ class DIDCovariateProcessor(DataProcessor):
         logger.info("Covariate Summary by Treatment Group:")
 
         for cov in covariates:
-            treated_mean = tract_data.loc[
-                tract_data["ever_treated"] == 1, cov
-            ].mean()
-            control_mean = tract_data.loc[
-                tract_data["ever_treated"] == 0, cov
-            ].mean()
+            treated_mean = tract_data.loc[tract_data["ever_treated"] == 1, cov].mean()
+            control_mean = tract_data.loc[tract_data["ever_treated"] == 0, cov].mean()
 
             diff = treated_mean - control_mean
             pct_diff = (diff / control_mean * 100) if control_mean != 0 else 0
 
             logger.info(
                 "  %s: Treated=%.2f, Control=%.2f, Diff=%.2f (%.1f%%)",
-                cov, treated_mean, control_mean, diff, pct_diff
+                cov,
+                treated_mean,
+                control_mean,
+                diff,
+                pct_diff,
             )
