@@ -76,6 +76,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
             "adoption_by_month": adoption_stats["adoption_by_month"],
             "cumulative_adoption": adoption_stats["cumulative_adoption"],
             "avg_by_group_month": avg_by_group_month,
+            "average_rent_by_treatment_group": avg_by_group_month,
             "pre_balance": pre_balance,
             "summary_stats": summary_stats,
             "balance_test": balance_test,
