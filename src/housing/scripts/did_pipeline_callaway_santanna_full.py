@@ -44,25 +44,27 @@ from pathlib import Path
 import pandas as pd
 
 from housing.components.analyzers.callaway_santanna import CallawaySantAnnaAnalyzer
+from housing.components.analyzers.callaway_santanna_summary import (
+    CallawaySantAnnaSummaryAnalyzer,
+)
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.analyzers.event_study import EventStudyAnalyzer
-from housing.components.loaders.census_data import CensusDataLoader
+from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental_data import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
-from housing.components.processors.points_to_tract import PointsToTractProcessor
 from housing.components.processors.time_series_zip_to_tract import (
     TimeSeriesZipToTractProcessor,
 )
 from housing.components.processors.tract_prohibition_dates import (
     TractProhibitionDatesProcessor,
 )
-from housing.components.processors.treatment_threshold import (
-    TreatmentThresholdProcessor,
+from housing.components.processors.treatment_indicator import (
+    TreatmentIndicatorProcessor,
 )
 from housing.components.processors.trend_matching import TrendMatchingProcessor
-from housing.components.processors.zip_tract_crosswalk import ZipTractCrosswalkProcessor
+from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.callaway_santanna import (
     CallawaySantAnnaComparisonVisualizer,
     CallawaySantAnnaVisualizer,
@@ -82,7 +84,7 @@ _LARGE_CS_TWFE_DIFF_DOLLARS = 10.0
 # Paths
 DATA_ROOT = Path(os.environ.get("DATA_DIR", "/project/data"))
 TRACT_SHP = DATA_ROOT / "tl_2023_17_tract" / "tl_2023_17_tract.shp"
-ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
+ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_sa_month.csv"
 DID_CS_OUTPUT_DIR = "/project/output/did-cs"
 
 
@@ -153,40 +155,18 @@ def run_did_analysis_with_cs() -> tuple:
     pipeline.register_component(ZipBoundariesLoader())
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
-    pipeline.register_component(TimeSeriesRentalLoader())
-    pipeline.register_component(
-        CensusDataLoader(api_key="2a9cd1fa2e1158252a3f3810be0589b6d9ef41a0")
-    )
+    pipeline.register_component(TimeSeriesRentalLoader(file_path=ZORI_CSV))
+    pipeline.register_component(RentalDataLoader(file_path=ZORI_CSV))
 
     # 2. Process Data
     logger.info("\n[2/5] Processing panel data...")
-    pipeline.register_component(ZipTractCrosswalkProcessor())
+    pipeline.register_component(ZipToTractProcessor())
     pipeline.register_component(TimeSeriesZipToTractProcessor())
-    pipeline.register_component(
-        PointsToTractProcessor(
-            input_key="str_prohibition_data",
-            output_key="str_tract_data",
-            id_column="application_id",
-            aggregate_columns={
-                "prohibition_date": "min",
-                "number_of_units": "sum",
-            },
-            calculate_density=True,
-            data_source_name="str_prohibition",
-        )
-    )
     pipeline.register_component(
         TractProhibitionDatesProcessor(output_dir=DID_CS_OUTPUT_DIR)
     )
-    # pipeline.register_component(
-    # TreatmentIndicatorProcessor(
-    # output_dir=DID_CS_OUTPUT_DIR
-    # )
-    # )
     pipeline.register_component(
-        TreatmentThresholdProcessor(  # REPLACE TreatmentIndicatorProcessor
-            output_dir=DID_CS_OUTPUT_DIR
-        )
+        TreatmentIndicatorProcessor(output_dir=DID_CS_OUTPUT_DIR)
     )
 
     # 3. Trend matching (restrict panel to matched treated + control tracts)
@@ -220,31 +200,13 @@ def run_did_analysis_with_cs() -> tuple:
         )
     )
     pipeline.register_component(
+        CallawaySantAnnaSummaryAnalyzer(output_dir=DID_CS_OUTPUT_DIR)
+    )
+    pipeline.register_component(
         CallawaySantAnnaVisualizer(output_dir=DID_CS_OUTPUT_DIR)
     )
     pipeline.register_component(
         CallawaySantAnnaComparisonVisualizer(output_dir=DID_CS_OUTPUT_DIR)
-    )
-
-    # Set execution order
-    pipeline.set_execution_order(
-        [
-            "zip_boundaries",
-            "tract_boundaries",
-            "zip_tract_crosswalk",
-            "str_prohibition_data",
-            "rental_panel_data",
-            "zip_to_tract_panel",
-            "tract_prohibition_dates",
-            "treatment_indicator",
-            "trend_matching",
-            "did_descriptive_analysis",
-            "event_study_analysis",
-            "event_study_visualization",
-            "callaway_santanna_analysis",
-            "callaway_santanna_visualizer",
-            "cs_comparison_visualizer",
-        ]
     )
 
     # Execute pipeline
@@ -305,6 +267,27 @@ def _print_summary(results: dict) -> None:
         logger.info("  Number of treatment cohorts: %d", n_cohorts)
         logger.info("  Number of never-treated tracts: %d", n_never)
 
+    # Cohort-level overall ATTs (post-treatment average per cohort)
+    cohort_overall = results.get("cs_overall_att_by_cohort")
+    if isinstance(cohort_overall, pd.DataFrame) and not cohort_overall.empty:
+        logger.info("\nCohort-Level Overall ATTs (Callaway-Sant'Anna):")
+        for _, row in cohort_overall.iterrows():
+            cohort = str(row.get("cohort"))[:10]
+            att = row.get("att", float("nan"))
+            se = row.get("se", float("nan"))
+            ci_low = row.get("ci_low", float("nan"))
+            ci_high = row.get("ci_high", float("nan"))
+            p_val = row.get("p_value", float("nan"))
+            logger.info(
+                "  Cohort %s: ATT=$%.2f (SE=$%.2f, 95%% CI=[$%.2f, $%.2f], p=%.4f)",
+                cohort,
+                att,
+                se,
+                ci_low,
+                ci_high,
+                p_val,
+            )
+
     # Comparison with TWFE (use housing's event_study_coefficients format)
     cs_event = results.get("cs_event_study")
     twfe_event = _get_twfe_event_df(results)
@@ -347,4 +330,4 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    run_did_analysis_with_cs()
+    pipeline, context = run_did_analysis_with_cs()
