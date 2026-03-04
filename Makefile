@@ -68,8 +68,5 @@ run-clustering-pipeline: build-only ## Prepare data for clustering
 run-clustering-analysis: build-only ## Run clustering data exploration
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/clustering_analysis.py $(ARGS)
 
-run-did-pipeline: build-only ## Run the DiD (Difference-in-Differences) pipeline
-	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline.py
-
 run-did-pipeline-cs: build-only ## Run DiD analysis with Callaway-Sant'Anna (2020) robust estimator
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna.py
