@@ -166,6 +166,7 @@ class CensusDataLoader(DataLoader):
             "B15003_022E": "bachelor_count",
             "B15003_001E": "pop_25_plus",
             "B01003_001E": "total_population",
+            "B25003_001E": "total_occupied_units",
             "NAME": "tract_name",
             "state": "state_fips",
             "county": "county_fips",
