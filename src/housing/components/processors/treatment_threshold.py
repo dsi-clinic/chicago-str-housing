@@ -32,7 +32,7 @@ class TreatmentThresholdProcessor(DataProcessor):
     def __init__(
         self,
         output_dir: str | None = None,
-        percentile: float = 0.50,
+        percentile: float = 0.25,
     ) -> None:
         """Initialize the processor."
 

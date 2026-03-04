@@ -47,8 +47,9 @@ from housing.components.analyzers.callaway_santanna import CallawaySantAnnaAnaly
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.analyzers.event_study import EventStudyAnalyzer
 from housing.components.loaders.census_data import CensusDataLoader
+from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
-from housing.components.loaders.time_series_rental_data import TimeSeriesRentalLoader
+from housing.components.loaders.time_series_rental import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
 from housing.components.processors.points_to_tract import PointsToTractProcessor
@@ -62,7 +63,7 @@ from housing.components.processors.treatment_threshold import (
     TreatmentThresholdProcessor,
 )
 from housing.components.processors.trend_matching import TrendMatchingProcessor
-from housing.components.processors.zip_tract_crosswalk import ZipTractCrosswalkProcessor
+from housing.components.processors.zip_to_tract import ZipToTractProcessor
 from housing.components.visualizers.callaway_santanna import (
     CallawaySantAnnaComparisonVisualizer,
     CallawaySantAnnaVisualizer,
@@ -153,14 +154,15 @@ def run_did_analysis_with_cs() -> tuple:
     pipeline.register_component(ZipBoundariesLoader())
     pipeline.register_component(TractBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
-    pipeline.register_component(TimeSeriesRentalLoader())
+    pipeline.register_component(TimeSeriesRentalLoader(file_path=ZORI_CSV))
+    pipeline.register_component(RentalDataLoader(file_path=ZORI_CSV))
     pipeline.register_component(
         CensusDataLoader(api_key="2a9cd1fa2e1158252a3f3810be0589b6d9ef41a0")
     )
 
     # 2. Process Data
     logger.info("\n[2/5] Processing panel data...")
-    pipeline.register_component(ZipTractCrosswalkProcessor())
+    pipeline.register_component(ZipToTractProcessor())
     pipeline.register_component(TimeSeriesZipToTractProcessor())
     pipeline.register_component(
         PointsToTractProcessor(
@@ -179,13 +181,11 @@ def run_did_analysis_with_cs() -> tuple:
         TractProhibitionDatesProcessor(output_dir=DID_CS_OUTPUT_DIR)
     )
     # pipeline.register_component(
-    # TreatmentIndicatorProcessor(
-    # output_dir=DID_CS_OUTPUT_DIR
-    # )
+    # TreatmentIndicatorProcessor(output_dir=DID_CS_OUTPUT_DIR)
     # )
     pipeline.register_component(
         TreatmentThresholdProcessor(  # REPLACE TreatmentIndicatorProcessor
-            output_dir=DID_CS_OUTPUT_DIR
+            output_dir=DID_CS_OUTPUT_DIR, percentile=0.25
         )
     )
 
@@ -231,12 +231,15 @@ def run_did_analysis_with_cs() -> tuple:
         [
             "zip_boundaries",
             "tract_boundaries",
-            "zip_tract_crosswalk",
             "str_prohibition_data",
             "rental_panel_data",
+            "rental_data",
+            "census_data",
+            "zip_to_tract",
             "zip_to_tract_panel",
+            "points_to_tract_str_prohibition_data",
             "tract_prohibition_dates",
-            "treatment_indicator",
+            "treatment_threshold",
             "trend_matching",
             "did_descriptive_analysis",
             "event_study_analysis",

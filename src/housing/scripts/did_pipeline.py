@@ -14,7 +14,7 @@ from housing.components.loaders.census_data import CensusDataLoader
 from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
-from housing.components.loaders.time_series_rental_data import TimeSeriesRentalLoader
+from housing.components.loaders.time_series_rental import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
 from housing.components.loaders.zip_boundaries import ZipBoundariesLoader
 from housing.components.processors.points_to_tract import PointsToTractProcessor
