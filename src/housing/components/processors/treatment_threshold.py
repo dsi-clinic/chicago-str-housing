@@ -35,7 +35,7 @@ class TreatmentThresholdProcessor(DataProcessor):
         percentile: float = 0.50,
     ) -> None:
         """Initialize the processor."
-        
+
         Args:
             output_dir: Optional output directory for CSVs.
             percentile: Percentile for yearly threshold (0–1). Default 0.25 = 25th percentile.
@@ -110,7 +110,9 @@ class TreatmentThresholdProcessor(DataProcessor):
         total_occupied_units = pd.to_numeric(
             merged["total_occupied_units"], errors="coerce"
         ).replace(0, np.nan)
-        merged["pct_units_restricted"] = (prohibited_units / total_occupied_units).fillna(0)
+        merged["pct_units_restricted"] = (
+            prohibited_units / total_occupied_units
+        ).fillna(0)
 
         merged["year"] = merged["month"].dt.year
         active_prohibitions = merged[merged["pct_units_restricted"] > 0].copy()
@@ -144,9 +146,8 @@ class TreatmentThresholdProcessor(DataProcessor):
         ).astype(int)
 
         merged["months_since_treatment"] = (
-            (merged["month"].dt.year - merged["treatment_start_month"].dt.year) * 12
-            + (merged["month"].dt.month - merged["treatment_start_month"].dt.month)
-        )
+            merged["month"].dt.year - merged["treatment_start_month"].dt.year
+        ) * 12 + (merged["month"].dt.month - merged["treatment_start_month"].dt.month)
         merged["first_prohibition_date"] = merged["treatment_start_month"]
 
         logger.info("Created DiD panel with threshold-based treatment indicator")

@@ -52,7 +52,7 @@ class DIDTrendsVisualizer(Visualizer):
         )
 
         # Average rental price by ever_treated status and month (from context)
-        avg_by_group = context["average_rent_by_treatment_group"]
+        avg_by_group = context["avg_by_group_month"]
 
         # Plot average by group
         avg_by_group.plot(ax=ax[0, 1])

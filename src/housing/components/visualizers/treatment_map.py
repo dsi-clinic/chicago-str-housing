@@ -122,7 +122,7 @@ class TreatmentMapVisualizer(Visualizer):
             axes[1],
             map_peak,
             "treated",
-            f"Most Treatments Added Date in {pd.Timestamp(peak_month).strftime('%B %Y')}", 
+            f"Most Treatments Added Date in {pd.Timestamp(peak_month).strftime('%B %Y')}",
             "Treated (1) vs Never Treated (0)",
             cmap="Blues",
             bounds=common_bounds,
