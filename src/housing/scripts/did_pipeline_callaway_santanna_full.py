@@ -163,14 +163,10 @@ def run_did_analysis_with_cs() -> tuple:
     pipeline.register_component(ZipToTractProcessor())
     pipeline.register_component(TimeSeriesZipToTractProcessor())
     pipeline.register_component(
-        TractProhibitionDatesProcessor(
-            output_dir=DID_CS_OUTPUT_DIR
-        )
+        TractProhibitionDatesProcessor(output_dir=DID_CS_OUTPUT_DIR)
     )
     pipeline.register_component(
-        TreatmentIndicatorProcessor(
-            output_dir=DID_CS_OUTPUT_DIR
-        )
+        TreatmentIndicatorProcessor(output_dir=DID_CS_OUTPUT_DIR)
     )
 
     # 3. Trend matching (restrict panel to matched treated + control tracts)

@@ -102,9 +102,13 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
             # in context as `cs_overall_att`.
             "cs_overall_att_by_cohort": cohort_summary,
             "cs_att_summary_table": summary_table,
-            "cs_att_summary_path": str(summary_path) if summary_path is not None else None,
+            "cs_att_summary_path": str(summary_path)
+            if summary_path is not None
+            else None,
             "cs_pretrend_sig_counts": sig_counts,
-            "cs_pretrend_sig_counts_path": str(sig_counts_path) if sig_counts_path is not None else None,
+            "cs_pretrend_sig_counts_path": str(sig_counts_path)
+            if sig_counts_path is not None
+            else None,
         }
 
     def _compute_overall_by_cohort(
@@ -261,6 +265,7 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
                 n_periods,
                 n_treated,
             )
+
     def _build_summary_table(
         self,
         cohort_summary: pd.DataFrame,
@@ -351,7 +356,11 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
         exclude -1 because it is the reference period in the event study.
         """
         cohort_dyn = context.get("cs_cohort_dynamics")
-        if cohort_dyn is None or not isinstance(cohort_dyn, pd.DataFrame) or cohort_dyn.empty:
+        if (
+            cohort_dyn is None
+            or not isinstance(cohort_dyn, pd.DataFrame)
+            or cohort_dyn.empty
+        ):
             logger.info(
                 "cs_cohort_dynamics not available or empty; "
                 "skipping pre-treatment significance counts."
@@ -384,7 +393,10 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
             .reset_index()
         )
 
-        logger.info("Computed pre-treatment significance counts for %d cohorts.", len(sig_counts))
+        logger.info(
+            "Computed pre-treatment significance counts for %d cohorts.",
+            len(sig_counts),
+        )
         return sig_counts
 
     def _write_sig_counts_table(self, sig_counts: pd.DataFrame) -> Path | None:
@@ -406,5 +418,3 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
         )
 
         return output_path
-
-
