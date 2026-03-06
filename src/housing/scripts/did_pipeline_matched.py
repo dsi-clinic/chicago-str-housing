@@ -66,7 +66,7 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     pipeline.register_component(TreatmentIndicatorProcessor())
 
     # Conduct trend-matching filter
-    pipeline.register_component(TrendMatchingProcessor(k_neighbors=2))
+    pipeline.register_component(TrendMatchingProcessor())
 
     # Conduct pre-experiment analysis
     pipeline.register_component(

@@ -68,12 +68,13 @@ class TrendMatchingProcessor(DataProcessor):
 
         # Helper: compute slope per tract using treated-pre period vs never-treated full period
         def get_tract_slope(group: pd.DataFrame) -> float:
+            first_treatment_date = panel.loc[panel["treated"] == 1]["month"].min()
             if group["ever_treated"].iloc[0] == 1:
                 # Treated tract → true pre-period
                 pre = group[group["months_since_treatment"] < 0]
             else:
                 # Never-treated → use entire time span
-                pre = group
+                pre = group[group["month"] < first_treatment_date]
             return linregress(pre["month_numeric"], pre["rental_price"]).slope
 
         slopes = panel_filtered.groupby("tract_geoid").apply(get_tract_slope)
