@@ -305,7 +305,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         return {"att": att, "se": se}
 
     def _aggregate_to_event_study(
-        self, group_time_atts: pd.DataFrame, df: pd.DataFrame
+        self, group_time_atts: pd.DataFrame, _df: pd.DataFrame
     ) -> pd.DataFrame:
         """Aggregate group-time ATTs to event study by relative time.
 

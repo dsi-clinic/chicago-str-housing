@@ -45,7 +45,7 @@ class TimeSeriesRentalLoader(DataLoader):
         """
         super().__init__(
             "rental_panel_data",
-            file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv",
+            file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_sa_month.csv",
             "Load rental price data from ZORI dataset and create a panel timeseries dataframe",
         )
 
