@@ -92,7 +92,7 @@ _LARGE_CS_TWFE_DIFF_DOLLARS = 10.0
 # Paths
 DATA_ROOT = Path(os.environ.get("DATA_DIR", "/project/data"))
 TRACT_SHP = DATA_ROOT / "tl_2023_17_tract" / "tl_2023_17_tract.shp"
-ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_sa_month.csv"
+ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
 DID_CS_OUTPUT_DIR = "/project/output/did-cs"
 
 

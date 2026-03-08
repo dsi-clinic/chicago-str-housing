@@ -15,7 +15,6 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
 from matplotlib.colors import LinearSegmentedColormap
 
 from housing.components.constants import MIN_LAND_AREA_SQ_METERS
@@ -55,6 +54,7 @@ class CohortChoroplethVisualizer(Visualizer):
     """Create per-cohort choropleth maps for cohorts with ATT estimates."""
 
     def __init__(self, output_dir: str | None = None) -> None:
+        """Initialize the visualizer with output directory for choropleth maps."""
         super().__init__(
             "cohort_choropleth_visualizer",
             "Choropleth maps of treatment cohort membership by census tract",
@@ -88,9 +88,7 @@ class CohortChoroplethVisualizer(Visualizer):
         cohorts_sorted = sorted(cohort_sizes.index)
         n_cohorts = len(cohorts_sorted)
 
-        logger.info(
-            "Plotting %d cohorts (those with ATT estimates):", n_cohorts
-        )
+        logger.info("Plotting %d cohorts (those with ATT estimates):", n_cohorts)
         for cohort in cohorts_sorted:
             logger.info(
                 "  %s: %d tracts",
@@ -101,8 +99,7 @@ class CohortChoroplethVisualizer(Visualizer):
         # Cohort colors from gradient, equidistant, decided only after n_cohorts is known
         cohort_hex_colors = _cohort_colors_from_gradient(n_cohorts)
         color_map = {
-            cohort: cohort_hex_colors[i]
-            for i, cohort in enumerate(cohorts_sorted)
+            cohort: cohort_hex_colors[i] for i, cohort in enumerate(cohorts_sorted)
         }
 
         base = self._prepare_map_base(tract_boundaries, city_boundaries)
