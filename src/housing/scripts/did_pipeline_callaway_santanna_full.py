@@ -92,7 +92,7 @@ _LARGE_CS_TWFE_DIFF_DOLLARS = 10.0
 # Paths
 DATA_ROOT = Path(os.environ.get("DATA_DIR", "/project/data"))
 TRACT_SHP = DATA_ROOT / "tl_2023_17_tract" / "tl_2023_17_tract.shp"
-ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
+ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_sa_month.csv"
 DID_CS_OUTPUT_DIR = "/project/output/did-cs"
 
 
@@ -350,6 +350,10 @@ def _print_summary(results: dict) -> None:
     logger.info("  • did_twfe_vs_cs_comparison.png - Side-by-side comparison")
     logger.info("  • did_cs_twfe_difference.png - Bias visualization")
     logger.info("  • did_cohort_dynamics.png - Cohort-specific effects")
+    logger.info(
+        "  • did_cs_dynamic_att.png - Dynamic ATT (Eq. 3.8) and cumulative ATT (Eq. 3.9)"
+    )
+    logger.info("  • did_cs_dynamic_att.csv - Dynamic and cumulative ATT table")
     logger.info("  • did_twfe_cs_comparison_table.csv - Detailed comparison")
     logger.info("  • cohort-choropleths/ - Per-cohort and combined choropleth maps")
 
