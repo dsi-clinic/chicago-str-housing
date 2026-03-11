@@ -42,6 +42,7 @@ import os
 from pathlib import Path
 
 import pandas as pd
+from dotenv import load_dotenv
 
 from housing.components.analyzers.callaway_santanna import CallawaySantAnnaAnalyzer
 from housing.components.analyzers.callaway_santanna_summary import (
@@ -50,6 +51,7 @@ from housing.components.analyzers.callaway_santanna_summary import (
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.analyzers.event_study import EventStudyAnalyzer
 from housing.components.loaders.census_data import CensusDataLoader
+from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.rental_data import RentalDataLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental import TimeSeriesRentalLoader
@@ -71,10 +73,14 @@ from housing.components.visualizers.callaway_santanna import (
     CallawaySantAnnaComparisonVisualizer,
     CallawaySantAnnaVisualizer,
 )
+from housing.components.visualizers.cohort_choropleth import (
+    CohortChoroplethVisualizer,
+)
 from housing.components.visualizers.event_study import EventStudyVisualizer
 from pipeline import Pipeline
 
 logger = logging.getLogger(__name__)
+load_dotenv()
 
 # Constants for reporting / checks
 _ALPHA_005 = 0.05
@@ -156,12 +162,11 @@ def run_did_analysis_with_cs() -> tuple:
     logger.info("\n[1/5] Loading data...")
     pipeline.register_component(ZipBoundariesLoader())
     pipeline.register_component(TractBoundariesLoader())
+    pipeline.register_component(CityBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(TimeSeriesRentalLoader(file_path=ZORI_CSV))
     pipeline.register_component(RentalDataLoader(file_path=ZORI_CSV))
-    pipeline.register_component(
-        CensusDataLoader(api_key="2a9cd1fa2e1158252a3f3810be0589b6d9ef41a0")
-    )
+    pipeline.register_component(CensusDataLoader(api_key=os.getenv("CENSUS_API_KEY")))
 
     # 2. Process Data
     logger.info("\n[2/5] Processing panel data...")
@@ -230,6 +235,9 @@ def run_did_analysis_with_cs() -> tuple:
     )
     pipeline.register_component(
         CallawaySantAnnaComparisonVisualizer(output_dir=DID_CS_OUTPUT_DIR)
+    )
+    pipeline.register_component(
+        CohortChoroplethVisualizer(output_dir=DID_CS_OUTPUT_DIR)
     )
 
     # Execute pipeline
@@ -343,6 +351,7 @@ def _print_summary(results: dict) -> None:
     logger.info("  • did_cs_twfe_difference.png - Bias visualization")
     logger.info("  • did_cohort_dynamics.png - Cohort-specific effects")
     logger.info("  • did_twfe_cs_comparison_table.csv - Detailed comparison")
+    logger.info("  • cohort-choropleths/ - Per-cohort and combined choropleth maps")
 
     logger.info("\n" + "=" * 80)
 
