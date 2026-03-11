@@ -342,7 +342,9 @@ def _print_summary(results: dict) -> None:
     logger.info("  • did_twfe_vs_cs_comparison.png - Side-by-side comparison")
     logger.info("  • did_cs_twfe_difference.png - Bias visualization")
     logger.info("  • did_cohort_dynamics.png - Cohort-specific effects")
-    logger.info("  • did_cs_dynamic_att.png - Dynamic ATT (Eq. 3.8) and cumulative ATT (Eq. 3.9)")
+    logger.info(
+        "  • did_cs_dynamic_att.png - Dynamic ATT (Eq. 3.8) and cumulative ATT (Eq. 3.9)"
+    )
     logger.info("  • did_cs_dynamic_att.csv - Dynamic and cumulative ATT table")
     logger.info("  • did_twfe_cs_comparison_table.csv - Detailed comparison")
 

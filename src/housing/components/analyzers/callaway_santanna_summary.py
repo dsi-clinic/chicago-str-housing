@@ -437,9 +437,9 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
             rel_times = sorted(group_time_atts["rel_time"].unique())
             rows: list[dict[str, Any]] = []
             for e in rel_times:
-                atts_at_e = group_time_atts[
-                    group_time_atts["rel_time"] == e
-                ].dropna(subset=["att", "se"])
+                atts_at_e = group_time_atts[group_time_atts["rel_time"] == e].dropna(
+                    subset=["att", "se"]
+                )
                 if atts_at_e.empty:
                     continue
                 w = atts_at_e["n_treated"].to_numpy(dtype=float)
@@ -495,9 +495,7 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
             catt = float(np.sum(att_vals[: idx + 1]) / n_obs)
 
             # Conservative SE assuming independence across periods
-            catt_se = float(
-                np.sqrt(np.sum(se_vals[: idx + 1] ** 2)) / n_obs
-            )
+            catt_se = float(np.sqrt(np.sum(se_vals[: idx + 1] ** 2)) / n_obs)
             catt_ci_low = catt - 1.96 * catt_se
             catt_ci_high = catt + 1.96 * catt_se
 
@@ -552,9 +550,7 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
         Both panels show 95% confidence intervals as shaded bands.
         """
         if dynamic_att_table is None or dynamic_att_table.empty:
-            logger.info(
-                "Dynamic ATT table is empty; skipping dynamic ATT plot."
-            )
+            logger.info("Dynamic ATT table is empty; skipping dynamic ATT plot.")
             return None
 
         plot_df = dynamic_att_table.copy()
