@@ -7,6 +7,21 @@ This component takes the detailed group-time ATT estimates produced by
    `cs_overall_att`, computed by `CallawaySantAnnaAnalyzer`)
 2. A cohort-level overall ATT for each treatment cohort, averaging over all
    available post-treatment periods for that cohort.
+3. A dynamic ATT table implementing Callaway & Sant'Anna (2021) equations 3.8
+   and 3.9:
+
+   Equation 3.8 — Dynamic ATT e periods after treatment:
+       ATT^O(e) = Σ_g P(G=g | G ∈ G_e) * ATT(g, g+e)
+
+   where G_e = {g : g+e ≤ T_max, g ∈ G} is the set of cohorts for which the
+   e-period horizon is identified, and weights P(G=g | G ∈ G_e) are
+   proportional to cohort size (n_treated_g / Σ_{g' ∈ G_e} n_treated_{g'}).
+
+   Equation 3.9 — Cumulative average ATT up to e periods after treatment:
+       CATT^O(e) = (1/(e+1)) * Σ_{l=0}^{e} ATT^O(l)
+
+   Standard error for CATT^O(e) (conservative, assuming period independence):
+       SE(CATT^O(e)) = (1/(e+1)) * sqrt(Σ_{l=0}^{e} SE(ATT^O(l))^2)
 
 For each cohort, we report:
     - Overall ATT (level effect, in dollars)
@@ -19,10 +34,12 @@ import logging
 from pathlib import Path
 from typing import Any
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy import stats
 
+from housing.components.utils import setup_figure_and_save
 from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
@@ -93,6 +110,15 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
         )
         summary_path = self._write_summary_table(summary_table)
 
+        # Build and persist dynamic ATT table (equations 3.8 and 3.9)
+        event_study = context.get("cs_event_study")
+        dynamic_att_table = self._compute_dynamic_att_table(
+            group_time_atts=group_time_atts,
+            event_study=event_study,
+        )
+        dynamic_att_path = self._write_dynamic_att_table(dynamic_att_table)
+        dynamic_att_plot_path = self._plot_dynamic_att(dynamic_att_table)
+
         # Compute and persist pre-treatment significance counts by cohort
         sig_counts = self._compute_pretrend_significance(context)
         sig_counts_path = self._write_sig_counts_table(sig_counts)
@@ -104,6 +130,13 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
             "cs_att_summary_table": summary_table,
             "cs_att_summary_path": str(summary_path)
             if summary_path is not None
+            else None,
+            "cs_dynamic_att_table": dynamic_att_table,
+            "cs_dynamic_att_path": str(dynamic_att_path)
+            if dynamic_att_path is not None
+            else None,
+            "cs_dynamic_att_plot_path": str(dynamic_att_plot_path)
+            if dynamic_att_plot_path is not None
             else None,
             "cs_pretrend_sig_counts": sig_counts,
             "cs_pretrend_sig_counts_path": str(sig_counts_path)
@@ -343,6 +376,274 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
             output_path,
         )
 
+        return output_path
+
+    def _compute_dynamic_att_table(
+        self,
+        group_time_atts: pd.DataFrame,
+        event_study: pd.DataFrame | None,
+    ) -> pd.DataFrame:
+        """Build the dynamic and cumulative ATT table (CS 2021, equations 3.8–3.9).
+
+        **Equation 3.8** — Average treatment effect e periods after first treatment,
+        aggregated across cohorts:
+
+            ATT^O(e) = Σ_g P(G=g | G ∈ G_e) * ATT(g, g+e)
+
+        where G_e = {g : g+e ≤ T_max, g ∈ G} and weights are proportional to the
+        number of treated units in each cohort among those that contribute to
+        horizon e (i.e., n_treated_g / Σ_{g' ∈ G_e} n_treated_{g'}).
+
+        These are taken directly from ``cs_event_study`` when available (which
+        applies the same formula in ``_aggregate_to_event_study``).  When
+        ``cs_event_study`` is absent we recompute from ``cs_group_time_atts``.
+
+        **Equation 3.9** — Cumulative average treatment effect up to horizon e:
+
+            CATT^O(e) = (1 / (e + 1)) * Σ_{l=0}^{e} ATT^O(l)
+
+        Standard error (conservative, assuming period independence):
+
+            SE(CATT^O(e)) = (1 / (e + 1)) * sqrt(Σ_{l=0}^{e} SE(ATT^O(l))^2)
+
+        Returns a DataFrame with one row per post-treatment horizon (e ≥ 0) and
+        columns::
+
+            rel_time, att, se, ci_low, ci_high, n_cohorts,
+            catt, catt_se, catt_ci_low, catt_ci_high
+        """
+        empty_cols = [
+            "rel_time",
+            "att",
+            "se",
+            "ci_low",
+            "ci_high",
+            "n_cohorts",
+            "catt",
+            "catt_se",
+            "catt_ci_low",
+            "catt_ci_high",
+        ]
+
+        # --- Equation 3.8: obtain ATT^O(e) per horizon ---
+        if event_study is not None and not event_study.empty:
+            # cs_event_study already contains ATT^O(e) for all relative times.
+            dynamic = event_study.copy()
+        else:
+            # Fallback: recompute from group-time ATTs (same formula).
+            if group_time_atts.empty:
+                return pd.DataFrame(columns=empty_cols)
+
+            rel_times = sorted(group_time_atts["rel_time"].unique())
+            rows: list[dict[str, Any]] = []
+            for e in rel_times:
+                atts_at_e = group_time_atts[
+                    group_time_atts["rel_time"] == e
+                ].dropna(subset=["att", "se"])
+                if atts_at_e.empty:
+                    continue
+                w = atts_at_e["n_treated"].to_numpy(dtype=float)
+                w = w / w.sum()
+                att_e = float(np.sum(atts_at_e["att"].to_numpy() * w))
+                se_e = float(
+                    np.sqrt(np.sum((atts_at_e["se"].to_numpy() ** 2) * (w**2)))
+                )
+                rows.append(
+                    {
+                        "rel_time": e,
+                        "att": att_e,
+                        "se": se_e,
+                        "ci_low": att_e - 1.96 * se_e,
+                        "ci_high": att_e + 1.96 * se_e,
+                        "n_cohorts": int(len(atts_at_e)),
+                    }
+                )
+            dynamic = pd.DataFrame(rows)
+
+        # Keep only post-treatment horizons (e >= 0) and sort
+        post = (
+            dynamic[dynamic["rel_time"] >= 0]
+            .sort_values("rel_time")
+            .reset_index(drop=True)
+        )
+
+        if post.empty:
+            return pd.DataFrame(columns=empty_cols)
+
+        # --- Equation 3.9: cumulative average ATT ---
+        # Extract all needed columns as numpy arrays upfront to avoid .at/.iloc
+        att_vals = post["att"].to_numpy(dtype=float)
+        se_vals = post["se"].to_numpy(dtype=float)
+        ci_low_vals = post["ci_low"].to_numpy(dtype=float)
+        ci_high_vals = post["ci_high"].to_numpy(dtype=float)
+        rel_time_vals = post["rel_time"].to_numpy(dtype=int)
+        n_cohorts_vals = (
+            post["n_cohorts"].to_numpy(dtype=float)
+            if "n_cohorts" in post.columns
+            else np.full(len(post), np.nan)
+        )
+
+        catt_rows: list[dict[str, Any]] = []
+        for idx in range(len(post)):
+            e = int(rel_time_vals[idx])
+            # Use idx+1 (number of observed values summed) as the denominator, not
+            # e+1 (the horizon value). These are equal only when rel_times are
+            # contiguous integers starting at 0; using idx+1 is always correct.
+            n_obs = idx + 1
+
+            # Eq. 3.9: CATT^O(e) = (1 / n_obs) * Σ_{l=0}^{idx} ATT^O(l)
+            catt = float(np.sum(att_vals[: idx + 1]) / n_obs)
+
+            # Conservative SE assuming independence across periods
+            catt_se = float(
+                np.sqrt(np.sum(se_vals[: idx + 1] ** 2)) / n_obs
+            )
+            catt_ci_low = catt - 1.96 * catt_se
+            catt_ci_high = catt + 1.96 * catt_se
+
+            row: dict[str, Any] = {
+                "rel_time": e,
+                "att": float(att_vals[idx]),
+                "se": float(se_vals[idx]),
+                "ci_low": float(ci_low_vals[idx]),
+                "ci_high": float(ci_high_vals[idx]),
+                "n_cohorts": float(n_cohorts_vals[idx]),
+                "catt": catt,
+                "catt_se": catt_se,
+                "catt_ci_low": catt_ci_low,
+                "catt_ci_high": catt_ci_high,
+            }
+            catt_rows.append(row)
+
+        result = pd.DataFrame(catt_rows)
+        logger.info(
+            "Dynamic ATT table (equations 3.8–3.9) built for %d post-treatment horizons.",
+            len(result),
+        )
+        return result
+
+    def _write_dynamic_att_table(self, dynamic_att_table: pd.DataFrame) -> Path | None:
+        """Write the dynamic ATT table (equations 3.8–3.9) to CSV."""
+        if dynamic_att_table is None or dynamic_att_table.empty:
+            logger.info(
+                "Dynamic ATT table is empty; no CSV file will be written for "
+                "Callaway-Sant'Anna dynamic ATT (equations 3.8–3.9)."
+            )
+            return None
+
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = self.output_dir / "did_cs_dynamic_att.csv"
+        dynamic_att_table.to_csv(output_path, index=False)
+        logger.info(
+            "Callaway-Sant'Anna dynamic ATT table (equations 3.8–3.9) written to: %s",
+            output_path,
+        )
+        return output_path
+
+    def _plot_dynamic_att(self, dynamic_att_table: pd.DataFrame) -> Path | None:
+        """Plot dynamic ATT (eq. 3.8) and cumulative ATT (eq. 3.9) as a two-panel figure.
+
+        Top panel — ATT^O(e): average treatment effect e periods after first treatment,
+        aggregated across cohorts with cohort-size weights.
+
+        Bottom panel — CATT^O(e): cumulative average treatment effect from period 0
+        through period e (simple average of ATT^O(0), …, ATT^O(e)).
+
+        Both panels show 95% confidence intervals as shaded bands.
+        """
+        if dynamic_att_table is None or dynamic_att_table.empty:
+            logger.info(
+                "Dynamic ATT table is empty; skipping dynamic ATT plot."
+            )
+            return None
+
+        plot_df = dynamic_att_table.copy()
+        x = plot_df["rel_time"].to_numpy()
+
+        fig, (ax_att, ax_catt) = plt.subplots(2, 1, figsize=(10, 9), sharex=True)
+
+        # ── shared style helpers ──────────────────────────────────────────────
+        def _add_reference_lines(ax: plt.Axes) -> None:
+            ax.axhline(0, color="red", linestyle="--", linewidth=1, alpha=0.8)
+            ax.axvline(
+                0,
+                color="red",
+                linestyle=":",
+                linewidth=1,
+                alpha=0.6,
+                label="Treatment begins",
+            )
+
+        def _shade_and_label(
+            ax: plt.Axes,
+            att_vals: np.ndarray,
+            ci_low: np.ndarray,
+            ci_high: np.ndarray,
+            label: str,
+        ) -> None:
+            ax.plot(
+                x,
+                att_vals,
+                color="darkblue",
+                marker="o",
+                markersize=4,
+                linewidth=1.5,
+                label=label,
+            )
+            ax.fill_between(
+                x,
+                ci_low,
+                ci_high,
+                alpha=0.25,
+                color="darkblue",
+                label="95% CI",
+            )
+
+        # ── top panel: ATT^O(e) ──────────────────────────────────────────────
+        _shade_and_label(
+            ax_att,
+            plot_df["att"].to_numpy(),
+            plot_df["ci_low"].to_numpy(),
+            plot_df["ci_high"].to_numpy(),
+            label="ATT\u1d52(e)  [Eq. 3.8]",
+        )
+        _add_reference_lines(ax_att)
+        ax_att.set_ylabel("ATT ($)", fontsize=11)
+        ax_att.set_title(
+            "Dynamic ATT — Avg. treatment effect e periods after treatment\n"
+            "Callaway & Sant\u2019Anna (2021), Eq. 3.8",
+            fontsize=11,
+        )
+        ax_att.legend(fontsize=9, loc="best")
+        ax_att.grid(True, alpha=0.3)
+
+        # ── bottom panel: CATT^O(e) ──────────────────────────────────────────
+        _shade_and_label(
+            ax_catt,
+            plot_df["catt"].to_numpy(),
+            plot_df["catt_ci_low"].to_numpy(),
+            plot_df["catt_ci_high"].to_numpy(),
+            label="CATT\u1d52(e)  [Eq. 3.9]",
+        )
+        _add_reference_lines(ax_catt)
+        ax_catt.set_xlabel("Months since first treatment", fontsize=11)
+        ax_catt.set_ylabel("Cumulative avg. ATT ($)", fontsize=11)
+        ax_catt.set_title(
+            "Cumulative avg. ATT — avg. of ATT\u1d52(0)\u2026ATT\u1d52(e)\n"
+            "Callaway & Sant\u2019Anna (2021), Eq. 3.9",
+            fontsize=11,
+        )
+        ax_catt.legend(fontsize=9, loc="best")
+        ax_catt.grid(True, alpha=0.3)
+
+        output_path = self.output_dir / "did_cs_dynamic_att.png"
+        setup_figure_and_save(
+            fig,
+            output_path,
+            title="Callaway & Sant\u2019Anna (2021): Dynamic and Cumulative ATT",
+            title_y=0.99,
+            logger=logger,
+        )
         return output_path
 
     def _compute_pretrend_significance(self, context: dict[str, Any]) -> pd.DataFrame:
