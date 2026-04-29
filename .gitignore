@@ -150,3 +150,19 @@ output/
 
 # data files
 data/
+
+# Literature PDFs stay local (size/copyright); commit references.bib and notes
+literature/**/*.pdf
+
+# LaTeX build artifacts (white paper)
+docs/white-paper/*.aux
+docs/white-paper/*.bbl
+docs/white-paper/*.bcf
+docs/white-paper/*.blg
+docs/white-paper/*.fdb_latexmk
+docs/white-paper/*.fls
+docs/white-paper/*.log
+docs/white-paper/*.out
+docs/white-paper/*.toc
+docs/white-paper/*.synctex.gz
+docs/white-paper/main.pdf
