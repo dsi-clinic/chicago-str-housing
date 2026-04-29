@@ -1,0 +1,5 @@
+\frametitle{Event study preview}
+\vfill
+% Copy figure into ppt/assets for portable builds if needed:
+\includegraphics[width=0.92\linewidth]{../../../output/did-cs/did_callaway_santanna_event_study_with_controls.png}
+\vfill

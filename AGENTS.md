@@ -52,6 +52,24 @@ Docker / Make: [`Makefile`](Makefile)—`make run-did-pipeline-cs`; `run-did-pip
 4. White paper builds from [`docs/white-paper/main.tex`](docs/white-paper/main.tex); bibliography is [`literature/references.bib`](literature/references.bib)—update both when citing new work.
 5. **ATT interpretation:** Effects are differences in rent **levels** in $/month (index-scale), not "dollars of change per elapsed calendar month" unless stated.
 
+## DiD descriptive outputs (for slides / appendices)
+
+After a successful [`did_pipeline_callaway_santanna.py`](src/housing/scripts/did_pipeline_callaway_santanna.py) run, **`output/did-cs/did_descriptive_*.csv`** are written by [`DIDDescriptiveAnalyzer`](src/housing/components/analyzers/did_descriptive.py), including panel coverage (balanced tract-month counts), adoption curves, pre-treatment balance rent table, tract-level coverage, and a mean-comparison \(t\)-test.
+
+## Slides (`docs/white-paper/ppt`)
+
+Beamer skeleton: [`docs/white-paper/ppt/presentation.tex`](docs/white-paper/ppt/presentation.tex); [`analysis/`](docs/white-paper/ppt/analysis/) links to the same CSV summaries for copy-paste tables.
+
+## Local pipeline (no Docker)
+
+Set `DATA_DIR` to your checkout’s `data/` folder; the script resolves **`DID_CS_OUTPUT_DIR`** to `output/did-cs` when not using `/project` paths. Example:
+
+```bash
+export PYTHONPATH=src
+export DATA_DIR="$(pwd)/data"
+.venv/bin/python src/housing/scripts/did_pipeline_callaway_santanna.py
+```
+
 ---
 
 ## Optional commands

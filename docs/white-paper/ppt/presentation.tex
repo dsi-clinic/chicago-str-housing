@@ -1,0 +1,40 @@
+% Beamer outline — STR prohibitions × rents (Chicago tracts)
+\documentclass[11pt]{beamer}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{booktabs}
+
+\usetheme{Dresden}
+\usecolortheme{default}
+
+\title[]{Short-Term Rental Prohibitions and Rents}
+\subtitle{\large Evidence from staggered DiD \& Callaway/Sant\textquotesingle Anna}
+\author[]{Chicago Housing / DSI Clinic}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{frame}{Outline}
+  \tableofcontents
+\end{frame}
+
+\section{Design}
+\input{sections/design.tex}
+
+\section{Data \& sample}
+\input{sections/data_sample.tex}
+
+\section{Results preview}
+\begin{frame}[fragile]{Event study preview}
+\vfill
+% Copy figure into ppt/assets for portable builds if needed:
+\includegraphics[width=0.92\linewidth]{../../../output/did-cs/did_callaway_santanna_event_study_with_controls.png}
+\vfill
+\end{frame}
+
+\end{document}

@@ -3,6 +3,7 @@
 Place **downloaded PDFs** in `literature/topic/` (substantive papers: STR regulation, rents, housing) or `literature/methods/` (causal inference, DiD, Callaway–Sant'Anna, synthetic control, double ML).
 
 - **`references.bib`**: BibTeX database used by [`docs/white-paper/main.tex`](../docs/white-paper/main.tex). Commit this file when you add citations.
+- **`methods/`** (PDFs gitignored): open-access copies are listed in [`methods/README.md`](methods/README.md).
 - **`notes/`**: Short reading notes—what each paper contributes to identification, methods, or policy framing.
 
 ## Git behavior
