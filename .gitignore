@@ -180,3 +180,4 @@ docs/white-paper/ppt/*.snm
 docs/white-paper/ppt/*.synctex.gz
 docs/white-paper/ppt/*.toc
 docs/white-paper/ppt/presentation.pdf
+docs/white-paper/ppt/*.vrb
