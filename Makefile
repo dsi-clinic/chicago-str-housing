@@ -18,7 +18,7 @@ project_dir := "$(current_abs_path)"
 # Optional data directory mount (if DATA_DIR is set)
 mount_data := $(if $(DATA_DIR),-v $(DATA_DIR):/project/data,)
 
-.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline run-did-pipeline-covariates run-did-pipeline-cs run-did-pipeline-cs-local run-did-matched-pipeline
+.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline run-did-pipeline-covariates run-did-pipeline-cs run-did-pipeline-cs-local run-did-matched-pipeline white-paper
 
 help: ## Show the help message
 	@echo "Available commands:"
@@ -38,6 +38,7 @@ help: ## Show the help message
 	@echo "  run-did-pipeline-cs         Run DiD with Callaway-Sant'Anna (2021) robust estimator"
 	@echo "  run-did-pipeline-cs-local   Same, with data copied to /tmp (avoids sync drive I/O)"
 	@echo "  run-did-matched-pipeline  Run DiD analysis on trend-matched sample"
+	@echo "  white-paper              Build policy brief PDF (latexmk; host TeX required)"
 	@echo ""
 	@echo "Optional environment variables (.env file):"
 	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
@@ -88,3 +89,6 @@ run-did-pipeline-cs-local: build-only ## Copy data to /tmp and run Callaway-Sant
 
 run-did-matched-pipeline: build-only ## Run DiD analysis on trend-matched sample
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_matched_pipeline.py
+
+white-paper: ## Build LaTeX policy brief (requires latexmk on host TeXLive/MacTeX)
+	cd docs/white-paper && latexmk -pdf -interaction=nonstopmode main.tex
