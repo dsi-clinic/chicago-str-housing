@@ -5,6 +5,7 @@ This module loads zip code boundary geometries from the Chicago Data Portal JSON
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -54,7 +55,7 @@ class ZipBoundariesLoader(DataLoader):
             "http://"
         ) or self._original_source.startswith("https://"):
             # Set up cache file path
-            cache_dir = Path("/project/data/.cache")
+            cache_dir = Path(os.environ.get("DATA_DIR", "/project/data")) / ".cache"
             cache_file = cache_dir / "zip_boundaries.json"
 
             # Check if cache exists

@@ -82,11 +82,16 @@ logger = logging.getLogger(__name__)
 SIGNIFICANCE_LEVEL = 0.05
 BIAS_THRESHOLD = 10  # $ threshold for TWFE vs CS difference
 
-# Paths
+# Paths (defaults work in Docker; local runs resolve repo-relative output unless overridden)
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = Path(os.environ.get("DATA_DIR", "/project/data"))
 TRACT_SHP = DATA_ROOT / "tl_2023_17_tract" / "tl_2023_17_tract.shp"
 ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
-DID_CS_OUTPUT_DIR = "/project/output/did-cs"
+_default_out = _REPO_ROOT / "output" / "did-cs"
+DID_CS_OUTPUT_DIR = os.environ.get(
+    "DID_CS_OUTPUT_DIR",
+    "/project/output/did-cs" if str(DATA_ROOT).startswith("/project") else str(_default_out),
+)
 
 DID_PREFLIGHT_MSG = (
     "If data files exist but you see 'Resource deadlock avoided' (Errno 35) or "
@@ -164,9 +169,13 @@ def run_did_analysis_with_cs() -> tuple:
     # 1. Load Data
     logger.info("\n[1/5] Loading data...")
     pipeline.register_component(ZipBoundariesLoader())
-    pipeline.register_component(TractBoundariesLoader())
+    pipeline.register_component(
+        TractBoundariesLoader(file_path=str(TRACT_SHP))
+    )
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
-    pipeline.register_component(TimeSeriesRentalLoader())
+    pipeline.register_component(
+        TimeSeriesRentalLoader(file_path=str(ZORI_CSV))
+    )
 
     # 2. Process Data
     logger.info("\n[2/5] Processing panel data...")
@@ -204,7 +213,9 @@ def run_did_analysis_with_cs() -> tuple:
 
     # 4. Descriptive Analysis (on matched sample)
     logger.info("\n[4/7] Running descriptive analysis...")
-    pipeline.register_component(DIDDescriptiveAnalyzer())
+    pipeline.register_component(
+        DIDDescriptiveAnalyzer(output_dir=DID_CS_OUTPUT_DIR)
+    )
 
     # 5. TWFE Event Study (on matched sample)
     logger.info("\n[5/7] Estimating TWFE event study (matched sample)...")

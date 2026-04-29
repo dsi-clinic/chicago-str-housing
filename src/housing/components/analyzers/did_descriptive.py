@@ -5,6 +5,7 @@ Difference-in-Differences analysis of STR prohibition effects.
 """
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -28,13 +29,18 @@ class DIDDescriptiveAnalyzer(Analyzer):
     5. Creates summary statistics tables
     """
 
-    def __init__(self) -> None:
-        """Initialize the DID descriptive analyzer."""
+    def __init__(self, output_dir: str | None = None) -> None:
+        """Initialize the DID descriptive analyzer.
+
+        Args:
+            output_dir: If set, write CSV summaries for slides / appendices here.
+        """
         super().__init__(
             "did_descriptive_analysis",
             "Compute descriptive statistics and balance checks for DiD analysis",
         )
         self.required_data = ["did_panel"]
+        self.output_dir = output_dir
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Perform descriptive analysis on the DiD panel.
@@ -70,8 +76,24 @@ class DIDDescriptiveAnalyzer(Analyzer):
         # Step 5: Summary statistics table
         summary_stats = self._compute_summary_stats(did_panel)
 
+        # Step 6: Panel coverage (balanced vs unbalanced tract-month structure)
+        panel_structure = self._compute_panel_structure(did_panel)
+
+        if self.output_dir:
+            self._export_tables(
+                output_dir=self.output_dir,
+                adoption_stats=adoption_stats,
+                pre_balance=pre_balance,
+                summary_stats=summary_stats,
+                balance_test=balance_test,
+                panel_structure=panel_structure,
+                did_panel=did_panel,
+            )
+
         # Log key findings
-        self._log_findings(did_panel, adoption_stats, pre_balance, balance_test)
+        self._log_findings(
+            did_panel, adoption_stats, pre_balance, balance_test, panel_structure
+        )
 
         return {
             "did_panel": did_panel,
@@ -82,6 +104,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
             "summary_stats": summary_stats,
             "balance_test": balance_test,
             "first_treatment_date": adoption_stats["first_treatment_date"],
+            "panel_structure": panel_structure,
         }
 
     def _add_ever_treated(self, panel: pd.DataFrame) -> pd.DataFrame:
@@ -198,12 +221,94 @@ class DIDDescriptiveAnalyzer(Analyzer):
 
         return summary
 
+
+    def _compute_panel_structure(self, df: pd.DataFrame) -> dict[str, Any]:
+        """Summarize tract--time coverage (how 'balanced' the panel is)."""
+        n_tracts = df["tract_geoid"].nunique()
+        n_periods = df["month"].nunique()
+        total_cells = n_tracts * n_periods
+        n_obs = len(df)
+        n_nonmiss = df["rental_price"].notna().sum()
+        miss_share = 1.0 - (n_nonmiss / n_obs) if n_obs else 0.0
+
+        months_per_tract = df.groupby("tract_geoid")["month"].nunique()
+        counts_per_tract = df.groupby("tract_geoid")["rental_price"].apply(
+            lambda s: int(s.notna().sum())
+        )
+        full_span_tracts = int((months_per_tract == n_periods).sum())
+
+        by_group = df.groupby("ever_treated")["tract_geoid"].nunique()
+        n_never = int(by_group.get(0, 0))
+        n_event = int(by_group.get(1, 0))
+
+        return {
+            "n_tracts": n_tracts,
+            "n_periods": n_periods,
+            "n_observations": n_obs,
+            "share_missing_rental_price": float(miss_share),
+            "tracts_with_full_month_span": full_span_tracts,
+            "share_tracts_full_span": float(full_span_tracts / n_tracts) if n_tracts else 0.0,
+            "tract_months_min": int(counts_per_tract.min()) if len(counts_per_tract) else 0,
+            "tract_months_median": float(counts_per_tract.median()) if len(counts_per_tract) else 0.0,
+            "tract_months_max": int(counts_per_tract.max()) if len(counts_per_tract) else 0,
+            "notional_balanced_cells": total_cells,
+            "tracts_never_treated": n_never,
+            "tracts_eventually_treated": n_event,
+        }
+
+    def _export_tables(
+        self,
+        output_dir: str,
+        adoption_stats: dict[str, Any],
+        pre_balance: pd.DataFrame,
+        summary_stats: pd.DataFrame,
+        balance_test: dict[str, float],
+        panel_structure: dict[str, Any],
+        did_panel: pd.DataFrame,
+    ) -> None:
+        """Write CSV tables for appendices, Beamer tables, and QA."""
+        out = Path(output_dir)
+        out.mkdir(parents=True, exist_ok=True)
+
+        summary_stats.to_csv(out / "did_descriptive_summary_stats.csv")
+        if len(pre_balance) > 0:
+            pre_balance.to_csv(out / "did_descriptive_pre_balance.csv")
+
+        pd.DataFrame([balance_test]).to_csv(
+            out / "did_descriptive_balance_test.csv", index=False
+        )
+        pd.DataFrame([panel_structure]).to_csv(
+            out / "did_descriptive_panel_overview.csv", index=False
+        )
+
+        adoption_stats["adoption_by_month"].to_csv(
+            out / "did_descriptive_adoption_by_month.csv"
+        )
+        adoption_stats["cumulative_adoption"].to_csv(
+            out / "did_descriptive_cumulative_adoption.csv"
+        )
+
+        tract_cov = (
+            did_panel.groupby(["tract_geoid", "ever_treated"])
+            .agg(
+                n_obs=("rental_price", lambda s: int(s.notna().sum())),
+                n_months=("month", "nunique"),
+                first_month=("month", "min"),
+                last_month=("month", "max"),
+            )
+            .reset_index()
+        )
+        tract_cov.to_csv(out / "did_descriptive_tract_coverage.csv", index=False)
+
+        logger.info("Wrote DiD descriptive tables to %s", out)
+
     def _log_findings(
         self,
         df: pd.DataFrame,
         adoption_stats: dict[str, Any],
         pre_balance: pd.DataFrame,
         balance_test: dict[str, float],
+        panel_structure: dict[str, Any],
     ) -> None:
         """Log key findings from the descriptive analysis."""
         logger.info("\n" + "=" * 60)
@@ -253,3 +358,24 @@ class DIDDescriptiveAnalyzer(Analyzer):
                     logger.info(
                         "  No significant difference in pre-treatment rents (p >= 0.05)"
                     )
+
+        logger.info("\nPanel structure:")
+        logger.info(
+            "  Periods (distinct months): %d", panel_structure["n_periods"]
+        )
+        logger.info(
+            "  Tracts with observations in all %d months: %d (%.1f%%)",
+            panel_structure["n_periods"],
+            panel_structure["tracts_with_full_month_span"],
+            100 * panel_structure["share_tracts_full_span"],
+        )
+        logger.info(
+            "  Obs per tract (non-missing rent): min %s, median %.1f, max %s",
+            panel_structure["tract_months_min"],
+            panel_structure["tract_months_median"],
+            panel_structure["tract_months_max"],
+        )
+        logger.info(
+            "  Share of tract-months missing rent: %.2f%%",
+            100 * panel_structure["share_missing_rental_price"],
+        )
