@@ -29,17 +29,23 @@ class TractProhibitionDatesProcessor(DataProcessor):
     Tracts not in the output are considered "never treated" (control group).
     """
 
-    def __init__(self, output_path: str | None = None) -> None:
+    def __init__(
+        self,
+        output_dir: str | None = None,
+        output_path: str | None = None,
+    ) -> None:
         """Initialize the tract prohibition dates processor.
 
         Args:
-            output_path: Optional path to save tract prohibition dates CSV
+            output_dir: Directory for ``tract_prohibition_dates.csv`` (default /project/output).
+            output_path: If set, write CSV exactly to this path (overrides output_dir).
         """
         super().__init__(
             "tract_prohibition_dates",
             "Aggregate building-level STR prohibitions to tract-level treatment dates",
         )
         self.required_data = ["str_prohibition_data", "tract_boundaries"]
+        self.output_dir = output_dir
         self.output_path = output_path
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
@@ -55,7 +61,6 @@ class TractProhibitionDatesProcessor(DataProcessor):
             - first_prohibition_date: Date of first STR prohibition in the tract
             - building_count: Number of buildings with prohibitions in the tract
         """
-        # Get inputs from context
         str_data = context["str_prohibition_data"].copy()
         tract_boundaries = context["tract_boundaries"]
 
@@ -65,11 +70,9 @@ class TractProhibitionDatesProcessor(DataProcessor):
         logger.info("  Input STR prohibition buildings: %d", len(str_data))
         logger.info("  Census tracts available: %d", len(tract_boundaries))
 
-        # Ensure both datasets are in the same CRS
         if str_data.crs != tract_boundaries.crs:
             str_data = str_data.to_crs(tract_boundaries.crs)
 
-        # Step 1: Spatial join to assign each building to a census tract
         str_with_tract = gpd.sjoin(
             str_data,
             tract_boundaries[["tract_geoid", "geometry"]],
@@ -77,7 +80,6 @@ class TractProhibitionDatesProcessor(DataProcessor):
             predicate="within",
         )
 
-        # Check for buildings that didn't match any tract
         unmatched = str_with_tract["tract_geoid"].isna().sum()
         if unmatched > 0:
             logger.warning(
@@ -88,8 +90,6 @@ class TractProhibitionDatesProcessor(DataProcessor):
 
         logger.info("  Buildings matched to tracts: %d", len(str_with_tract))
 
-        # Step 2: Determine which date column to use
-        # The STRProhibitionDataLoader creates 'prohibition_date' from signed_date
         if "prohibition_date" in str_with_tract.columns:
             date_col = "prohibition_date"
         elif "signed_date" in str_with_tract.columns:
@@ -104,35 +104,36 @@ class TractProhibitionDatesProcessor(DataProcessor):
 
         logger.info("  Using date column: %s", date_col)
 
-        # Ensure date column is datetime
         str_with_tract[date_col] = pd.to_datetime(str_with_tract[date_col])
 
-        # Step 3: Aggregate by tract - get first prohibition date and building count
+        id_col = (
+            "application_id"
+            if "application_id" in str_with_tract.columns
+            else str_with_tract.columns[0]
+        )
+
         tract_dates = (
             str_with_tract.groupby("tract_geoid")
             .agg(
                 {
-                    date_col: "min",  # First prohibition date in tract
-                    "application_id": "count",  # Number of buildings (using any ID column)
+                    date_col: "min",
+                    id_col: "count",
                 }
             )
             .reset_index()
         )
 
-        # Rename columns for clarity
         tract_dates = tract_dates.rename(
             columns={
                 date_col: "first_prohibition_date",
-                "application_id": "building_count",
+                id_col: "building_count",
             }
         )
 
-        # Sort by first prohibition date
         tract_dates = tract_dates.sort_values("first_prohibition_date").reset_index(
             drop=True
         )
 
-        # Log summary statistics
         n_treated_tracts = len(tract_dates)
         n_total_tracts = len(tract_boundaries)
         n_never_treated = n_total_tracts - n_treated_tracts
@@ -156,11 +157,13 @@ class TractProhibitionDatesProcessor(DataProcessor):
             tract_dates["building_count"].max(),
         )
 
-        # Optionally save to CSV
         if self.output_path:
-            output_file = Path(self.output_path)
-            output_file.parent.mkdir(parents=True, exist_ok=True)
-            tract_dates.to_csv(output_file, index=False)
-            logger.info("  Saved to: %s", output_file)
+            out_file = Path(self.output_path)
+        else:
+            base = Path(self.output_dir or "/project/output")
+            out_file = base / "tract_prohibition_dates.csv"
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        tract_dates.to_csv(out_file, index=False)
+        logger.info("  Saved to: %s", out_file)
 
         return {"tract_prohibition_dates": tract_dates}
