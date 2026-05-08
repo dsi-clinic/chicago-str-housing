@@ -1,4 +1,8 @@
-% Placeholder — replace once results are finalized.
-\textbf{Abstract (draft placeholder).}
-We summarize causal evidence on Chicago short-term rental (STR) prohibitions under the Shared Housing Ordinance and tract-level rents, using staggered DiD methods robust to heterogeneous treatment effects \citep{callaway2021difference}.
-The empirical strategy builds on panel data at the census tract--month level; details appear in Sections~\ref{sec:data}--\ref{sec:methods}.
+% Refresh dollar magnitudes whenever you rerun ``python -m housing.scripts.did_pipeline_callaway_santanna``.
+\textbf{Abstract.}
+The City of Chicago enforces Shared Housing Ordinance registrations that forbid eligible buildings from renting units on short-term rental platforms once prohibitions finalize.
+Combining prohibition records spatially aggregated to census tracts with tract--month rental indices (Zillow Observed Rent interpolated from ZIP-month data), we estimate staggered difference-in-differences effects where treatments adopt at different calendar months.
+
+We report Callaway and Sant'Anna (\citeyear{callaway2021difference}) group--time average treatment effects on the treated (ATT) rather than relying solely on two-way fixed effects, which can reweight cohorts in misleading ways when effects are heterogeneous \citep{goodman-bacon2021difference}.
+Dual specifications appear: a baseline ATT on observed rent levels, and a covariate- and tract-trend-adjusted specification fit on pre-prohibition months only (\texttt{CallawaySantAnnaWithControlsAnalyzer}; see \texttt{docs/CS\_WITH\_CONTROLS.md}).
+In a recent local run, baseline pooled ATT was about \$-2.95 per month on the tract--month rental index (SE \$0.63), while the pooled ATT after residualizing on ACS covariates and tract-linear trends approached \$-85 monthly on the \emph{preprocessed} outcome—not directly comparable dollar-for-dollar because the outcome replaces raw rent with fitted residuals (\texttt{docs/CS\_WITH\_CONTROLS.md}); readers should privilege event-study dynamics and diagnostics committed under \texttt{output/did-cs/}.

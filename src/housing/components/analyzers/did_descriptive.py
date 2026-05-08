@@ -16,6 +16,8 @@ from pipeline.base import Analyzer
 logger = logging.getLogger(__name__)
 
 SIGNIFICANCE_LEVEL = 0.05
+# Align with CallawaySantAnnaAnalyzer(min_cohort_size=…) in DiD pipeline
+MIN_COHORT_SIZE_FOR_DESCRIPTIONS = 5
 
 
 class DIDDescriptiveAnalyzer(Analyzer):
@@ -79,6 +81,13 @@ class DIDDescriptiveAnalyzer(Analyzer):
         # Step 6: Panel coverage (balanced vs unbalanced tract-month structure)
         panel_structure = self._compute_panel_structure(did_panel)
 
+        # Per-cohort descriptives (uses covariates when merged by DIDCovariateProcessor)
+        panel_with_cov = context.get("did_panel_with_covariates")
+        cohort_stats = self._compute_cohort_stats(
+            panel_with_cov if panel_with_cov is not None else did_panel,
+            min_cohort_size=MIN_COHORT_SIZE_FOR_DESCRIPTIONS,
+        )
+
         if self.output_dir:
             self._export_tables(
                 output_dir=self.output_dir,
@@ -88,6 +97,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
                 balance_test=balance_test,
                 panel_structure=panel_structure,
                 did_panel=did_panel,
+                cohort_stats=cohort_stats,
             )
 
         # Log key findings
@@ -105,6 +115,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
             "balance_test": balance_test,
             "first_treatment_date": adoption_stats["first_treatment_date"],
             "panel_structure": panel_structure,
+            "did_cohort_stats": cohort_stats,
         }
 
     def _add_ever_treated(self, panel: pd.DataFrame) -> pd.DataFrame:
@@ -256,6 +267,81 @@ class DIDDescriptiveAnalyzer(Analyzer):
             "tracts_eventually_treated": n_event,
         }
 
+    def _compute_cohort_stats(
+        self,
+        panel: pd.DataFrame,
+        min_cohort_size: int,
+    ) -> pd.DataFrame:
+        """One row per first-prohibition cohort (sizes >= ``min_cohort_size``).
+
+        Mirrors Callaway-Sant'Anna cohort dropping of small cohorts for deck tables.
+        """
+        if panel is None or len(panel) == 0:
+            return pd.DataFrame()
+
+        tract_first = (
+            panel[panel["treated"] == 1]
+            .groupby("tract_geoid")["month"]
+            .min()
+            .reset_index()
+            .rename(columns={"month": "first_prohibition_month"})
+        )
+        if tract_first.empty:
+            return pd.DataFrame()
+
+        n_treated_matched = int(
+            panel.groupby("tract_geoid")["treated"].max().astype(int).sum()
+        )
+        tract_first_full = tract_first.copy()
+        sizes = tract_first_full.groupby("first_prohibition_month").size()
+        kept_cohorts = sizes[sizes >= min_cohort_size].index
+        tract_kept = tract_first_full[
+            tract_first_full["first_prohibition_month"].isin(kept_cohorts)
+        ]
+
+        # One tract-level covariate row per tract (time-invariant)
+        tract_one = (
+            panel.sort_values(["tract_geoid", "month"])
+            .drop_duplicates(subset=["tract_geoid"], keep="first")
+            .merge(tract_kept, on="tract_geoid", how="inner")
+        )
+
+        rows: list[dict[str, Any]] = []
+        for cohort_month in sorted(tract_kept["first_prohibition_month"].unique()):
+            sub = tract_one[tract_one["first_prohibition_month"] == cohort_month].copy()
+            n_c = len(sub)
+            row: dict[str, Any] = {
+                "first_prohibition_month": pd.Timestamp(cohort_month).strftime(
+                    "%Y-%m-%d"
+                ),
+                "n_tracts": int(n_c),
+                "share_of_treated_tracts": round(
+                    n_c / n_treated_matched, 4
+                )
+                if n_treated_matched
+                else float("nan"),
+            }
+            for col in (
+                "baseline_rent",
+                "median_income",
+                "pct_bachelor",
+                "pct_rented",
+            ):
+                if col in sub.columns and sub[col].notna().any():
+                    row[f"mean_{col}"] = float(sub[col].mean(skipna=True))
+                else:
+                    row[f"mean_{col}"] = float("nan")
+            rows.append(row)
+
+        cohort_df = pd.DataFrame(rows)
+        if cohort_df.empty:
+            return cohort_df
+        cohort_df["first_prohibition_month"] = cohort_df[
+            "first_prohibition_month"
+        ].astype(str)
+        cohort_df.attrs["min_cohort_size"] = min_cohort_size
+        return cohort_df
+
     def _export_tables(
         self,
         output_dir: str,
@@ -265,6 +351,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
         balance_test: dict[str, float],
         panel_structure: dict[str, Any],
         did_panel: pd.DataFrame,
+        cohort_stats: pd.DataFrame | None,
     ) -> None:
         """Write CSV tables for appendices, Beamer tables, and QA."""
         out = Path(output_dir)
@@ -299,6 +386,15 @@ class DIDDescriptiveAnalyzer(Analyzer):
             .reset_index()
         )
         tract_cov.to_csv(out / "did_descriptive_tract_coverage.csv", index=False)
+
+        if cohort_stats is not None and not cohort_stats.empty:
+            cohort_stats.to_csv(
+                out / "did_descriptive_cohort_stats.csv", index=False
+            )
+            logger.info(
+                "Wrote cohort descriptive table (%d rows)",
+                len(cohort_stats),
+            )
 
         logger.info("Wrote DiD descriptive tables to %s", out)
 

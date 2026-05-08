@@ -5,6 +5,7 @@ by analyzing observable tract characteristics and testing parallel trends formal
 """
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -22,12 +23,17 @@ BALANCE_THRESHOLD = 0.1  # |Cohen's d| threshold for imbalance
 class PretrendDiagnosticAnalyzer(Analyzer):
     """Diagnose pre-treatment trend divergence and test parallel trends assumption."""
 
-    def __init__(self) -> None:
-        """Initialize the diagnostic analyzer."""
+    def __init__(self, output_dir: str | Path | None = None) -> None:
+        """Initialize the diagnostic analyzer.
+
+        Args:
+            output_dir: If set, write CSV summaries for reproducible slide/brief references.
+        """
         super().__init__(
             "pretrend_diagnostic",
             "Analyze pre-treatment trends and test parallel trends assumption",
         )
+        self.output_dir = Path(output_dir) if output_dir else None
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Run pre-trend diagnostic analysis."""
@@ -57,12 +63,50 @@ class PretrendDiagnosticAnalyzer(Analyzer):
         # Log key findings
         self._log_diagnostic_summary(tract_comparison, pretrend_test, rent_divergence)
 
+        if self.output_dir is not None:
+            self._export_csv_tables(
+                tract_comparison,
+                pretrend_test,
+                rent_divergence,
+                balance_check,
+                self.output_dir,
+            )
+
         return {
             "pretrend_tract_comparison": tract_comparison,
             "pretrend_test_results": pretrend_test,
             "pretrend_rent_divergence": rent_divergence,
             "pretrend_balance_check": balance_check,
         }
+
+    def _export_csv_tables(
+        self,
+        tract_comparison: pd.DataFrame,
+        pretrend_test: dict[str, Any],
+        rent_divergence: pd.DataFrame,
+        balance_check: dict[str, Any],
+        output_dir: Path,
+    ) -> None:
+        """Write diagnostic tables alongside other DiD CSV outputs."""
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if not tract_comparison.empty:
+            tract_comparison.to_csv(
+                output_dir / "pretrend_tract_comparison.csv", index=False
+            )
+        if not rent_divergence.empty:
+            rent_divergence.to_csv(output_dir / "pretrend_rent_gap_by_month.csv")
+        pt_row = dict(pretrend_test)
+        pd.DataFrame([pt_row]).to_csv(
+            output_dir / "pretrend_parallel_trends_regression_summary.csv",
+            index=False,
+        )
+        bc = balance_check.copy()
+        if isinstance(bc.get("imbalanced_covariates"), list):
+            bc["imbalanced_covariates"] = "; ".join(bc["imbalanced_covariates"])
+        pd.DataFrame([bc]).to_csv(
+            output_dir / "pretrend_balance_summary.csv",
+            index=False,
+        )
 
     def _compare_tract_characteristics(self, df: pd.DataFrame) -> pd.DataFrame:
         """Compare observable characteristics between treated and control tracts."""

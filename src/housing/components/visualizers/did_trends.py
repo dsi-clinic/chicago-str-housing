@@ -2,6 +2,9 @@
 
 This module creates diagnostic plots for Difference-in-Differences analysis
 including adoption curves, parallel trends checks, and balance comparisons.
+
+Also writes small CSV extracts for decks and reproducible tables when used
+through the Callaway–Sant'Anna pipeline.
 """
 
 import logging
@@ -58,6 +61,16 @@ class DIDTrendsVisualizer(Visualizer):
 
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Tabular excerpt for slides / appendix (average rent by cohort and month)
+        avg_by_month = context["avg_by_group_month"].copy()
+        avg_by_month = avg_by_month.rename_axis("month").reset_index()
+        avg_by_month.to_csv(
+            self.output_dir / "did_trends_avg_rent_by_group_month.csv",
+            index=False,
+        )
+        cumulative = context["cumulative_adoption"].reset_index()
+        cumulative.to_csv(self.output_dir / "did_trends_cumulative_adoption.csv")
 
         # Create individual plots
         adoption_path = self._plot_adoption_curve(context)

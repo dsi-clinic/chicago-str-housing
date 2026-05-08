@@ -98,11 +98,11 @@ class CallawaySantAnnaVisualizer(Visualizer):
             if comparison_path:
                 output_paths["cs_twfe_comparison_plot"] = comparison_path
 
-        # 3. Cohort-specific dynamics (only for base CS, not for with_controls)
-        if not self.context_suffix:
-            cohort_path = self._plot_cohort_dynamics(context)
-            if cohort_path:
-                output_paths["cs_cohort_dynamics_plot"] = cohort_path
+        # 3. Cohort-specific dynamics (run for baseline AND residualized CS so
+        #    the deck can compare cohort heterogeneity with and without controls).
+        cohort_path = self._plot_cohort_dynamics(context)
+        if cohort_path:
+            output_paths[f"cs_cohort_dynamics_plot{self.output_suffix}"] = cohort_path
 
         return output_paths
 
@@ -441,14 +441,20 @@ class CallawaySantAnnaVisualizer(Visualizer):
         for idx in range(n_cohorts, len(axes)):
             axes[idx].axis("off")
 
+        scale_note = (
+            " (residualized: ACS + tract trends)"
+            if self.context_suffix == "_with_controls"
+            else ""
+        )
         fig.suptitle(
-            "Cohort-Specific Dynamic Treatment Effects\n"
+            "Cohort-Specific Dynamic Treatment Effects" + scale_note + "\n"
             "Each panel shows effects for one treatment cohort",
             fontsize=14,
         )
         plt.tight_layout()
 
-        out_path = Path(self.output_dir) / "did_cohort_dynamics.png"
+        filename = f"did_cohort_dynamics{self.output_suffix}.png"
+        out_path = Path(self.output_dir) / filename
         setup_figure_and_save(fig, out_path, "Cohort Dynamics", logger=logger)
 
         logger.info("Saved cohort dynamics plot to %s", out_path)

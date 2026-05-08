@@ -4,7 +4,7 @@ Place **downloaded PDFs** in `literature/topic/` (substantive papers: STR regula
 
 - **`references.bib`**: BibTeX database used by [`docs/white-paper/main.tex`](../docs/white-paper/main.tex). Commit this file when you add citations.
 - **`methods/`** (PDFs gitignored): open-access copies are listed in [`methods/README.md`](methods/README.md).
-- **`notes/`**: Short reading notes—what each paper contributes to identification, methods, or policy framing.
+- **`notes/`**: Short reading notes—what each paper contributes to identification, methods, or policy framing. See [`notes/staggered_did_methods.md`](notes/staggered_did_methods.md) for a runnable summary tied to pipelines, and [`topic/chicago_str_housing_notes.md`](topic/chicago_str_housing_notes.md) for substantive context.
 
 ## Git behavior
 

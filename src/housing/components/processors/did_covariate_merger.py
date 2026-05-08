@@ -88,6 +88,10 @@ class DIDCovariateProcessor(DataProcessor):
         # Keep only available columns
         available_cols = [col for col in census_cols if col in census.columns]
         census_subset = census[available_cols].copy()
+        census_subset["tract_id"] = census_subset["tract_id"].astype(str)
+
+        panel = panel.copy()
+        panel["tract_geoid"] = panel["tract_geoid"].astype(str)
 
         # Merge (many-to-one: many panel rows to one census row per tract)
         merged = panel.merge(

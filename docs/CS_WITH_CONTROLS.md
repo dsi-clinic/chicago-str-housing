@@ -1,6 +1,6 @@
 # Callaway-Sant'Anna with Controls: What It Does and Why
 
-## The Problem
+Operational hyperparameters wired into `did_pipeline_callaway_santanna` are summarized separately in **[`DID_CS_RUNBOOK.md`](DID_CS_RUNBOOK.md)**; this doc explains estimation logic.
 
 The basic Callaway-Sant'Anna (CS) estimator computes treatment effects under the **parallel trends assumption**: absent treatment, treated and control tracts would have followed the same rental price trajectory.
 

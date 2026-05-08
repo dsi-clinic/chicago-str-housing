@@ -1,14 +1,19 @@
-\begin{frame}{Panel \& balance (matched sample)}
+
+\begin{frame}{Panel \& descriptive CSVs (\texttt{\detokenize{did-cs-whitepaper}})}
 \vfill
-\begin{tabular}{lr}
+\begin{tabular}{ll}
 \toprule
-\textbf{Statistic} & \textbf{(see CSV)} \\
+\textbf{Artefact} & \textbf{Use} \\
 \midrule
-\texttt{did\_descriptive\_panel\_overview.csv} & tract$\times$time coverage \\
-\texttt{did\_descriptive\_summary\_stats.csv} & means by ever-treated \\
-\texttt{did\_descriptive\_pre\_balance.csv} & pre-window rent balance \\
+\texttt{did\_descriptive\_panel\_overview.csv} & tract \(\times\) time coverage \\
+\texttt{did\_descriptive\_summary\_stats.csv} & means split by ever-treated \\
+\texttt{did\_descriptive\_pre\_balance.csv} & pre-window rent comparisons \\
+\texttt{cohort\_dynamics\_explainer\_data.csv} & CS curve vs.\ raw rents export \\
+\texttt{sutva\_donut\_summary.csv}, \texttt{sutva\_dose\_quartiles.csv} & spatial contrasts \\
+\texttt{honest\_pretrends\_summary.csv} & pretrend heuristic (single row) \\
 \bottomrule
 \end{tabular}
 \vfill
-\footnotesize Outputs live under \texttt{output/did-cs/}.
+{\footnotesize All files sit next to PNGs under \texttt{output/did-cs-whitepaper/} (\texttt{DID\_WHITEPAPER\_MODE=1}).}
+\vfill
 \end{frame}

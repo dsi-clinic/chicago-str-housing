@@ -40,6 +40,7 @@ Important scripts:
 
 - [`did_pipeline_callaway_santanna.py`](src/housing/scripts/did_pipeline_callaway_santanna.py): TWFE + CS + CS with controls → figures under configurable output (Docker: `/project/output/did-cs/`).
 
+**Slide / whitepaper tree:** With `DID_WHITEPAPER_MODE=1` (or `make run-did-pipeline-cs-whitepaper`), outputs default to **`output/did-cs-whitepaper/`** and add pretrend heuristic, cohort explainer figure, spatial donut/dose diagnostics, and `tables/tab_*.tex`. See [`docs/DID_CS_RUNBOOK.md`](docs/DID_CS_RUNBOOK.md) and [`docs/white-paper/STORY_OUTLINE.md`](docs/white-paper/STORY_OUTLINE.md).
 Docker / Make: [`Makefile`](Makefile)—`make run-did-pipeline-cs`; `run-did-pipeline-cs-local` copies `data/` to `/tmp` to avoid Box/cloud sync locks.
 
 ---
@@ -58,7 +59,7 @@ After a successful [`did_pipeline_callaway_santanna.py`](src/housing/scripts/did
 
 ## Slides (`docs/white-paper/ppt`)
 
-Beamer skeleton: [`docs/white-paper/ppt/presentation.tex`](docs/white-paper/ppt/presentation.tex); [`analysis/`](docs/white-paper/ppt/analysis/) links to the same CSV summaries for copy-paste tables.
+Beamer deck: [`docs/white-paper/ppt/presentation.tex`](docs/white-paper/ppt/presentation.tex) + `beamerthemeUChicago.sty` (DSI-inspired maroon styling; `\WPFig` placeholders if PNGs not built yet). Figures/tables `\input`/paths target **`../../../output/did-cs-whitepaper/`** by default (`make whitepaper-deck`). [`analysis/`](docs/white-paper/ppt/analysis/) retains CSV summaries for copy-paste.
 
 ## Local pipeline (no Docker)
 
@@ -77,6 +78,8 @@ export DATA_DIR="$(pwd)/data"
 ```bash
 make run-did-pipeline-cs         # Docker: full CS pipeline
 make white-paper                 # Requires latexmk + TeX on host (outside Docker)
+make run-did-pipeline-cs-whitepaper   # Host: artefacts → output/did-cs-whitepaper
+make whitepaper-deck             # Builds Beamer at docs/white-paper/ppt
 make test                       # pytest in container
 ```
 

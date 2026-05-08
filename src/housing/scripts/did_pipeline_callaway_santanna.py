@@ -51,7 +51,12 @@ from housing.components.analyzers.callaway_santanna_with_controls import (
 )
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.analyzers.event_study import EventStudyAnalyzer
+from housing.components.analyzers.honest_pretrends import HonestPretrendsAnalyzer
+from housing.components.analyzers.latex_table_exporter import LaTeXTableExporter
+from housing.components.analyzers.pretrend_diagnostic import PretrendDiagnosticAnalyzer
+from housing.components.analyzers.sutva_donut_dose import SUTVADonutDoseAnalyzer
 from housing.components.loaders.census_data import CensusDataLoader
+from housing.components.loaders.city_boundaries import CityBoundariesLoader
 from housing.components.loaders.str_prohibition_data import STRProhibitionDataLoader
 from housing.components.loaders.time_series_rental_data import TimeSeriesRentalLoader
 from housing.components.loaders.tract_boundaries import TractBoundariesLoader
@@ -72,6 +77,13 @@ from housing.components.visualizers.callaway_santanna import (
     CallawaySantAnnaComparisonVisualizer,
     CallawaySantAnnaVisualizer,
 )
+from housing.components.visualizers.cohort_dynamics_explainer import (
+    CohortDynamicsExplainerVisualizer,
+)
+from housing.components.visualizers.data_funnel import DataFunnelVisualizer
+from housing.components.visualizers.did_sample_map import DiDSampleMapVisualizer
+from housing.components.visualizers.did_story_map import DiDStoryMapVisualizer
+from housing.components.visualizers.did_trends import DIDTrendsVisualizer
 from housing.components.visualizers.event_study import EventStudyVisualizer
 from pipeline import Pipeline
 
@@ -87,10 +99,21 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = Path(os.environ.get("DATA_DIR", "/project/data"))
 TRACT_SHP = DATA_ROOT / "tl_2023_17_tract" / "tl_2023_17_tract.shp"
 ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
-_default_out = _REPO_ROOT / "output" / "did-cs"
+DID_WHITEPAPER_MODE = os.environ.get("DID_WHITEPAPER_MODE", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+_default_leaf = "did-cs-whitepaper" if DID_WHITEPAPER_MODE else "did-cs"
+_default_out = _REPO_ROOT / "output" / _default_leaf
+_fallback_out = (
+    f"/project/output/{_default_leaf}"
+    if str(DATA_ROOT).startswith("/project")
+    else str(_default_out)
+)
 DID_CS_OUTPUT_DIR = os.environ.get(
     "DID_CS_OUTPUT_DIR",
-    "/project/output/did-cs" if str(DATA_ROOT).startswith("/project") else str(_default_out),
+    _fallback_out,
 )
 
 DID_PREFLIGHT_MSG = (
@@ -172,6 +195,7 @@ def run_did_analysis_with_cs() -> tuple:
     pipeline.register_component(
         TractBoundariesLoader(file_path=str(TRACT_SHP))
     )
+    pipeline.register_component(CityBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(
         TimeSeriesRentalLoader(file_path=str(ZORI_CSV))
@@ -216,6 +240,13 @@ def run_did_analysis_with_cs() -> tuple:
     pipeline.register_component(
         DIDDescriptiveAnalyzer(output_dir=DID_CS_OUTPUT_DIR)
     )
+    pipeline.register_component(DIDTrendsVisualizer(output_dir=DID_CS_OUTPUT_DIR))
+    pipeline.register_component(
+        PretrendDiagnosticAnalyzer(output_dir=DID_CS_OUTPUT_DIR)
+    )
+    pipeline.register_component(DiDSampleMapVisualizer(output_dir=DID_CS_OUTPUT_DIR))
+    if DID_WHITEPAPER_MODE:
+        pipeline.register_component(DiDStoryMapVisualizer(output_dir=DID_CS_OUTPUT_DIR))
 
     # 5. TWFE Event Study (on matched sample)
     logger.info("\n[5/7] Estimating TWFE event study (matched sample)...")
@@ -264,30 +295,59 @@ def run_did_analysis_with_cs() -> tuple:
     cs_visualizer_with_controls.name = "callaway_santanna_visualizer_with_controls"
     pipeline.register_component(cs_visualizer_with_controls)
 
+    wp_order_suffix: list[str] = []
+    if DID_WHITEPAPER_MODE:
+        logger.info("Whitepaper mode: registering extra diagnostics and LaTeX tables")
+        pipeline.register_component(HonestPretrendsAnalyzer(output_dir=DID_CS_OUTPUT_DIR))
+        pipeline.register_component(
+            SUTVADonutDoseAnalyzer(
+                comparison_group="nevertreated",
+                anticipation=0,
+                min_cohort_size=5,
+                output_dir=DID_CS_OUTPUT_DIR,
+            )
+        )
+        pipeline.register_component(CohortDynamicsExplainerVisualizer(output_dir=DID_CS_OUTPUT_DIR))
+        pipeline.register_component(DataFunnelVisualizer(output_dir=DID_CS_OUTPUT_DIR))
+        pipeline.register_component(LaTeXTableExporter(output_dir=DID_CS_OUTPUT_DIR))
+        wp_order_suffix.extend(
+            [
+                "honest_pretrends_analysis",
+                "sutva_donut_dose_analysis",
+                "cohort_dynamics_explainer",
+                "data_funnel_visualization",
+                "latex_whitepaper_tables",
+            ]
+        )
+
     # Set execution order
-    pipeline.set_execution_order(
-        [
-            "zip_boundaries",
-            "tract_boundaries",
-            "zip_tract_crosswalk",
-            "str_prohibition_data",
-            "rental_panel_data",
-            "zip_to_tract_panel",
-            "tract_prohibition_dates",
-            "treatment_indicator",
-            "trend_matching",
-            "census_data",
-            "did_panel_with_covariates",
-            "did_descriptive_analysis",
-            "event_study_analysis",
-            "event_study_visualization",
-            "callaway_santanna_analysis",
-            "callaway_santanna_visualizer",
-            "cs_comparison_visualizer",
-            "callaway_santanna_with_controls",
-            "callaway_santanna_visualizer_with_controls",
-        ]
-    )
+    exec_order_core = [
+        "zip_boundaries",
+        "tract_boundaries",
+        "city_boundaries",
+        "zip_tract_crosswalk",
+        "str_prohibition_data",
+        "rental_panel_data",
+        "zip_to_tract_panel",
+        "tract_prohibition_dates",
+        "treatment_indicator",
+        "trend_matching",
+        "census_data",
+        "did_panel_with_covariates",
+        "did_descriptive_analysis",
+        "did_trends_visualization",
+        "pretrend_diagnostic",
+        "did_sample_map_visualization",
+        *(["did_story_map_visualization"] if DID_WHITEPAPER_MODE else []),
+        "event_study_analysis",
+        "event_study_visualization",
+        "callaway_santanna_analysis",
+        "callaway_santanna_visualizer",
+        "cs_comparison_visualizer",
+        "callaway_santanna_with_controls",
+        "callaway_santanna_visualizer_with_controls",
+    ]
+    pipeline.set_execution_order(exec_order_core + wp_order_suffix)
 
     # Execute pipeline
     logger.info("\n" + "=" * 80)
@@ -403,6 +463,10 @@ def _print_summary(results: dict) -> None:
     logger.info("  • did_twfe_vs_cs_comparison.png - Side-by-side comparison")
     logger.info("  • did_cs_twfe_difference.png - Bias visualization")
     logger.info("  • did_cohort_dynamics.png - Cohort-specific effects")
+    logger.info("  • did_adoption_curve.png, did_parallel_trends.png — temporal/sample dynamics")
+    logger.info(
+        "  • did_spatial_sample*.png, pretrend_*.csv — geography and parallel-trends diagnostics"
+    )
     logger.info("  • did_twfe_cs_comparison_table.csv - Detailed comparison")
 
     logger.info("\n" + "=" * 80)

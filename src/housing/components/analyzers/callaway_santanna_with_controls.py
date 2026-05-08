@@ -46,6 +46,14 @@ logger = logging.getLogger(__name__)
 MAX_PRE_TIME = 12  # Maximum pre-treatment periods
 MAX_POST_TIME = 36  # Maximum post-treatment periods
 
+# -----------------------------------------------------------------------------
+# Hyperparameters as registered in ``did_pipeline_callaway_santanna``:
+#   TrendMatchingProcessor: k_neighbors=3, min_pre_periods=6
+#   CallawaySantAnna / WithControls: comparison_group="nevertreated", anticipation=0,
+#   min_cohort_size=5 (class default here is 10; pipeline overrides to 5),
+#   CS+controls: include_covariates=True, include_tract_trends=True, estimation_method="dr"
+# Detailed run notes: ``docs/DID_CS_RUNBOOK.md``
+# -----------------------------------------------------------------------------
 
 class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
     """CS estimator with covariate adjustment and tract-specific trends."""

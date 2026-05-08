@@ -1,0 +1,87 @@
+%% UChicago-inspired beamer colours (DSI clinic style; unofficial — no endorsed logo artwork).
+%% Usage: \usetheme{UChicago}
+%% Place this file alongside presentation.tex or on TEXINPUT paths.
+\ProvidesPackage{beamerthemeUChicago}[2026/04/30 v1 UChicago-inspired DSI clinic deck]
+
+\mode<presentation>{
+  % UChicago-inspired palette on a clean white background
+  \definecolor{uchiMaroon}{HTML}{800000}
+  \definecolor{uchiGray}{HTML}{262626}
+  \definecolor{uchiRule}{HTML}{BFBFBF}
+
+  \setbeamercolor{background canvas}{bg=white}
+  \setbeamercolor{normal text}{fg=uchiGray,bg=white}
+  \setbeamercolor{structure}{fg=uchiMaroon,bg=white}
+  \setbeamercolor{frametitle}{fg=uchiMaroon,bg=white}
+  \setbeamercolor{title}{fg=uchiMaroon,bg=white}
+  \setbeamercolor{subtitle}{fg=uchiGray,bg=white}
+  \setbeamercolor{author}{fg=uchiGray}
+  \setbeamercolor{date}{fg=uchiGray}
+  \setbeamercolor{itemize item}{fg=uchiMaroon}
+  \setbeamercolor{itemize subitem}{fg=uchiMaroon}
+  \setbeamercolor{enumerate item}{fg=uchiMaroon}
+  \setbeamercolor{caption name}{fg=uchiMaroon}
+  \setbeamercolor{block title}{fg=white,bg=uchiMaroon}
+  \setbeamercolor{block body}{fg=uchiGray,bg=white}
+  \setbeamercolor{section in toc}{fg=uchiGray}
+  \setbeamercolor{subsection in toc}{fg=uchiGray}
+  \setbeamercolor{footline}{fg=uchiGray,bg=white}
+
+  \usefonttheme{professionalfonts}
+  \renewcommand*\familydefault{\sfdefault}
+
+  \setbeamerfont{title}{series=\bfseries,size=\LARGE}
+  \setbeamerfont{frametitle}{series=\bfseries,size=\large}
+  \setbeamerfont{footline}{size=\tiny}
+}
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize item}{\textcolor{uchiMaroon}{\textbullet}}
+\setbeamertemplate{itemize subitem}{\textcolor{uchiMaroon}{\textendash}}
+
+% Clean frame title: maroon text with a thin maroon rule beneath; no coloured strip.
+\setbeamertemplate{frametitle}{%
+  \nointerlineskip%
+  \vskip0.4em%
+  \begin{beamercolorbox}[sep=0pt,wd=\paperwidth]{frametitle}%
+    \hspace*{0.04\paperwidth}\usebeamerfont{frametitle}\insertframetitle%
+  \end{beamercolorbox}%
+  \vskip0.15em%
+  \hspace*{0.04\paperwidth}\textcolor{uchiMaroon}{\rule{0.92\paperwidth}{0.6pt}}\par%
+  \vskip0.4em%
+}
+
+% Slim footline: short title (left), section (centre), slide number (right)
+\setbeamertemplate{footline}{%
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=0.33\paperwidth,ht=2.4ex,dp=1ex,leftskip=.04\paperwidth]{footline}%
+      \usebeamerfont{footline}\insertshorttitle%
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=0.34\paperwidth,ht=2.4ex,dp=1ex,center]{footline}%
+      \usebeamerfont{footline}\insertsectionhead%
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=0.33\paperwidth,ht=2.4ex,dp=1ex,rightskip=.04\paperwidth]{footline}%
+      \hfill\usebeamerfont{footline}\insertframenumber/\inserttotalframenumber%
+    \end{beamercolorbox}%
+  }%
+  \vskip0pt%
+}
+
+\setbeamertemplate{title page}{%
+  \vbox{}
+  \vskip2em%
+  \begingroup
+  \hspace*{0.04\paperwidth}\textcolor{uchiMaroon}{\rule{0.92\paperwidth}{1.2pt}}\par
+  \vskip1.3em%
+  \hspace*{0.04\paperwidth}\parbox{0.92\paperwidth}{\raggedright\usebeamerfont{title}\usebeamercolor[fg]{title}\inserttitle\par}%
+  \vskip0.4em%
+  \hspace*{0.04\paperwidth}\parbox{0.92\paperwidth}{\raggedright\usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle\par}%
+  \vskip1.0em%
+  \hspace*{0.04\paperwidth}\textcolor{uchiRule}{\rule{0.92\paperwidth}{0.4pt}}\par
+  \vskip0.6em%
+  \hspace*{0.04\paperwidth}{\usebeamerfont{author}\usebeamercolor[fg]{author}\insertauthor}\par%
+  \hspace*{0.04\paperwidth}{\usebeamerfont{date}\usebeamercolor[fg]{date}\insertdate}\par%
+  \endgroup
+  \vfill%
+}
