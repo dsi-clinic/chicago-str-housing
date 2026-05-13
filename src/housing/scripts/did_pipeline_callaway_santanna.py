@@ -243,7 +243,7 @@ def run_did_analysis_with_cs() -> tuple:
             "trend_matching",
             "did_descriptive_analysis",
             "event_study_analysis",
-            "event_study_visualization",
+            "event_study_visualizer",
             "callaway_santanna_analysis",
             "callaway_santanna_visualizer",
             "cs_comparison_visualizer",
