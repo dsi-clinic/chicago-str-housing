@@ -43,6 +43,9 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from housing.components.analyzers.callaway_santanna_pretrend_test import (
+    compute_pre_trend_joint_test_from_cs_event_study,
+)
 from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
@@ -122,6 +125,8 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         # Step 5: Compute cohort-specific dynamic effects
         cohort_dynamics = self._compute_cohort_dynamics(group_time_atts)
 
+        pre_trend = compute_pre_trend_joint_test_from_cs_event_study(event_study_agg)
+
         return {
             "cs_group_time_atts": group_time_atts,
             "cs_event_study": event_study_agg,
@@ -129,6 +134,8 @@ class CallawaySantAnnaAnalyzer(Analyzer):
             "cs_cohort_dynamics": cohort_dynamics,
             "cs_cohort_info": cohort_info,
             "cs_comparison_group": self.comparison_group,
+            "cs_pre_trend_joint_test": pre_trend["summary"],
+            "cs_pre_trend_joint_test_periods": pre_trend["periods"],
         }
 
     def _identify_cohorts(self, df: pd.DataFrame) -> dict[str, Any]:

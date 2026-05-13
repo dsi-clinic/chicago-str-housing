@@ -45,6 +45,9 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from housing.components.analyzers.callaway_santanna import CallawaySantAnnaAnalyzer
+from housing.components.analyzers.callaway_santanna_pretrend_test import (
+    log_and_export_pre_trend_joint_test,
+)
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.analyzers.event_study import EventStudyAnalyzer
 from housing.components.loaders.census_data import CensusDataLoader
@@ -308,6 +311,16 @@ def _print_summary(results: dict) -> None:
         logger.info("  Number of treatment cohorts: %d", n_cohorts)
         logger.info("  Number of never-treated tracts: %d", n_never)
 
+    log_and_export_pre_trend_joint_test(
+        results,
+        DID_CS_OUTPUT_DIR,
+        summary_key="cs_pre_trend_joint_test",
+        periods_key="cs_pre_trend_joint_test_periods",
+        aggregate_basename="cs_pre_trend_joint_test_aggregate",
+        periods_basename="cs_pre_trend_joint_test_periods",
+        label="Callaway–Sant'Anna (baseline CS)",
+    )
+
     # Comparison with TWFE (use housing's event_study_coefficients format)
     cs_event = results.get("cs_event_study")
     twfe_event = _get_twfe_event_df(results)
@@ -340,6 +353,10 @@ def _print_summary(results: dict) -> None:
     logger.info("  • did_cs_twfe_difference.png - Bias visualization")
     logger.info("  • did_cohort_dynamics.png - Cohort-specific effects")
     logger.info("  • did_twfe_cs_comparison_table.csv - Detailed comparison")
+    logger.info(
+        "  • cs_pre_trend_joint_test_aggregate.csv - Pre-trend joint Wald (chi-squared)"
+    )
+    logger.info("  • cs_pre_trend_joint_test_periods.csv - Per rel_time contributions")
 
     logger.info("\n" + "=" * 80)
 

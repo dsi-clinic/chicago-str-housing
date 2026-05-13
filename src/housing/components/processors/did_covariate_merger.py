@@ -24,7 +24,9 @@ def _canonical_tract_geoid(series: pd.Series) -> pd.Series:
     num = pd.to_numeric(series, errors="coerce")
     whole = num.notna() & (num == num.round()) & (num >= 0) & (num < 10**12)
     out = pd.Series(pd.NA, index=series.index, dtype=object)
-    out.loc[whole] = num.loc[whole].round(0).astype("int64").map(lambda x: f"{int(x):011d}")
+    out.loc[whole] = (
+        num.loc[whole].round(0).astype("int64").map(lambda x: f"{int(x):011d}")
+    )
 
     remainder = series.notna() & out.isna()
     for idx in series.index[remainder]:
@@ -39,6 +41,9 @@ def _canonical_tract_geoid(series: pd.Series) -> pd.Series:
             out.loc[idx] = raw
     return out
 
+
+# Minimum string length to slice state (1) + county (3) from an 11-digit tract GEOID
+_MIN_GEOID_STR_LEN_FOR_COUNTY_FIPS = 5
 
 # Census columns merged from ACS; imputed with county medians when tract-level is missing
 _CENSUS_COVARIATE_COLS = [
@@ -63,7 +68,9 @@ def _county_fips_from_census_row(census: pd.DataFrame) -> pd.Series:
     if "tract_id" in census.columns:
         tid = _canonical_tract_geoid(census["tract_id"])
         out = pd.Series(pd.NA, index=tid.index, dtype=object)
-        ok = tid.notna() & (tid.astype(str).str.len() >= 5)
+        ok = tid.notna() & (
+            tid.astype(str).str.len() >= _MIN_GEOID_STR_LEN_FOR_COUNTY_FIPS
+        )
         out.loc[ok] = tid.loc[ok].astype(str).str.slice(2, 5)
         return out
     return pd.Series(pd.NA, index=census.index)
@@ -73,7 +80,9 @@ def _county_fips_from_panel_geoid(panel_geoid: pd.Series) -> pd.Series:
     """3-digit county FIPS from tract GEOID (positions 2–4 = county within state)."""
     keys = _canonical_tract_geoid(panel_geoid)
     out = pd.Series(pd.NA, index=keys.index, dtype=object)
-    ok = keys.notna() & (keys.astype(str).str.len() >= 5)
+    ok = keys.notna() & (
+        keys.astype(str).str.len() >= _MIN_GEOID_STR_LEN_FOR_COUNTY_FIPS
+    )
     out.loc[ok] = keys.loc[ok].astype(str).str.slice(2, 5)
     return out
 
@@ -112,7 +121,9 @@ class DIDCovariateProcessor(DataProcessor):
                 panel_with_covariates, census_data
             )
         else:
-            logger.warning("census_data not found in context, skipping census covariates")
+            logger.warning(
+                "census_data not found in context, skipping census covariates"
+            )
 
         # 2. Calculate baseline rental price for each tract (pre-treatment average)
         panel_with_covariates = self._add_baseline_rent(panel_with_covariates)
@@ -224,7 +235,11 @@ class DIDCovariateProcessor(DataProcessor):
         self, merged: pd.DataFrame, census: pd.DataFrame
     ) -> pd.DataFrame:
         """Fill missing ACS columns using the median among tracts in the same county."""
-        cov_cols = [c for c in _CENSUS_COVARIATE_COLS if c in merged.columns and c in census.columns]
+        cov_cols = [
+            c
+            for c in _CENSUS_COVARIATE_COLS
+            if c in merged.columns and c in census.columns
+        ]
         if not cov_cols:
             return merged
 
@@ -266,7 +281,9 @@ class DIDCovariateProcessor(DataProcessor):
         first_treatment = panel.loc[panel["treated"] == 1, "month"].min()
 
         if pd.isna(first_treatment):
-            logger.warning("No treated observations found, cannot calculate baseline rent")
+            logger.warning(
+                "No treated observations found, cannot calculate baseline rent"
+            )
             panel["baseline_rent"] = panel["rental_price"]
             return panel
 

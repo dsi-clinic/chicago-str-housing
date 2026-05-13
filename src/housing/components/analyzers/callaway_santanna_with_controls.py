@@ -19,6 +19,7 @@ avoid contamination from treatment effects.
 """
 
 import logging
+from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
@@ -27,6 +28,9 @@ import statsmodels.api as sm
 from scipy import stats
 from sklearn.linear_model import LogisticRegression
 
+from housing.components.analyzers.callaway_santanna_pretrend_test import (
+    compute_pre_trend_joint_test_from_cs_event_study,
+)
 from pipeline.base import Analyzer
 
 # Default covariates for propensity score / outcome regression
@@ -105,34 +109,38 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             logger.error("did_panel not found in context")
             raise ValueError("did_panel not found in context")
 
-        df = did_panel.copy()
-        df = df.dropna(subset=["rental_price"]).reset_index(drop=True)
+        panel = did_panel.copy()
+        panel = panel.dropna(subset=["rental_price"]).reset_index(drop=True)
 
         # Residualize outcome if using controls
         if self.include_covariates or self.include_tract_trends:
-            df = self._residualize_outcome(df, context)
+            panel = self._residualize_outcome(panel, context)
 
         # Standard CS estimation on (residualized) outcome
-        cohort_info = self._identify_cohorts(df)
+        cohort_info = self._identify_cohorts(panel)
         logger.info(
             "Identified %d treatment cohorts and %d never-treated tracts",
             len(cohort_info["treated_cohorts"]),
             cohort_info["n_never_treated"],
         )
 
-        group_time_atts = self._estimate_group_time_atts(df, cohort_info)
+        group_time_atts = self._estimate_group_time_atts(panel, cohort_info)
         logger.info("Estimated %d group-time ATTs", len(group_time_atts))
 
-        event_study_agg = self._aggregate_to_event_study(group_time_atts, df)
+        event_study_agg = self._aggregate_to_event_study(group_time_atts, panel)
         logger.info(
             "Aggregated to event study with %d relative time periods",
             len(event_study_agg),
         )
 
         overall_att = self._compute_overall_att(group_time_atts)
-        logger.info("Overall ATT: %.2f (SE: %.2f)", overall_att["att"], overall_att["se"])
+        logger.info(
+            "Overall ATT: %.2f (SE: %.2f)", overall_att["att"], overall_att["se"]
+        )
 
         cohort_dynamics = self._compute_cohort_dynamics(group_time_atts)
+
+        pre_trend = compute_pre_trend_joint_test_from_cs_event_study(event_study_agg)
 
         # Write to distinct keys so basic CS results are not overwritten
         return {
@@ -147,6 +155,8 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             "cs_include_tract_trends": self.include_tract_trends,
             "cs_estimation_method": self.estimation_method,
             "cs_propensity_diagnostics": self._propensity_diagnostics,
+            "cs_pre_trend_joint_test_with_controls": pre_trend["summary"],
+            "cs_pre_trend_joint_test_periods_with_controls": pre_trend["periods"],
         }
 
     def _residualize_outcome(
@@ -169,7 +179,9 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
         # Map each row to its tract's first treatment month (NaT for never-treated)
         df["_first_treat"] = df["tract_geoid"].map(tract_first_treatment)
         # Pre-treatment: never-treated tracts (NaT) OR month < first treatment
-        pre_treatment_mask = df["_first_treat"].isna() | (df["month"] < df["_first_treat"])
+        pre_treatment_mask = df["_first_treat"].isna() | (
+            df["month"] < df["_first_treat"]
+        )
         logger.info(
             "  Pre-treatment observations: %d / %d (%.1f%%)",
             pre_treatment_mask.sum(),
@@ -209,11 +221,10 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
 
         if not X_components:
             logger.warning("No controls to residualize on")
-            df.drop(columns=["_first_treat"], inplace=True)
-            return df
+            return df.drop(columns=["_first_treat"])
 
         # --- Fit on pre-treatment data only, predict for full panel ---
-        y_full = df["rental_price"].values
+        y_full = df["rental_price"].to_numpy()
         X_full = pd.concat(X_components, axis=1)
         # Fill NaN covariates with 0 (covariates are standardized, so 0 = mean)
         n_nan = X_full.isna().sum().sum()
@@ -226,7 +237,7 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
         X_full = sm.add_constant(X_full, has_constant="add")
 
         X_pre = X_full.loc[pre_treatment_mask]
-        y_pre = y_full[pre_treatment_mask.values]
+        y_pre = y_full[pre_treatment_mask.to_numpy()]
 
         try:
             model = sm.OLS(y_pre, X_pre).fit()
@@ -245,8 +256,7 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
         except Exception as e:
             logger.warning("Residualization failed: %s. Using original outcome.", e)
 
-        df.drop(columns=["_first_treat"], inplace=True)
-        return df
+        return df.drop(columns=["_first_treat"])
 
     def _identify_cohorts(self, df: pd.DataFrame) -> dict[str, Any]:
         """Identify treatment cohorts and never-treated units."""
@@ -295,7 +305,7 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
         for cohort_date in cohorts:
             cohort_tracts = cohorts_df[
                 cohorts_df["first_treatment_month"] == cohort_date
-            ]["tract_geoid"].values
+            ]["tract_geoid"].to_numpy()
 
             logger.debug(
                 "Processing cohort %s with %d tracts",
@@ -314,10 +324,12 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
                 elif self.comparison_group == "notyettreated":
                     not_yet_treated = cohorts_df[
                         cohorts_df["first_treatment_month"] > t
-                    ]["tract_geoid"].values
+                    ]["tract_geoid"].to_numpy()
                     comparison_tracts = list(set(never_treated) | set(not_yet_treated))
                 else:
-                    raise ValueError(f"Unknown comparison_group: {self.comparison_group}")
+                    raise ValueError(
+                        f"Unknown comparison_group: {self.comparison_group}"
+                    )
 
                 if len(comparison_tracts) == 0:
                     logger.warning(
@@ -334,8 +346,8 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
                 )
 
                 if att_result is not None:
-                    months_diff = (
-                        (t.year - cohort_date.year) * 12 + (t.month - cohort_date.month)
+                    months_diff = (t.year - cohort_date.year) * 12 + (
+                        t.month - cohort_date.month
                     )
 
                     results.append(
@@ -369,7 +381,9 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             & (df["month"].isin([current_date, pre_period]))
         ][["tract_geoid", "month", "rental_price"]]
 
-        pivoted = sub.pivot(index="tract_geoid", columns="month", values="rental_price")
+        pivoted = sub.pivot_table(
+            index="tract_geoid", columns="month", values="rental_price", aggfunc="first"
+        )
         if current_date not in pivoted.columns or pre_period not in pivoted.columns:
             return None
 
@@ -379,7 +393,9 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             return None
         return pivoted[["change"]]
 
-    def _get_tract_covariates(self, df: pd.DataFrame, tract_ids) -> pd.DataFrame:
+    def _get_tract_covariates(
+        self, df: pd.DataFrame, tract_ids: Iterable[Any]
+    ) -> pd.DataFrame:
         """Get time-invariant covariates for a set of tracts (one row per tract)."""
         covariate_list = self.covariates or DEFAULT_COVARIATES
         available = [c for c in covariate_list if c in df.columns]
@@ -395,7 +411,7 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             if std > 0:
                 tract_covs[col] = (tract_covs[col] - tract_covs[col].mean()) / std
             else:
-                tract_covs.drop(columns=[col], inplace=True)
+                tract_covs = tract_covs.drop(columns=[col])
 
         return tract_covs.dropna()
 
@@ -478,7 +494,7 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             return self._estimate_att_or(treated_diff, control_diff)
 
         all_ids = sorted(treated_ids | control_ids)
-        X = covariates.loc[all_ids].values
+        X = covariates.loc[all_ids].to_numpy()
         D = np.array([1 if tid in treated_ids else 0 for tid in all_ids])
 
         # Fit propensity score
@@ -496,7 +512,8 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
         # Build arrays aligned to all_ids
         delta_y = np.array(
             [
-                treated_diff.loc[tid, "change"] if tid in treated_ids
+                treated_diff.loc[tid, "change"]
+                if tid in treated_ids
                 else control_diff.loc[tid, "change"]
                 for tid in all_ids
             ]
@@ -556,11 +573,12 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             return self._estimate_att_or(treated_diff, control_diff)
 
         all_ids = sorted(treated_ids | control_ids)
-        X = covariates.loc[all_ids].values
+        X = covariates.loc[all_ids].to_numpy()
         D = np.array([1 if tid in treated_ids else 0 for tid in all_ids])
         delta_y = np.array(
             [
-                treated_diff.loc[tid, "change"] if tid in treated_ids
+                treated_diff.loc[tid, "change"]
+                if tid in treated_ids
                 else control_diff.loc[tid, "change"]
                 for tid in all_ids
             ]
@@ -648,11 +666,11 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             if atts_at_e.empty:
                 continue
 
-            weights = atts_at_e["n_treated"].values
+            weights = atts_at_e["n_treated"].to_numpy()
             weights = weights / weights.sum()
 
-            agg_att = np.sum(atts_at_e["att"].values * weights)
-            agg_se = np.sqrt(np.sum((atts_at_e["se"].values**2) * (weights**2)))
+            agg_att = np.sum(atts_at_e["att"].to_numpy() * weights)
+            agg_se = np.sqrt(np.sum((atts_at_e["se"].to_numpy() ** 2) * (weights**2)))
 
             ci_low = agg_att - 1.96 * agg_se
             ci_high = agg_att + 1.96 * agg_se
@@ -682,11 +700,13 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
         if post_treatment.empty:
             return {"att": np.nan, "se": np.nan, "ci_low": np.nan, "ci_high": np.nan}
 
-        weights = post_treatment["n_treated"].values
+        weights = post_treatment["n_treated"].to_numpy()
         weights = weights / weights.sum()
 
-        overall_att = np.sum(post_treatment["att"].values * weights)
-        overall_se = np.sqrt(np.sum((post_treatment["se"].values**2) * (weights**2)))
+        overall_att = np.sum(post_treatment["att"].to_numpy() * weights)
+        overall_se = np.sqrt(
+            np.sum((post_treatment["se"].to_numpy() ** 2) * (weights**2))
+        )
 
         ci_low = overall_att - 1.96 * overall_se
         ci_high = overall_att + 1.96 * overall_se

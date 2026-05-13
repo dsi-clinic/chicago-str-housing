@@ -17,6 +17,9 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from housing.components.analyzers.callaway_santanna import CallawaySantAnnaAnalyzer
+from housing.components.analyzers.callaway_santanna_pretrend_test import (
+    log_and_export_pre_trend_joint_test,
+)
 from housing.components.analyzers.callaway_santanna_with_controls import (
     CallawaySantAnnaWithControlsAnalyzer,
 )
@@ -178,7 +181,7 @@ def run_did_analysis_with_cs_and_covariate_controls() -> tuple:
     pipeline.register_component(EventStudyVisualizer(output_dir=DID_CS_OUTPUT_DIR))
     pipeline.register_component(
         CallawaySantAnnaAnalyzer(
-            comparison_group="nevertreated",
+            comparison_group="notyettreated",
             anticipation=0,
             min_cohort_size=5,
         )
@@ -193,7 +196,7 @@ def run_did_analysis_with_cs_and_covariate_controls() -> tuple:
     logger.info("\n[7/7] Callaway–Sant'Anna with covariate / tract-trend controls...")
     pipeline.register_component(
         CallawaySantAnnaWithControlsAnalyzer(
-            comparison_group="nevertreated",
+            comparison_group="notyettreated",
             anticipation=0,
             min_cohort_size=5,
             include_covariates=True,
@@ -307,6 +310,25 @@ def _print_summary(results: dict) -> None:
         logger.info("  Number of treatment cohorts: %d", n_cohorts)
         logger.info("  Number of never-treated tracts: %d", n_never)
 
+    log_and_export_pre_trend_joint_test(
+        results,
+        DID_CS_OUTPUT_DIR,
+        summary_key="cs_pre_trend_joint_test",
+        periods_key="cs_pre_trend_joint_test_periods",
+        aggregate_basename="cs_pre_trend_joint_test_aggregate",
+        periods_basename="cs_pre_trend_joint_test_periods",
+        label="Callaway–Sant'Anna (baseline CS)",
+    )
+    log_and_export_pre_trend_joint_test(
+        results,
+        DID_CS_OUTPUT_DIR,
+        summary_key="cs_pre_trend_joint_test_with_controls",
+        periods_key="cs_pre_trend_joint_test_periods_with_controls",
+        aggregate_basename="cs_pre_trend_joint_test_with_controls_aggregate",
+        periods_basename="cs_pre_trend_joint_test_with_controls_periods",
+        label="Callaway–Sant'Anna (with controls)",
+    )
+
     cs_event = results.get("cs_event_study")
     twfe_event = _get_twfe_event_df(results)
 
@@ -333,11 +355,23 @@ def _print_summary(results: dict) -> None:
     logger.info("\n=== OUTPUT FILES ===\n")
     logger.info("Check %s/ for:", DID_CS_OUTPUT_DIR)
     logger.info("  • did_callaway_santanna_event_study.png - Main CS results")
-    logger.info("  • did_callaway_santanna_event_study_with_controls.png - CS with controls")
+    logger.info(
+        "  • did_callaway_santanna_event_study_with_controls.png - CS with controls"
+    )
     logger.info("  • did_twfe_vs_cs_comparison.png - Side-by-side comparison")
     logger.info("  • did_cs_twfe_difference.png - Bias visualization")
     logger.info("  • did_cohort_dynamics.png - Cohort-specific effects")
     logger.info("  • did_twfe_cs_comparison_table.csv - Detailed comparison")
+    logger.info(
+        "  • cs_pre_trend_joint_test_aggregate.csv - Pre-trend joint Wald (baseline CS)"
+    )
+    logger.info("  • cs_pre_trend_joint_test_periods.csv - Per rel_time (baseline CS)")
+    logger.info(
+        "  • cs_pre_trend_joint_test_with_controls_aggregate.csv - Pre-trend joint Wald (with controls)"
+    )
+    logger.info(
+        "  • cs_pre_trend_joint_test_with_controls_periods.csv - Per rel_time (with controls)"
+    )
 
     logger.info("\n" + "=" * 80)
 
