@@ -22,9 +22,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_REL_TIME_MIN = -12
 DEFAULT_REL_TIME_MAX = -1
 
-METHOD_DIAGONAL_WALD = (
-    "Wald_chi2_diagonal_V_independence_across_rel_time_approximation"
-)
+METHOD_DIAGONAL_WALD = "Wald_chi2_diagonal_V_independence_across_rel_time_approximation"
 
 
 def compute_pre_trend_joint_test_from_cs_event_study(
@@ -101,12 +99,14 @@ def compute_pre_trend_joint_test_from_cs_event_study(
     z2 = z * z
     wald = float(np.nansum(z2))
     k = int(len(z))
-    df = k
-    p_value = float(1.0 - stats.chi2.cdf(wald, df)) if df > 0 else float("nan")
+    dof_chi2 = k
+    p_value = (
+        float(1.0 - stats.chi2.cdf(wald, dof_chi2)) if dof_chi2 > 0 else float("nan")
+    )
 
     periods = pd.DataFrame(
         {
-            rel_time_col: sub[rel_time_col].values,
+            rel_time_col: sub[rel_time_col].to_numpy(),
             att_col: att,
             se_col: se,
             "z": z,
@@ -116,7 +116,7 @@ def compute_pre_trend_joint_test_from_cs_event_study(
 
     summary = {
         "wald_statistic": wald,
-        "degrees_of_freedom": df,
+        "degrees_of_freedom": dof_chi2,
         "p_value": p_value,
         "rel_time_min": rel_time_min,
         "rel_time_max": rel_time_max,

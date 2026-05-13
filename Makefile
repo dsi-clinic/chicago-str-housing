@@ -18,7 +18,11 @@ project_dir := "$(current_abs_path)"
 # Optional data directory mount (if DATA_DIR is set)
 mount_data := $(if $(DATA_DIR),-v $(DATA_DIR):/project/data,)
 
-.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline-cs run-did-pipeline-cs-covariates    
+# Tract-cluster bootstrap defaults (override: `make run-did-pipeline-cs-bootstrap CS_BOOTSTRAP_REPS=199`)
+CS_BOOTSTRAP_REPS ?= 399
+CS_BOOTSTRAP_SEED ?= 42
+
+.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline-cs run-did-pipeline-cs-bootstrap run-did-pipeline-cs-covariates run-did-pipeline-cs-covariates-bootstrap
 
 help: ## Show the help message
 	@echo "Available commands:"
@@ -34,10 +38,13 @@ help: ## Show the help message
 	@echo "  run-clustering-pipeline  Prepare data for clustering"
 	@echo "  run-clustering-analysis  Run clustering data exploration (ARGS=\"--scatter-matrix\" to include scatter matrix)"
 	@echo "  run-did-pipeline-cs      Run DiD analysis with Callaway-Sant'Anna (2020) robust estimator"
+	@echo "  run-did-pipeline-cs-bootstrap  Same, plus tract-cluster bootstrap (default $(CS_BOOTSTRAP_REPS) reps; override CS_BOOTSTRAP_REPS / CS_BOOTSTRAP_SEED)"
 	@echo "  run-did-pipeline-cs-covariates  Same pipeline plus covariate-adjusted CS (DR + tract trends)"
+	@echo "  run-did-pipeline-cs-covariates-bootstrap  Same as covariates pipeline with baseline CS bootstrap"
 	@echo ""
 	@echo "Optional environment variables (.env file):"
 	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
+	@echo "  CS_BOOTSTRAP_REPS / CS_BOOTSTRAP_SEED - Defaults for *-bootstrap targets (Makefile vars; also honored by pipeline env)"
 	@echo ""
 
 build-only: ## Build Docker image only
@@ -72,5 +79,11 @@ run-clustering-analysis: build-only ## Run clustering data exploration
 run-did-pipeline-cs: build-only ## Run DiD analysis with Callaway-Sant'Anna (2020) robust estimator
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna.py
 
+run-did-pipeline-cs-bootstrap: build-only ## DiD CS + tract-cluster bootstrap (default $(CS_BOOTSTRAP_REPS) reps; e.g. CS_BOOTSTRAP_REPS=199)
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna.py --cs-bootstrap-reps $(CS_BOOTSTRAP_REPS) --cs-bootstrap-seed $(CS_BOOTSTRAP_SEED)
+
 run-did-pipeline-cs-covariates: build-only ## Baseline CS pipeline plus Callaway-Sant'Anna with covariate controls
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna_with_controls.py
+
+run-did-pipeline-cs-covariates-bootstrap: build-only ## Covariates pipeline + baseline CS tract-cluster bootstrap (default $(CS_BOOTSTRAP_REPS) reps)
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna_with_controls.py --cs-bootstrap-reps $(CS_BOOTSTRAP_REPS) --cs-bootstrap-seed $(CS_BOOTSTRAP_SEED)

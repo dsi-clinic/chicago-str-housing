@@ -4,6 +4,12 @@ This pipeline runs both:
 1. Standard TWFE event study (for comparison)
 2. Callaway & Sant'Anna (2020) robust estimator
 
+Optional **tract-cluster block bootstrap** for baseline CS (resample tracts with
+replacement, re-estimate CS each draw): set ``--cs-bootstrap-reps N`` or environment
+variable ``CS_BOOTSTRAP_REPS``; use ``--cs-bootstrap-seed`` for reproducibility.
+Outputs ``cs_event_study_tract_bootstrap.csv`` and ``cs_tract_bootstrap_meta.csv``
+under the DID CS output directory when enabled.
+
 The comparison reveals whether heterogeneous treatment effects bias TWFE estimates.
 
 **When to use Callaway-Sant'Anna:**
@@ -47,6 +53,10 @@ from dotenv import load_dotenv
 from housing.components.analyzers.callaway_santanna import CallawaySantAnnaAnalyzer
 from housing.components.analyzers.callaway_santanna_pretrend_test import (
     log_and_export_pre_trend_joint_test,
+)
+from housing.components.analyzers.callaway_santanna_tract_bootstrap import (
+    parse_cs_bootstrap_cli,
+    write_cs_bootstrap_csv,
 )
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
 from housing.components.analyzers.event_study import EventStudyAnalyzer
@@ -143,7 +153,11 @@ def _get_twfe_event_df(results: dict) -> pd.DataFrame | None:
     return twfe_coef[twfe_coef["rel_time"] != -1].reset_index(drop=True)
 
 
-def run_did_analysis_with_cs() -> tuple:
+def run_did_analysis_with_cs(
+    *,
+    cs_bootstrap_reps: int | None = None,
+    cs_bootstrap_seed: int = 0,
+) -> tuple:
     """Run DiD analysis with both TWFE and Callaway-Sant'Anna estimators."""
     logger.info("=" * 80)
     logger.info("DiD Analysis Pipeline: TWFE vs. Callaway-Sant'Anna (2020)")
@@ -220,6 +234,8 @@ def run_did_analysis_with_cs() -> tuple:
             comparison_group="nevertreated",
             anticipation=0,
             min_cohort_size=5,
+            bootstrap_reps=cs_bootstrap_reps,
+            bootstrap_seed=cs_bootstrap_seed,
         )
     )
     pipeline.register_component(
@@ -321,6 +337,27 @@ def _print_summary(results: dict) -> None:
         label="Callaway–Sant'Anna (baseline CS)",
     )
 
+    boot_df = results.get("cs_event_study_tract_bootstrap")
+    boot_meta = results.get("cs_bootstrap_meta")
+    if (
+        isinstance(boot_df, pd.DataFrame)
+        and not boot_df.empty
+        and isinstance(boot_meta, dict)
+    ):
+        write_cs_bootstrap_csv(boot_df, boot_meta, DID_CS_OUTPUT_DIR)
+        logger.info("\nCallaway–Sant'Anna tract-cluster bootstrap (baseline CS):")
+        logger.info(
+            "  Overall ATT: point $%.2f (analytic SE $%.2f) | bootstrap SE $%.2f, "
+            "95%% CI [$%.2f, $%.2f] (%d valid draws, %d reps)",
+            float(boot_meta.get("overall_att_point", float("nan"))),
+            float(boot_meta.get("overall_se_analytic", float("nan"))),
+            float(boot_meta.get("overall_se_boot", float("nan"))),
+            float(boot_meta.get("overall_ci_low_boot", float("nan"))),
+            float(boot_meta.get("overall_ci_high_boot", float("nan"))),
+            int(boot_meta.get("overall_n_valid_draws", 0)),
+            int(boot_meta.get("n_reps", 0)),
+        )
+
     # Comparison with TWFE (use housing's event_study_coefficients format)
     cs_event = results.get("cs_event_study")
     twfe_event = _get_twfe_event_df(results)
@@ -357,6 +394,10 @@ def _print_summary(results: dict) -> None:
         "  • cs_pre_trend_joint_test_aggregate.csv - Pre-trend joint Wald (chi-squared)"
     )
     logger.info("  • cs_pre_trend_joint_test_periods.csv - Per rel_time contributions")
+    logger.info(
+        "  • cs_event_study_tract_bootstrap.csv - Tract-cluster bootstrap (when enabled)"
+    )
+    logger.info("  • cs_tract_bootstrap_meta.csv - Bootstrap metadata (when enabled)")
 
     logger.info("\n" + "=" * 80)
 
@@ -367,4 +408,5 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    run_did_analysis_with_cs()
+    _reps, _seed = parse_cs_bootstrap_cli()
+    run_did_analysis_with_cs(cs_bootstrap_reps=_reps, cs_bootstrap_seed=_seed)

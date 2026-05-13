@@ -5,6 +5,9 @@ covariate adjustment in the estimator, comparison plots), then merges census and
 baseline-rent covariates into the matched panel and estimates **Callaway–Sant'Anna
 with controls** (doubly robust + optional tract trends in the analyzer).
 
+Optional tract-cluster bootstrap for **baseline** CS uses the same flags as the
+baseline pipeline: ``--cs-bootstrap-reps``, ``--cs-bootstrap-seed``, or ``CS_BOOTSTRAP_REPS``.
+
 Requires the same data as the baseline CS pipeline (tract shapefile, ZORI CSV).
 `CENSUS_API_KEY` improves covariate coverage; without it the census loader uses demo data.
 """
@@ -19,6 +22,10 @@ from dotenv import load_dotenv
 from housing.components.analyzers.callaway_santanna import CallawaySantAnnaAnalyzer
 from housing.components.analyzers.callaway_santanna_pretrend_test import (
     log_and_export_pre_trend_joint_test,
+)
+from housing.components.analyzers.callaway_santanna_tract_bootstrap import (
+    parse_cs_bootstrap_cli,
+    write_cs_bootstrap_csv,
 )
 from housing.components.analyzers.callaway_santanna_with_controls import (
     CallawaySantAnnaWithControlsAnalyzer,
@@ -115,7 +122,11 @@ def _get_twfe_event_df(results: dict) -> pd.DataFrame | None:
     return twfe_coef[twfe_coef["rel_time"] != -1].reset_index(drop=True)
 
 
-def run_did_analysis_with_cs_and_covariate_controls() -> tuple:
+def run_did_analysis_with_cs_and_covariate_controls(
+    *,
+    cs_bootstrap_reps: int | None = None,
+    cs_bootstrap_seed: int = 0,
+) -> tuple:
     """Run baseline CS pipeline plus covariate merge and CS-with-controls."""
     logger.info("=" * 80)
     logger.info("DiD: TWFE vs. CS (2020) + Callaway–Sant'Anna with covariate controls")
@@ -184,6 +195,8 @@ def run_did_analysis_with_cs_and_covariate_controls() -> tuple:
             comparison_group="notyettreated",
             anticipation=0,
             min_cohort_size=5,
+            bootstrap_reps=cs_bootstrap_reps,
+            bootstrap_seed=cs_bootstrap_seed,
         )
     )
     pipeline.register_component(
@@ -329,6 +342,27 @@ def _print_summary(results: dict) -> None:
         label="Callaway–Sant'Anna (with controls)",
     )
 
+    boot_df = results.get("cs_event_study_tract_bootstrap")
+    boot_meta = results.get("cs_bootstrap_meta")
+    if (
+        isinstance(boot_df, pd.DataFrame)
+        and not boot_df.empty
+        and isinstance(boot_meta, dict)
+    ):
+        write_cs_bootstrap_csv(boot_df, boot_meta, DID_CS_OUTPUT_DIR)
+        logger.info("\nCallaway–Sant'Anna tract-cluster bootstrap (baseline CS):")
+        logger.info(
+            "  Overall ATT: point $%.2f (analytic SE $%.2f) | bootstrap SE $%.2f, "
+            "95%% CI [$%.2f, $%.2f] (%d valid draws, %d reps)",
+            float(boot_meta.get("overall_att_point", float("nan"))),
+            float(boot_meta.get("overall_se_analytic", float("nan"))),
+            float(boot_meta.get("overall_se_boot", float("nan"))),
+            float(boot_meta.get("overall_ci_low_boot", float("nan"))),
+            float(boot_meta.get("overall_ci_high_boot", float("nan"))),
+            int(boot_meta.get("overall_n_valid_draws", 0)),
+            int(boot_meta.get("n_reps", 0)),
+        )
+
     cs_event = results.get("cs_event_study")
     twfe_event = _get_twfe_event_df(results)
 
@@ -372,6 +406,10 @@ def _print_summary(results: dict) -> None:
     logger.info(
         "  • cs_pre_trend_joint_test_with_controls_periods.csv - Per rel_time (with controls)"
     )
+    logger.info(
+        "  • cs_event_study_tract_bootstrap.csv - Tract-cluster bootstrap (when enabled)"
+    )
+    logger.info("  • cs_tract_bootstrap_meta.csv - Bootstrap metadata (when enabled)")
 
     logger.info("\n" + "=" * 80)
 
@@ -382,4 +420,7 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    run_did_analysis_with_cs_and_covariate_controls()
+    _reps, _seed = parse_cs_bootstrap_cli()
+    run_did_analysis_with_cs_and_covariate_controls(
+        cs_bootstrap_reps=_reps, cs_bootstrap_seed=_seed
+    )
