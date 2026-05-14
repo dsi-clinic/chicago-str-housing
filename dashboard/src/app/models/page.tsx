@@ -1,5 +1,7 @@
 import FigureSlot from '@/components/FigureSlot'
 import StatTable from '@/components/StatTable'
+import InfoBlock from '@/components/InfoBlock'
+import { loadParallelTrendsTest, loadHonestPretrends } from '@/lib/data'
 
 /* ATT summary — from docs/DID_RESULTS_STORY.md (post-refactor run) */
 const SPEC_TABLE = [
@@ -9,13 +11,18 @@ const SPEC_TABLE = [
 ]
 
 export default function ModelsPage() {
+  const ptB = loadParallelTrendsTest('binary')
+  const ptT = loadParallelTrendsTest('threshold')
+  const hpB = loadHonestPretrends('binary')
+  const hpT = loadHonestPretrends('threshold')
+
   return (
     <div>
-      <h2 className="text-2xl font-extrabold tracking-tight mb-2">Models & Specifications</h2>
+      <h2 className="text-2xl font-extrabold tracking-tight mb-2">Empirical Strategy</h2>
       <p className="text-[15px] text-gray-500 mb-10 max-w-2xl leading-relaxed">
-        Three ways of estimating the same causal question — each stricter than the last.
-        The full-panel result is the headline; the others show how sensitive it is to the
-        choice of comparison group and adjustment method.
+        Why Callaway &amp; Sant&apos;Anna instead of standard regression, what the key
+        identifying assumption is and how well it holds, and how three specification
+        choices affect the estimated effect.
       </p>
 
       {/* ── Concept: The core question ── */}
@@ -71,6 +78,67 @@ export default function ModelsPage() {
         </div>
       </div>
 
+      {/* ── Parallel trends: the key assumption ── */}
+      <h3 className="text-lg font-bold mb-1">The key assumption: parallel trends</h3>
+      <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
+        For a DiD estimate to be causal, treated and control neighborhoods must have moved
+        in parallel before the ban. We cannot test this directly, but we can check whether
+        pre-ban rent trends already diverged.
+      </p>
+
+      <div className="grid grid-cols-2 gap-6 mb-4">
+        <InfoBlock
+          title="Formal regression test"
+          rows={[
+            { label: 'Binary p-value',    value: ptB.p_value.toFixed(3), valueClass: ptB.significant ? 'text-maroon' : 'text-teal-600' },
+            { label: 'Threshold p-value', value: ptT.p_value.toFixed(3), valueClass: ptT.significant ? 'text-maroon' : 'text-teal-600' },
+            { label: 'Verdict (binary)',    value: ptB.significant ? 'Rejects at 5% ✗' : 'Does not reject ✓', valueClass: ptB.significant ? 'text-maroon' : 'text-teal-600' },
+            { label: 'Verdict (threshold)', value: ptT.significant ? 'Rejects at 5% ✗' : 'Does not reject ✓', valueClass: ptT.significant ? 'text-maroon' : 'text-teal-600' },
+          ]}
+        />
+        <InfoBlock
+          title="Pre-period TWFE coefficient magnitude"
+          rows={[
+            { label: 'Binary max |pre-coef|',    value: `$${hpB.max_abs_twfe_coef_pre.toFixed(1)}/mo` },
+            { label: 'Threshold max |pre-coef|', value: `$${hpT.max_abs_twfe_coef_pre.toFixed(1)}/mo` },
+            { label: 'Sign restriction violated', value: hpB.violates_sign_restriction ? 'Yes ✗' : 'No ✓', valueClass: hpB.violates_sign_restriction ? 'text-maroon' : 'text-teal-600' },
+            { label: 'Honest reading', value: 'Plausible but not flat — see caveat' },
+          ]}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="bg-teal-50 border border-teal-200/60 rounded-xl px-4 py-3 text-[12px] text-gray-700">
+          <strong className="text-teal-700 block mb-1">Formal test: does not reject.</strong>
+          Neither binary (p={ptB.p_value.toFixed(2)}) nor threshold (p={ptT.p_value.toFixed(2)}) shows a significant pre-trend.
+        </div>
+        <div className="bg-amber-50 border border-amber-200/60 rounded-xl px-4 py-3 text-[12px] text-gray-700">
+          <strong className="text-amber-700 block mb-1">Visual check: non-trivial pre-period movement.</strong>
+          Max pre-period coefficients (~${hpB.max_abs_twfe_coef_pre.toFixed(0)} binary, ${hpT.max_abs_twfe_coef_pre.toFixed(0)} threshold) are roughly half the full-panel ATT. Plausible — not proven.
+        </div>
+      </div>
+
+      <FigureSlot
+        src="/data/binary/did_parallel_trends.png"
+        alt="Pre-treatment rent trends"
+        label="Average rent — treated vs never-treated before the ban (binary)"
+        className="mb-5"
+      />
+
+      {/* ── SUTVA checks ── */}
+      <h3 className="text-lg font-bold mb-1">Spatial assumption check (SUTVA)</h3>
+      <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
+        Do prohibitions spill over into neighboring tracts? The donut test excludes
+        nearby controls to check for spatial contamination; the dose-response tests
+        whether effect size scales with prohibition intensity.
+      </p>
+      <div className="grid grid-cols-2 gap-6 mb-12">
+        <FigureSlot src="/data/binary/sutva_donut.png"
+          alt="SUTVA donut test" label="Donut test — excluding near neighbors (binary)" />
+        <FigureSlot src="/data/binary/sutva_dose_response.png"
+          alt="SUTVA dose-response" label="Dose-response — effect vs prohibition density (binary)" />
+      </div>
+
       {/* ── ATT Summary Table ── */}
       <div className="mb-10">
         <h3 className="text-lg font-bold mb-1">Summary of estimates</h3>
@@ -90,68 +158,11 @@ export default function ModelsPage() {
         </p>
       </div>
 
-      {/* ══════════════════════════════════════════════════
-          SPEC 1: Full-panel CS (Primary)
-      ══════════════════════════════════════════════════ */}
-      <div className="border-l-4 border-maroon bg-maroon/5 rounded-r-xl overflow-hidden mb-8">
-        <div className="px-6 pt-5 pb-4">
-          <div className="flex items-baseline gap-3 mb-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-maroon bg-maroon/10 px-2 py-0.5 rounded">① Primary estimate</span>
-            <span className="text-[15px] font-bold text-gray-900">Full-panel Callaway &amp; Sant&apos;Anna</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6 mb-5">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2">What this model does</p>
-              <p className="text-[13px] text-gray-600 leading-relaxed">
-                Compares rent changes in <strong>every neighborhood that got a prohibition</strong> to
-                all neighborhoods that never got one (or hadn&apos;t yet). No filtering, no hand-picking
-                — the broadest, most transparent comparison group possible.
-              </p>
-              <p className="text-[13px] text-gray-600 leading-relaxed mt-2">
-                Each prohibited neighborhood (cohort) is compared to the pool of never-treated
-                neighborhoods that had <em>no ban at all</em> during the study period. The CS
-                estimator then aggregates these cohort-level comparisons with correct weights.
-              </p>
-            </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2">Why this is the headline</p>
-              <p className="text-[13px] text-gray-600 leading-relaxed">
-                This estimate uses the <strong>most comparison neighborhoods</strong> and makes
-                the fewest additional assumptions. It doesn&apos;t restrict the sample to
-                &ldquo;similar&rdquo; neighborhoods (we show what happens when you do that in
-                Specification ②). As long as rents in treated and control neighborhoods would have
-                moved in parallel without the ban, this is unbiased.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-8 mb-1">
-            <div>
-              <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-0.5">Threshold indicator</span>
-              <span className="text-3xl font-extrabold text-maroon tracking-tight">+56.0</span>
-              <span className="text-sm text-gray-400 ml-1">(SE 0.45)</span>
-              <span className="text-xs text-gray-400 ml-1">$/mo</span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-0.5">Binary indicator</span>
-              <span className="text-3xl font-extrabold text-maroon tracking-tight">+48.8</span>
-              <span className="text-sm text-gray-400 ml-1">(SE 0.53)</span>
-              <span className="text-xs text-gray-400 ml-1">$/mo</span>
-            </div>
-            <div className="flex-1 bg-white/60 border border-maroon/10 rounded-xl px-4 py-2 text-[12px] text-gray-600 max-w-xs">
-              <strong>Interpretation:</strong> In the average post-prohibition month, rents in
-              prohibited neighborhoods were roughly <strong>$49–56/month higher</strong> than
-              they would have been without the prohibition, compared to never-treated neighborhoods.
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4 px-6 pb-5">
-          <FigureSlot src="/data/threshold/did_callaway_santanna_event_study_full_panel.png"
-            alt="CS full-panel event study — threshold" label="Threshold indicator" />
-          <FigureSlot src="/data/binary/did_callaway_santanna_event_study_full_panel.png"
-            alt="CS full-panel event study — binary"    label="Binary indicator" />
-        </div>
+      <div className="bg-gray-50 border border-gray-100 rounded-xl px-5 py-4 mb-8">
+        <p className="text-[12px] text-gray-600">
+          <strong>① Full-panel CS (primary):</strong> event studies and headline ATTs are in the
+          <strong> Results tab</strong>. The specifications below add restrictions on top of that baseline.
+        </p>
       </div>
 
       {/* ══════════════════════════════════════════════════

@@ -1,6 +1,8 @@
 import FigureSlot from '@/components/FigureSlot'
+import InfoBlock from '@/components/InfoBlock'
 import StatTable from '@/components/StatTable'
-import { loadCohortStats, loadCovariateBalance } from '@/lib/data'
+import CohortBarChart from '@/components/CohortBarChart'
+import { loadSampleLineage, loadGroupStats, loadCohortStats, loadCovariateBalance } from '@/lib/data'
 
 const COVARIATE_LABELS: Record<string, string> = {
   median_income:      'Median income',
@@ -13,10 +15,24 @@ const COVARIATE_LABELS: Record<string, string> = {
 }
 
 export default function AnalysisPage() {
+  const linB = loadSampleLineage('binary')
+  const linT = loadSampleLineage('threshold')
+  const gsB  = loadGroupStats('binary')
+  const gsT  = loadGroupStats('threshold')
   const cohorts = loadCohortStats('binary').slice(0, 10)
   const balance = loadCovariateBalance('binary')
     .filter(b => b.covariate in COVARIATE_LABELS)
     .sort((a, b) => b.cohens_d - a.cohens_d)
+
+  const stageDbin = linB.find(s => s.stage_code === 'D')
+  const stageFbin = linB.find(s => s.stage_code === 'F')
+  const stageDthr = linT.find(s => s.stage_code === 'D')
+  const stageFthr = linT.find(s => s.stage_code === 'F')
+
+  const treatedB = gsB.find(g => g.group.includes('Eventually')) ?? { mean_rent: 0, std_dev: 0 }
+  const controlB = gsB.find(g => g.group.includes('Never'))      ?? { mean_rent: 0, std_dev: 0 }
+  const treatedT = gsT.find(g => g.group.includes('Eventually')) ?? { mean_rent: 0, std_dev: 0 }
+  const controlT = gsT.find(g => g.group.includes('Never'))      ?? { mean_rent: 0, std_dev: 0 }
 
   const cohortRows = cohorts.map(c => [
     c.first_prohibition_month,
@@ -27,7 +43,7 @@ export default function AnalysisPage() {
   ])
 
   const balanceRows = balance.map(b => [
-    COVARIATE_LABELS[b.covariate],
+    COVARIATE_LABELS[b.covariate] ?? b.covariate,
     `$${b.treated_mean.toFixed(0)}`,
     `$${b.control_mean.toFixed(0)}`,
     `${b.pct_diff.toFixed(1)}%`,
@@ -37,65 +53,101 @@ export default function AnalysisPage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-extrabold tracking-tight mb-2">Descriptive Analysis</h2>
+      <h2 className="text-2xl font-extrabold tracking-tight mb-2">Treatment Characterization</h2>
       <p className="text-[15px] text-gray-500 mb-10 max-w-2xl leading-relaxed">
-        Pre-treatment covariate balance, cohort composition, and treatment effect estimates.
+        Who got treated, when, and how the two treatment definitions differ — before asking
+        whether the effect is causal.
       </p>
 
-      {/* ── Covariate balance ── */}
-      <h3 className="text-lg font-bold mb-1">Pre-treatment Covariate Balance</h3>
-      <p className="text-[14px] text-gray-500 mb-4 max-w-2xl leading-relaxed">
-        All seven covariates are significantly imbalanced before matching. Treated tracts
-        are higher-income, higher-education, and higher-rent. The education gap is the
-        largest (Cohen&apos;s d ≈ 1.08). This pattern motivates matching as a design-stage
-        restriction, though it does not fully eliminate selection concerns.
+      {/* ── 1. Treatment counts by indicator ── */}
+      <h3 className="text-lg font-bold mb-1">Treatment counts by indicator</h3>
+      <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
+        The binary indicator counts any prohibition in a tract. The threshold indicator
+        requires the share of prohibited units to cross a minimum. The two definitions
+        agree on never-treated tracts but disagree on which tracts cross the threshold.
       </p>
-
-      <div className="border-l-4 border-teal-600 bg-teal-50/50 rounded-r-xl px-5 py-4 mb-4 max-w-2xl">
-        <p className="text-[13px] text-gray-700 leading-relaxed">
-          The Love-style figure below uses the <strong>post-refactor</strong> matcher (standardized{' '}
-          <code className="text-xs bg-white/80 px-1 rounded">pre_trend_slope</code> +{' '}
-          <code className="text-xs bg-white/80 px-1 rounded">avg_pre_rent</code>, <em>k</em>-NN).{' '}
-          <strong>Before</strong> = treated vs all never-treated tracts in the pre-trend pool;{' '}
-          <strong>after</strong> = treated vs matched controls only. It is not the residualized
-          Callaway–Sant&apos;Anna-with-controls step (see Methodology Audit for the full explainer).
-        </p>
+      <div className="grid grid-cols-2 gap-6 mb-10">
+        <InfoBlock
+          title="Binary indicator"
+          rows={[
+            { label: 'Treated tracts (pre-match)',       value: (stageDbin?.treated ?? 373).toLocaleString(),        valueClass: 'text-maroon' },
+            { label: 'Never-treated pool',               value: (stageDbin?.never_treated ?? 469).toLocaleString() },
+            { label: 'Matched analysis sample',          value: (stageFbin?.n_tracts ?? 556).toLocaleString(),       valueClass: 'text-blue-600' },
+            { label: 'Mean rent · treated (matched)',    value: `$${treatedB.mean_rent.toFixed(0)} / mo` },
+            { label: 'Mean rent · controls (matched)',   value: `$${controlB.mean_rent.toFixed(0)} / mo` },
+          ]}
+        />
+        <InfoBlock
+          title="Threshold indicator"
+          rows={[
+            { label: 'Treated tracts (pre-match)',       value: (stageDthr?.treated ?? 274).toLocaleString(),        valueClass: 'text-teal-600' },
+            { label: 'Never-treated pool',               value: (stageDthr?.never_treated ?? 568).toLocaleString() },
+            { label: 'Matched analysis sample',          value: (stageFthr?.n_tracts ?? 453).toLocaleString(),       valueClass: 'text-teal-600' },
+            { label: 'Mean rent · treated (matched)',    value: `$${treatedT.mean_rent.toFixed(0)} / mo` },
+            { label: 'Mean rent · controls (matched)',   value: `$${controlT.mean_rent.toFixed(0)} / mo` },
+          ]}
+        />
       </div>
 
-      <FigureSlot
-        src="/data/binary/did_story_matching_love.png"
-        alt="Love plot: standardized mean differences before and after matching"
-        label="Love plot — SMD before vs after matching (post-refactor matching)"
-        className="mb-6"
-      />
-
-      <StatTable
-        className="mb-10"
-        headers={['Covariate', 'Treated Mean', 'Control Mean', '% Diff', "Cohen's d", 'Significant']}
-        rows={balanceRows}
-      />
-
-      {/* ── Cohort composition ── */}
-      <h3 className="text-lg font-bold mb-1">Prohibition Cohorts</h3>
-      <p className="text-[14px] text-gray-500 mb-4 max-w-2xl leading-relaxed">
-        The 2016 cohort dominates. Early cohorts (Jul–Aug 2016) are notably
-        higher-rent and higher-income than later cohorts, which trend toward
-        lower-income neighborhoods.
+      {/* ── 2. When did prohibitions arrive? ── */}
+      <h3 className="text-lg font-bold mb-1">When did prohibitions arrive?</h3>
+      <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
+        Prohibitions rolled out in waves from mid-2016 onward. The July and August 2016
+        cohorts account for the largest share of treated tracts under both definitions.
+        Early cohorts tend to be higher-rent neighborhoods.
       </p>
+      <div className="grid grid-cols-2 gap-5 mb-6">
+        <div className="border border-gray-100 rounded-xl p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-maroon mb-3">Binary</p>
+          <CohortBarChart dir="binary" />
+        </div>
+        <div className="border border-gray-100 rounded-xl p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-teal-600 mb-3">Threshold</p>
+          <CohortBarChart dir="threshold" />
+        </div>
+      </div>
       <StatTable
         className="mb-10"
         headers={['First Prohibition Month', 'Tracts', 'Share of Treated', 'Mean Baseline Rent', 'Mean Income']}
         rows={cohortRows}
       />
 
-      {/* ── Event study + cohort dynamics ── */}
-      <h3 className="text-lg font-bold mb-4">Treatment Effect Estimates</h3>
-      <div className="grid grid-cols-2 gap-6">
-        <FigureSlot src="/data/binary/event_study_plot.png"
-          alt="TWFE event study coefficients" label="TWFE event study" />
-        <FigureSlot src="/data/binary/did_cohort_dynamics.png"
-          alt="Cohort-specific dynamic treatment effects" label="Cohort dynamics (CS)" />
-      </div>
+      {/* ── 3. Pre-treatment rent distributions ── */}
+      <h3 className="text-lg font-bold mb-1">Pre-treatment rent distributions</h3>
+      <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
+        Even before any prohibition, treated tracts had substantially higher rents than
+        never-treated ones. This level gap is one reason the comparison is difficult and
+        motivates the use of CS rather than a simple before-after design.
+      </p>
+      <FigureSlot
+        src="/data/binary/did_story_pre_rent_violin.png"
+        alt="Pre-treatment rent distribution by group"
+        label="Pre-treatment rent — never-treated vs ever-treated (binary, matched sample)"
+        className="mb-10"
+      />
+
+      {/* ── 4. Are treated and control tracts comparable? ── */}
+      <h3 className="text-lg font-bold mb-1">Are treated and control tracts comparable?</h3>
+      <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
+        On every measured covariate, treated tracts are significantly different from the
+        never-treated pool before any matching. The education gap is the largest
+        (Cohen's d ≈ 1.08). This does not disqualify a causal estimate, but it means the
+        comparison group choice matters — and the full-panel CS result should be accompanied
+        by sensitivity checks on the comparison group (see Robustness tab).
+      </p>
+
+      <FigureSlot
+        src="/data/binary/did_story_matching_love.png"
+        alt="SMD before and after matching on pre-trend features"
+        label="Pre-treatment balance — SMD before matching (grey) and after k-NN matching (maroon)"
+        className="mb-6"
+      />
+
+      <StatTable
+        className="mb-0"
+        headers={['Covariate', 'Treated Mean', 'Control Mean', '% Diff', "Cohen's d", 'Imbalanced']}
+        rows={balanceRows}
+      />
     </div>
   )
 }
