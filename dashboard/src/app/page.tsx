@@ -1,6 +1,6 @@
 import DataCard from '@/components/DataCard'
 import InfoBlock from '@/components/InfoBlock'
-import { loadPanelOverview, loadGroupStats } from '@/lib/data'
+import { loadSampleLineage, loadGroupStats } from '@/lib/data'
 
 const STORY = [
   {
@@ -30,10 +30,25 @@ const STORY = [
 ]
 
 export default function IntroductionPage() {
-  const ov = loadPanelOverview('binary')
-  const gs = loadGroupStats('binary')
-  const treated = gs.find(g => g.group.includes('Eventually')) ?? { mean_rent: 0, std_dev: 0, n_tracts: 0 }
-  const control  = gs.find(g => g.group.includes('Never'))     ?? { mean_rent: 0, std_dev: 0, n_tracts: 0 }
+  // Load from sample lineage so numbers reflect the full audit story
+  const lineage  = loadSampleLineage('binary')
+  const stageA   = lineage.find(s => s.stage_code === 'A')
+  const stageC   = lineage.find(s => s.stage_code === 'C')
+  const stageD   = lineage.find(s => s.stage_code === 'D')
+  const stageF   = lineage.find(s => s.stage_code === 'F')
+
+  const nAll      = stageA?.n_tracts   ?? 1332
+  const nPanel    = stageC?.n_tracts   ?? 842
+  const nMonths   = stageC?.n_months   ?? 128
+  const nTreated  = stageD?.treated    ?? 373
+  const nPool     = stageD?.never_treated ?? 469
+  const nMatched  = stageF?.n_tracts   ?? 556
+  const nControls = nMatched - nTreated
+
+  // Group stats for rent balance info block (from matched binary sample)
+  const gs       = loadGroupStats('binary')
+  const treated  = gs.find(g => g.group.includes('Eventually')) ?? { mean_rent: 0, std_dev: 0, n_tracts: nTreated }
+  const control  = gs.find(g => g.group.includes('Never'))     ?? { mean_rent: 0, std_dev: 0, n_tracts: nControls }
 
   return (
     <div>
@@ -80,12 +95,16 @@ export default function IntroductionPage() {
             </p>
             <div className="flex gap-3 mt-4">
               <div className="bg-blue-100 rounded-lg px-4 py-2 text-center">
-                <span className="block text-xl font-extrabold text-blue-600">{treated.n_tracts.toLocaleString()}</span>
+                <span className="block text-xl font-extrabold text-blue-600">{nTreated.toLocaleString()}</span>
                 <span className="block text-[10px] text-gray-500">Treated tracts</span>
               </div>
               <div className="bg-blue-100 rounded-lg px-4 py-2 text-center">
-                <span className="block text-xl font-extrabold text-blue-600">{control.n_tracts.toLocaleString()}</span>
-                <span className="block text-[10px] text-gray-500">Never-treated</span>
+                <span className="block text-xl font-extrabold text-blue-600">{nPool.toLocaleString()}</span>
+                <span className="block text-[10px] text-gray-500">Control pool (pre-match)</span>
+              </div>
+              <div className="bg-blue-100 rounded-lg px-4 py-2 text-center">
+                <span className="block text-xl font-extrabold text-blue-600">{nControls.toLocaleString()}</span>
+                <span className="block text-[10px] text-gray-500">Matched controls</span>
               </div>
             </div>
           </div>
@@ -102,27 +121,27 @@ export default function IntroductionPage() {
         </div>
       </div>
 
-      {/* Data cards — centered */}
+      {/* Data cards — centered, showing the full audit funnel story */}
       <p className="text-[11px] font-bold uppercase tracking-wider text-gray-300 mb-4 text-center">
-        Panel at a glance
+        Sample construction at a glance
       </p>
       <div className="flex flex-wrap gap-4 justify-center mb-10">
-        <DataCard value={ov.n_tracts.toLocaleString()}                  label="Census Tracts"   sub="in rent panel"        accent="blue" />
-        <DataCard value={ov.n_periods.toLocaleString()}                 label="Panel Months"    sub="2012 – 2022"          accent="teal" />
-        <DataCard value={ov.tracts_eventually_treated.toLocaleString()} label="Treated Tracts"  sub="STR ever prohibited"  accent="maroon" />
-        <DataCard value={ov.tracts_never_treated.toLocaleString()}      label="Control Tracts"  sub="never treated"        accent="amber" />
-        <DataCard value={`${Math.round(ov.n_observations / 1000)}k`}   label="Observations"   sub="tract-month cells"    accent="slate" />
+        <DataCard value={nAll.toLocaleString()}     label="All Chicago Tracts"   sub="starting universe"     accent="slate" />
+        <DataCard value={nPanel.toLocaleString()}   label="Rent-panel Tracts"    sub="with ZORI coverage"    accent="blue" />
+        <DataCard value={nMonths.toLocaleString()}  label="Panel Months"         sub="2015 – 2022"           accent="teal" />
+        <DataCard value={nTreated.toLocaleString()} label="Treated Tracts"       sub="binary, pre-match"     accent="maroon" />
+        <DataCard value={nMatched.toLocaleString()} label="Analysis Sample"      sub={`${nTreated}T + ${nControls}C`} accent="amber" />
       </div>
 
       {/* Two-col info blocks */}
       <div className="grid grid-cols-2 gap-5">
         <InfoBlock
-          title="Pre-treatment Rent — Treated vs Control"
+          title="Pre-treatment Rent — Treated vs Matched Controls"
           rows={[
             { label: 'Mean rent · treated tracts',  value: `$${treated.mean_rent.toFixed(0)} / mo` },
-            { label: 'Mean rent · never-treated',   value: `$${control.mean_rent.toFixed(0)} / mo` },
+            { label: 'Mean rent · matched controls', value: `$${control.mean_rent.toFixed(0)} / mo` },
             { label: 'Std dev · treated',           value: `$${treated.std_dev.toFixed(0)}` },
-            { label: 'Std dev · never-treated',     value: `$${control.std_dev.toFixed(0)}` },
+            { label: 'Std dev · matched controls',  value: `$${control.std_dev.toFixed(0)}` },
             {
               label: 'Difference in means',
               value: `$${(treated.mean_rent - control.mean_rent).toFixed(0)}`,
@@ -133,11 +152,11 @@ export default function IntroductionPage() {
         <InfoBlock
           title="Panel Coverage"
           rows={[
-            { label: 'Total tract-month cells',  value: ov.n_observations.toLocaleString() },
-            { label: 'Tracts with full span',    value: `${ov.n_tracts} (100%)`,  valueClass: 'text-teal-600' },
-            { label: 'Missing rent obs.',        value: '0.0%',                    valueClass: 'text-teal-600' },
-            { label: 'Outcome variable',         value: 'ZORI ($/mo)' },
-            { label: 'Treatment timing',         value: 'Staggered' },
+            { label: 'Total tract-month cells (panel)',   value: (nPanel * nMonths).toLocaleString() },
+            { label: 'Total tract-month cells (matched)', value: (nMatched * nMonths).toLocaleString() },
+            { label: 'Missing rent obs.',                 value: '0.0%',        valueClass: 'text-teal-600' },
+            { label: 'Outcome variable',                  value: 'ZORI ($/mo)' },
+            { label: 'Treatment timing',                  value: 'Staggered'   },
           ]}
         />
       </div>
