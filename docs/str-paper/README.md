@@ -24,4 +24,4 @@ Then commit updates under `figures/` and `csv/` when outputs change.
 
 The site is built with Jekyll from the repository **`docs/`** folder (Minima theme). After merging to `main`, enable **Settings → Pages → Build and deployment → Source: Deploy from a branch**, branch **`main`**, folder **`/docs`**.
 
-The published URL for this repository is **https://dsi-clinic.github.io/2025-autumn-city-of-chicago-housing/** (see `docs/_config.yml` for `baseurl`). To preview locally, install Jekyll (or use the `jekyll/jekyll` Docker image) and run `jekyll serve` with `source` set to `docs/`.
+The published URL for this repository is **https://dsi-clinic.github.io/chicago-str-housing/** (see `docs/_config.yml` for `baseurl`). To preview locally, install Jekyll (or use the `jekyll/jekyll` Docker image) and run `jekyll serve` with `source` set to `docs/`.

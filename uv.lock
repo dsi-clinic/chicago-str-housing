@@ -8,7 +8,7 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "2025-autumn-city-of-chicago-housing"
+name = "chicago-str-housing"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

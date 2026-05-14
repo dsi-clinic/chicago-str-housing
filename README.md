@@ -1,4 +1,4 @@
-# 2025-autumn-city-of-chicago-housing
+# chicago-str-housing
 
 ## Project Summary
 

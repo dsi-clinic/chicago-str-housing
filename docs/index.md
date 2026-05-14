@@ -2,7 +2,7 @@
 layout: home
 ---
 
-This site hosts the **policy brief** and **technical paper** on how short-term rental prohibitions under Chicago’s Shared Housing Ordinance relate to long-term rental prices. The underlying code and pipeline live in the [same repository on GitHub](https://github.com/dsi-clinic/2025-autumn-city-of-chicago-housing).
+This site hosts the **policy brief** and **technical paper** on how short-term rental prohibitions under Chicago’s Shared Housing Ordinance relate to long-term rental prices. The underlying code and pipeline live in the [same repository on GitHub](https://github.com/dsi-clinic/chicago-str-housing).
 
 ## Documents
 

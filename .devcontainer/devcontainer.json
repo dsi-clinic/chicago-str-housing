@@ -1,7 +1,7 @@
 {
   "name": "Housing Project",
   "dockerComposeFile": "../docker-compose.yaml",
-  "service": "2025-autumn-city-of-chicago-housing",
+  "service": "chicago-str-housing",
   "workspaceFolder": "/project",
   
   // Configure tool-specific properties

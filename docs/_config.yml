@@ -1,10 +1,10 @@
 # GitHub Pages (Settings → Pages → Deploy from branch → main → /docs)
-# Live site: https://dsi-clinic.github.io/2025-autumn-city-of-chicago-housing/
+# Live site: https://dsi-clinic.github.io/chicago-str-housing/
 title: "Chicago STR prohibitions & long-term rents"
 description: "Policy brief and technical paper — DSI Clinic / City of Chicago DTI"
 
 url: "https://dsi-clinic.github.io"
-baseurl: "/2025-autumn-city-of-chicago-housing"
+baseurl: "/chicago-str-housing"
 
 theme: minima
 markdown: kramdown

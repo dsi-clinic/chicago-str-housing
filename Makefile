@@ -8,7 +8,7 @@ current_dir := $(notdir $(patsubst %/,%,$(dir $(mkfile_path))))
 current_abs_path := $(subst Makefile,,$(mkfile_path))
 
 # pipeline constants
-project_name := "2025-autumn-city-of-chicago-housing"
+project_name := "chicago-str-housing"
 project_dir := "$(current_abs_path)"
 
 # environment variables (optional - .env may not exist)
