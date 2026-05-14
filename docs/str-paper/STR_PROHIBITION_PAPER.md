@@ -11,8 +11,6 @@ title: "Technical paper"
 
 Chicago's Shared Housing Ordinance allows residential buildings to prohibit short-term rentals, with adoption staggered across census tracts from 2015 to 2024. We estimate the causal effect of these prohibitions on long-term rental prices using the Callaway–Sant'Anna (2020) staggered difference-in-differences estimator on a monthly tract-level panel of roughly 110,000 observations constructed from six public data sources. The overall average treatment effect on the treated is $6.13 per month (bootstrap 95% CI [$2.74, $10.19] from 1,000 tract-cluster resamples). The effect grows linearly over the post-treatment window at approximately $3 per year, with no sign of plateau through 36 months. It is robust across comparison groups, matching specifications, and treatment thresholds (specification range $3.65–$6.53), and is positive in every subgroup tested. Heterogeneity analysis shows the effect is strongest in tracts with higher Airbnb density, stricter prohibition intensity, and higher renter shares, but does not vary with income. A spillover test finds that never-treated tracts adjacent to prohibited tracts also experience rent increases, suggesting the direct estimate understates total policy impact. The positive sign is consistent with a demand-side channel: prohibitions signal residential protection in desirable neighborhoods, attracting long-term tenants at a rate that outweighs the modest supply gain from returning units to the conventional market.
 
-*Figures in Sections 5–8 use embedded copies in the [`figures/`](figures/) subdirectory; summary CSV tables are mirrored under [`csv/`](csv/) so they can be opened or downloaded on GitHub (`output/` remains gitignored). After regenerating DiD outputs locally, run `make sync-str-paper-figures` from the repository root and commit any updated files under `figures/` and `csv/`.*
-
 ---
 
 ## 1. Introduction
@@ -95,7 +93,7 @@ Our preferred estimator is the Callaway and Sant'Anna (2021) group-time ATT fram
 
 **Step 1: Group-time ATTs.** For each treatment cohort *g* (defined by the month of treatment adoption) and each calendar time *t*, estimate the average treatment effect on the treated:
 
-ATT(g, t) = E[Y_t - Y_{g-1} | G = g] - E[Y_t - Y_{g-1} | C]
+ATT(g, t) = E[Y_t − Y_{g−1} ∣ G = g] − E[Y_t − Y_{g−1} ∣ C]
 
 where the comparison group *C* consists of units not yet treated by time *t* (in the "notyettreated" specification) or units never treated during the sample period (in the "nevertreated" specification). The key difference from TWFE is that already-treated units are never used as controls.
 
@@ -134,7 +132,7 @@ The bootstrap SE ($1.89) is roughly five times the analytic SE ($0.36). The anal
 
 **Figure 1.** Callaway–Sant'Anna event study with 95% confidence bands.
 
-![Figure 1: Callaway–Sant'Anna event study](figures/did_callaway_santanna_event_study.png)
+![Figure 1: Callaway–Sant'Anna event study]({{ "/str-paper/figures/did_callaway_santanna_event_study.png" | relative_url }})
 
 ### 5.2 Event Study
 
@@ -181,11 +179,11 @@ The linear fit has the best AIC. The F-test of quadratic versus linear is non-si
 
 **Figure 2.** CS event study with WLS linear and log overlay fits on the post-treatment window.
 
-![Figure 2: Trajectory fit](figures/did_cs_trajectory_fit.png)
+![Figure 2: Trajectory fit]({{ "/str-paper/figures/did_cs_trajectory_fit.png" | relative_url }})
 
 **Figure 3.** Early / mid / late phase inverse-variance mean ATTs.
 
-![Figure 3: Trajectory phases](figures/did_cs_trajectory_phases.png)
+![Figure 3: Trajectory phases]({{ "/str-paper/figures/did_cs_trajectory_phases.png" | relative_url }})
 
 ### 5.4 Comparison with TWFE
 
@@ -193,11 +191,11 @@ We estimate a standard TWFE event study on the same matched panel for comparison
 
 **Figure 4.** TWFE vs. Callaway–Sant'Anna side-by-side comparison.
 
-![Figure 4: TWFE vs CS](figures/did_twfe_vs_cs_comparison.png)
+![Figure 4: TWFE vs CS]({{ "/str-paper/figures/did_twfe_vs_cs_comparison.png" | relative_url }})
 
 **Figure 5.** CS minus TWFE difference at each event time.
 
-![Figure 5: CS minus TWFE](figures/did_cs_twfe_difference.png)
+![Figure 5: CS minus TWFE]({{ "/str-paper/figures/did_cs_twfe_difference.png" | relative_url }})
 
 The divergence is consistent with the heterogeneous-effects bias documented in the econometrics literature: TWFE's implicit use of already-treated units as controls introduces downward bias when treatment effects grow over time, as they do in our setting.
 
@@ -329,15 +327,15 @@ All subgroup ATTs are positive and statistically significant. The effect is pres
 
 **Figure 6.** Heterogeneity event studies (median splits).
 
-![Figure 6a: Median household income](figures/did_cs_heterogeneity_income.png)
+![Figure 6a: Median household income]({{ "/str-paper/figures/did_cs_heterogeneity_income.png" | relative_url }})
 
-![Figure 6b: Renter share](figures/did_cs_heterogeneity_renter_share.png)
+![Figure 6b: Renter share]({{ "/str-paper/figures/did_cs_heterogeneity_renter_share.png" | relative_url }})
 
-![Figure 6c: Airbnb listing density](figures/did_cs_heterogeneity_airbnb_density.png)
+![Figure 6c: Airbnb listing density]({{ "/str-paper/figures/did_cs_heterogeneity_airbnb_density.png" | relative_url }})
 
-![Figure 6d: Peak prohibited share (dose)](figures/did_cs_heterogeneity_dose.png)
+![Figure 6d: Peak prohibited share (dose)]({{ "/str-paper/figures/did_cs_heterogeneity_dose.png" | relative_url }})
 
-![Figure 6e: Cohort timing (early vs. late)](figures/did_cs_cohort_early_vs_late.png)
+![Figure 6e: Cohort timing (early vs. late)]({{ "/str-paper/figures/did_cs_cohort_early_vs_late.png" | relative_url }})
 
 ---
 
@@ -371,7 +369,7 @@ Never-treated tracts adjacent to prohibited tracts see rental prices increase by
 
 **Figure 7.** Spillover event study.
 
-![Figure 7: Spillover](figures/did_cs_spillover_event_study.png)
+![Figure 7: Spillover]({{ "/str-paper/figures/did_cs_spillover_event_study.png" | relative_url }})
 
 ### 8.3 Interpretation
 
@@ -451,31 +449,31 @@ Koster, H.R.A., van Ommeren, J., and Volkhausen, N. (2021). Short-term rentals a
 
 ## Appendix
 
-PNG figures below are mirrored under [`figures/`](figures/) (main text, heterogeneity panels, TWFE comparison, trajectory, spillover, and sensitivity plots). CSV tables under [`csv/`](csv/) are a smaller **curated** set for key tabular results. Run `make sync-str-paper-figures` after pipelines. Not archived here: full tract–month panel (`did_panel_data.csv`, ~11 MB), pre-trend Wald detail CSVs, tract-level spillover classification, TWFE coefficient CSV — regenerate under `output/did-cs/` with the Makefile pipeline targets.
+Figures in the main text (Sections 5–8) load from `docs/str-paper/figures/` in this repository; direct URLs on this site use the `/str-paper/figures/` prefix (see Section A.1). Summary CSV tables are a smaller **curated** set under `docs/str-paper/csv/` (`/str-paper/csv/` on the site). After regenerating DiD outputs locally, run `make sync-str-paper-figures` from the repository root and commit updates. Not archived here: full tract–month panel (`did_panel_data.csv`, ~11 MB), pre-trend Wald detail CSVs, tract-level spillover classification, TWFE coefficient CSV — regenerate under `output/did-cs/` with the Makefile pipeline targets.
 
 ### A.1 Key output files (archived)
 
 | Archive (this repo) | Description |
 |---|---|
-| [figures/did_callaway_santanna_event_study.png](figures/did_callaway_santanna_event_study.png) | Main CS event study (baseline) |
-| [figures/did_callaway_santanna_event_study_with_controls.png](figures/did_callaway_santanna_event_study_with_controls.png) | CS with controls (sensitivity) |
-| [figures/did_twfe_vs_cs_comparison.png](figures/did_twfe_vs_cs_comparison.png) | TWFE vs CS side-by-side |
-| [figures/did_cs_twfe_difference.png](figures/did_cs_twfe_difference.png) | CS minus TWFE by event time |
-| [figures/did_cohort_dynamics.png](figures/did_cohort_dynamics.png) | Cohort-specific dynamics |
-| [figures/did_cs_trajectory_fit.png](figures/did_cs_trajectory_fit.png) | Post-treatment trajectory (WLS overlays) |
-| [figures/did_cs_trajectory_phases.png](figures/did_cs_trajectory_phases.png) | Early / mid / late phase mean ATTs |
-| [figures/did_cs_heterogeneity_income.png](figures/did_cs_heterogeneity_income.png) | Heterogeneity: median income split |
-| [figures/did_cs_heterogeneity_renter_share.png](figures/did_cs_heterogeneity_renter_share.png) | Heterogeneity: renter share split |
-| [figures/did_cs_heterogeneity_airbnb_density.png](figures/did_cs_heterogeneity_airbnb_density.png) | Heterogeneity: Airbnb density split |
-| [figures/did_cs_heterogeneity_dose.png](figures/did_cs_heterogeneity_dose.png) | Heterogeneity: prohibition dose split |
-| [figures/did_cs_cohort_early_vs_late.png](figures/did_cs_cohort_early_vs_late.png) | Heterogeneity: early vs. late cohort |
-| [figures/did_cs_spillover_event_study.png](figures/did_cs_spillover_event_study.png) | Spillover event study |
-| [csv/did_twfe_cs_comparison_table.csv](csv/did_twfe_cs_comparison_table.csv) | TWFE vs CS comparison (tabular) |
-| [csv/cs_heterogeneity_summary.csv](csv/cs_heterogeneity_summary.csv) | All subgroup ATTs (income, renter share, Airbnb, dose, cohort) |
-| [csv/cs_event_study_tract_bootstrap.csv](csv/cs_event_study_tract_bootstrap.csv) | Tract-cluster bootstrap by `rel_time` |
-| [csv/cs_tract_bootstrap_meta.csv](csv/cs_tract_bootstrap_meta.csv) | Bootstrap metadata (reps, overall ATT summary) |
-| [csv/cs_spillover_summary.csv](csv/cs_spillover_summary.csv) | Spillover overall ATT |
-| [csv/cs_trajectory_summary.csv](csv/cs_trajectory_summary.csv) | Trajectory phases + shape-fit summary |
+| [figures/did_callaway_santanna_event_study.png]({{ "/str-paper/figures/did_callaway_santanna_event_study.png" | relative_url }}) | Main CS event study (baseline) |
+| [figures/did_callaway_santanna_event_study_with_controls.png]({{ "/str-paper/figures/did_callaway_santanna_event_study_with_controls.png" | relative_url }}) | CS with controls (sensitivity) |
+| [figures/did_twfe_vs_cs_comparison.png]({{ "/str-paper/figures/did_twfe_vs_cs_comparison.png" | relative_url }}) | TWFE vs CS side-by-side |
+| [figures/did_cs_twfe_difference.png]({{ "/str-paper/figures/did_cs_twfe_difference.png" | relative_url }}) | CS minus TWFE by event time |
+| [figures/did_cohort_dynamics.png]({{ "/str-paper/figures/did_cohort_dynamics.png" | relative_url }}) | Cohort-specific dynamics |
+| [figures/did_cs_trajectory_fit.png]({{ "/str-paper/figures/did_cs_trajectory_fit.png" | relative_url }}) | Post-treatment trajectory (WLS overlays) |
+| [figures/did_cs_trajectory_phases.png]({{ "/str-paper/figures/did_cs_trajectory_phases.png" | relative_url }}) | Early / mid / late phase mean ATTs |
+| [figures/did_cs_heterogeneity_income.png]({{ "/str-paper/figures/did_cs_heterogeneity_income.png" | relative_url }}) | Heterogeneity: median income split |
+| [figures/did_cs_heterogeneity_renter_share.png]({{ "/str-paper/figures/did_cs_heterogeneity_renter_share.png" | relative_url }}) | Heterogeneity: renter share split |
+| [figures/did_cs_heterogeneity_airbnb_density.png]({{ "/str-paper/figures/did_cs_heterogeneity_airbnb_density.png" | relative_url }}) | Heterogeneity: Airbnb density split |
+| [figures/did_cs_heterogeneity_dose.png]({{ "/str-paper/figures/did_cs_heterogeneity_dose.png" | relative_url }}) | Heterogeneity: prohibition dose split |
+| [figures/did_cs_cohort_early_vs_late.png]({{ "/str-paper/figures/did_cs_cohort_early_vs_late.png" | relative_url }}) | Heterogeneity: early vs. late cohort |
+| [figures/did_cs_spillover_event_study.png]({{ "/str-paper/figures/did_cs_spillover_event_study.png" | relative_url }}) | Spillover event study |
+| [csv/did_twfe_cs_comparison_table.csv]({{ "/str-paper/csv/did_twfe_cs_comparison_table.csv" | relative_url }}) | TWFE vs CS comparison (tabular) |
+| [csv/cs_heterogeneity_summary.csv]({{ "/str-paper/csv/cs_heterogeneity_summary.csv" | relative_url }}) | All subgroup ATTs (income, renter share, Airbnb, dose, cohort) |
+| [csv/cs_event_study_tract_bootstrap.csv]({{ "/str-paper/csv/cs_event_study_tract_bootstrap.csv" | relative_url }}) | Tract-cluster bootstrap by `rel_time` |
+| [csv/cs_tract_bootstrap_meta.csv]({{ "/str-paper/csv/cs_tract_bootstrap_meta.csv" | relative_url }}) | Bootstrap metadata (reps, overall ATT summary) |
+| [csv/cs_spillover_summary.csv]({{ "/str-paper/csv/cs_spillover_summary.csv" | relative_url }}) | Spillover overall ATT |
+| [csv/cs_trajectory_summary.csv]({{ "/str-paper/csv/cs_trajectory_summary.csv" | relative_url }}) | Trajectory phases + shape-fit summary |
 | *not archived* | `output/did-cs/did_panel_data.csv` and other diagnostic CSVs — run DiD Makefile targets locally |
 
 ### A.2 Preferred Specification
