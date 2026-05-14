@@ -4,6 +4,35 @@ Chicago **housing** analytics for the Data Science Institute (DSI) clinic and th
 
 Confirm `git remote -v`; ongoing work may use a personal fork/private copy (see project notes).
 
+**Claude Code:** [`CLAUDE.md`](CLAUDE.md) is a symlink to this file—same content for Cursor agents and Claude sessions.
+
+---
+
+## Current session — how to run the DiD / CS analysis
+
+Prerequisites in `DATA_DIR` (often `./data`): tract shapefile `tl_2023_17_tract/…`, ZORI `Zip_zori_uc_sfrcondomfr_sm_month.csv`. Put **`CENSUS_API_KEY`** in `.env` (loaded by `load_dotenv()` in the CS script) so ACS covariates are full quality; without it the loader may fall back to a demo key with a warning.
+
+```bash
+export PYTHONPATH=src
+export DATA_DIR="$(pwd)/data"   # or your path
+# optional: export DID_CS_OUTPUT_DIR="$(pwd)/output/did-cs"
+# optional: export DID_TREATMENT_MODE=threshold   # threshold | binary | both
+# optional: export DID_WHITEPAPER_MODE=1
+.venv/bin/python src/housing/scripts/did_pipeline_callaway_santanna.py
+```
+
+Or Docker: `make run-did-pipeline-cs` (see [`docs/DID_CS_RUNBOOK.md`](docs/DID_CS_RUNBOOK.md)). `DID_TREATMENT_MODE=both` runs the full pipeline twice into `{output}-threshold` and `{output}-binary`.
+
+### Sample flow: tracts, census, trend matching
+
+1. **Tract–month panel** — After ZORI + ZIP→tract crosswalk (`TimeSeriesZipToTractProcessor`), you have one row per tract–month for tracts that appear in the rent panel (`tract_panel_data`). That is the geographic/time coverage of rents, not necessarily every census tract in the city shapefile.
+
+2. **Treatment** — `TreatmentThresholdProcessor` (default) or `TreatmentIndicatorProcessor` (`DID_TREATMENT_MODE=binary`) builds `did_panel` with `treated` / timing. Counts of “treated tracts” and “never-treated” come from this step (see pipeline logs and `did_descriptive_*.csv` after a run).
+
+3. **Census** — `CensusDataLoader` + `DIDCovariateProcessor` **add columns** (income, occupancy, etc.) via merge on tract ID. That is mostly **not** dropping tract–months; you may get **missing covariates** where ACS has no match. `TreatmentThresholdProcessor` also uses ACS occupied units for the share threshold—tracts without occupied-units data can behave like missing denominator (see that processor’s fill logic).
+
+4. **Trend matching** — This step **does** shrink the estimand sample **on purpose**: only tracts with at least `min_pre_periods` (default 6) months of data **before the first treated month in the panel** enter the pre-trend calculation; each **ever-treated** tract is matched to `k_neighbors` **never-treated** tracts by pre-treatment rent slope; downstream TWFE/CS use **only** those matched tracts. So you **lose** never-treated tracts that are not selected as matches and **lose** treated tracts that lack enough pre-periods. That is separate from the tract-specific linear trends inside **CS with controls** ([`CS_WITH_CONTROLS.md`](docs/CS_WITH_CONTROLS.md)).
+
 ---
 
 ## Repository layout
