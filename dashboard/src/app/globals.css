@@ -1,5 +1,6 @@
 /* dashboard/src/app/globals.css */
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 @theme {
   /* "rgb(R G B)" format enables /opacity modifiers: bg-maroon/10 */

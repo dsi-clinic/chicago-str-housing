@@ -1,5 +1,6 @@
 import DataCard from '@/components/DataCard'
 import InfoBlock from '@/components/InfoBlock'
+import TreatmentMap from '@/components/TreatmentMap'
 import { loadSampleLineage, loadGroupStats } from '@/lib/data'
 
 const STORY = [
@@ -118,6 +119,31 @@ export default function IntroductionPage() {
               Comparison of both definitions in the Robustness tab.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Interactive treatment indicator maps */}
+      <div className="mb-10">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+          Treatment indicators at census-tract level
+        </h3>
+        <p className="text-[13px] text-gray-500 mb-5 leading-relaxed max-w-2xl">
+          The two maps below show the same Chicago tracts coloured by treatment status under
+          each indicator. <span className="font-semibold text-maroon">Red</span> = treated,{' '}
+          <span className="font-semibold text-blue-600">blue</span> = never-treated controls,
+          grey = outside the rent-panel sample. Hover a tract to see its role.
+        </p>
+        <div className="grid grid-cols-2 gap-6">
+          <TreatmentMap
+            geojsonUrl="/data/binary/tracts_treatment.geojson"
+            title="Binary indicator"
+            subtitle={`${nTreated.toLocaleString()} treated · ${nPool.toLocaleString()} never-treated pool`}
+          />
+          <TreatmentMap
+            geojsonUrl="/data/threshold/tracts_treatment.geojson"
+            title="Threshold indicator"
+            subtitle="Stricter definition — fewer treated tracts"
+          />
         </div>
       </div>
 
