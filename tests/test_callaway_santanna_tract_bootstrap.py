@@ -116,7 +116,9 @@ def test_parse_cs_bootstrap_cli_strips_leading_double_dash(
 
 def test_parse_cs_bootstrap_cli(monkeypatch: pytest.MonkeyPatch) -> None:
     """``--cs-bootstrap-reps`` / ``--cs-bootstrap-seed`` override defaults; env optional."""
-    monkeypatch.setattr(sys, "argv", ["prog", "--cs-bootstrap-reps", "50", "--cs-bootstrap-seed", "7"])
+    monkeypatch.setattr(
+        sys, "argv", ["prog", "--cs-bootstrap-reps", "50", "--cs-bootstrap-seed", "7"]
+    )
     reps, seed = parse_cs_bootstrap_cli()
     assert reps == 50
     assert seed == 7

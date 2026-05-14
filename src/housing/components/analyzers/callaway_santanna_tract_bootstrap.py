@@ -21,7 +21,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def resample_panel_by_tract(panel: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
+def resample_panel_by_tract(
+    panel: pd.DataFrame, rng: np.random.Generator
+) -> pd.DataFrame:
     """Build a bootstrap panel by sampling tract clusters with replacement."""
     tract_ids = panel["tract_geoid"].unique()
     n = len(tract_ids)
@@ -90,9 +92,7 @@ def tract_bootstrap_event_study_and_overall(
         cs_log.setLevel(logging.WARNING)
         for b in range(n_reps):
             panel_b = resample_panel_by_tract(panel, rng)
-            core = analyzer.estimate_core_from_panel(
-                panel_b, log_cohort_summary=False
-            )
+            core = analyzer.estimate_core_from_panel(panel_b, log_cohort_summary=False)
             es = core["event_study"]
             if not es.empty and "rel_time" in es.columns and "att" in es.columns:
                 es_idx = es.drop_duplicates(subset=["rel_time"]).set_index("rel_time")[
@@ -227,7 +227,9 @@ def parse_cs_bootstrap_cli() -> tuple[int | None, int]:
     return reps, int(args.cs_bootstrap_seed)
 
 
-def write_cs_bootstrap_csv(boot_df: pd.DataFrame, meta: dict[str, Any], out_dir: str) -> str:
+def write_cs_bootstrap_csv(
+    boot_df: pd.DataFrame, meta: dict[str, Any], out_dir: str
+) -> str:
     """Write ``cs_event_study_tract_bootstrap.csv``; return path."""
     path = f"{out_dir.rstrip('/')}/cs_event_study_tract_bootstrap.csv"
     boot_df.to_csv(path, index=False)

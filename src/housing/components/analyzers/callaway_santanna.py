@@ -424,8 +424,11 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         if group_time_atts.empty:
             return {"att": np.nan, "se": np.nan, "ci_low": np.nan, "ci_high": np.nan}
 
-        # Only post-treatment periods
-        post_treatment = group_time_atts[group_time_atts["rel_time"] >= 0].copy()
+        # Same window as event-study aggregation to keep the two consistent
+        post_treatment = group_time_atts[
+            (group_time_atts["rel_time"] >= 0)
+            & (group_time_atts["rel_time"] <= MAX_POST_TIME)
+        ].copy()
 
         if post_treatment.empty:
             return {"att": np.nan, "se": np.nan, "ci_low": np.nan, "ci_high": np.nan}
