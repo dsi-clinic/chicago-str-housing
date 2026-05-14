@@ -399,7 +399,13 @@ The positive sign of the treatment effect is the most important finding and requ
 
 **Demand-side signaling.** Prohibitions signal that a neighborhood is committed to residential character. For prospective long-term tenants, this is an amenity: it suggests fewer transient visitors, less noise, and more stable building communities. In desirable neighborhoods, this signal attracts long-term demand that bids up rents. The demand effect dominates the supply effect.
 
-The data favor the demand-side interpretation. The dose-response pattern (stricter prohibition → larger effect) is consistent with both channels, but the heterogeneity results are more diagnostic: the effect is largest in tracts with high Airbnb density and high renter share — exactly the neighborhoods where the signaling value of prohibition is greatest. If the supply channel dominated, we would expect the largest effects in tracts where the most units are returned to the long-term market, which is not cleanly what we observe.
+The data favor the demand-side interpretation. The dose-response pattern (stricter prohibition → larger effect) is consistent with both channels, but the heterogeneity results are more diagnostic.
+
+The effect is largest in tracts with high Airbnb density and high renter share (Table 10). These are the neighborhoods where the signaling value of prohibition is greatest: STR activity is visible enough that its removal is salient to prospective tenants, and the renter pool is thick enough that the signal reaches a large audience of mobile households making location decisions. The demand-side channel predicts exactly this pattern.
+
+The supply channel predicts a different one. If the dominant mechanism were the return of units to the long-term market, the key moderator would be the *volume* of housing stock converted from short-term to long-term use. We would expect the largest rent effects in tracts where prohibition frees up the most units relative to existing supply — and we would expect renter share to be irrelevant or even to attenuate the effect, since a larger rental stock means the same number of returned units is a smaller proportional supply shock. Instead, renter share amplifies the effect ($6.72 vs. $4.88), which has no natural supply-side explanation but is precisely what a demand-signaling model predicts: more renters means more marginal tenants who value the residential-stability amenity.
+
+The Airbnb density result is less cleanly diagnostic — tracts with more listings plausibly have more units to return, so the supply channel could partly account for the density gradient. But the renter-share result breaks the tie: it is a demand-side moderator with no supply-side analog, and it shows a strong, significant gradient.
 
 ### Policy Implications
 
