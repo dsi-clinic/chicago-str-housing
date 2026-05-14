@@ -1,3 +1,8 @@
+---
+layout: page
+title: "Policy brief"
+---
+
 # Policy Brief: Short-Term Rental Prohibitions and Rental Prices in Chicago
 
 Prepared for the City of Chicago — Department of Technology and Innovation
@@ -44,4 +49,4 @@ The estimate reflects an average across census tracts and may not apply to indiv
 
 ---
 
-*Full methods, robustness checks, and references: [STR_PROHIBITION_PAPER.md](STR_PROHIBITION_PAPER.md).*
+*Full methods, robustness checks, and references: [technical paper]({% link str-paper/STR_PROHIBITION_PAPER.md %}).*

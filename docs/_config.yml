@@ -1,0 +1,27 @@
+# GitHub Pages (Settings → Pages → Deploy from branch → main → /docs)
+# Live site: https://dsi-clinic.github.io/2025-autumn-city-of-chicago-housing/
+title: "Chicago STR prohibitions & long-term rents"
+description: "Policy brief and technical paper — DSI Clinic / City of Chicago DTI"
+
+url: "https://dsi-clinic.github.io"
+baseurl: "/2025-autumn-city-of-chicago-housing"
+
+theme: minima
+markdown: kramdown
+permalink: pretty
+
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+header_pages:
+  - str-paper/STR_POLICY_BRIEF.md
+  - str-paper/STR_PROHIBITION_PAPER.md
+
+exclude:
+  - CLUSTERING_ANALYSIS.md
+  - CLUSTERING_PIPELINE.md
+  - HOUSING_GUIDE.md
+  - PIPELINE_GUIDE.md
+  - did-lessons
+  - str-paper/README.md
