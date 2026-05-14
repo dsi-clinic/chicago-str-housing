@@ -73,3 +73,12 @@ DID_TWFE_POST_PERIODS: Final = 36
 # --- Heterogeneity: Airbnb tract density winsorization ---
 
 DID_AIRBNB_DENSITY_WINSOR_PERCENTILE: Final = 0.99
+
+# --- CS post-treatment trajectory phases (months since treatment, inclusive) ---
+
+DID_CS_TRAJECTORY_PHASE_BOUNDARIES: Final[tuple[tuple[int, int], ...]] = (
+    (0, 12),
+    (13, 24),
+    (25, 36),
+)
+DID_CS_TRAJECTORY_PHASE_LABELS: Final[tuple[str, ...]] = ("early", "mid", "late")
