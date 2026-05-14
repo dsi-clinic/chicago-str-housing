@@ -33,45 +33,14 @@ function Note({ children }: { children: React.ReactNode }) {
   )
 }
 
-function LovePlotCallout() {
+function LovePlotNote() {
   return (
-    <div className="border-l-4 border-teal-600 bg-teal-50/50 rounded-r-xl px-6 py-5 mb-5">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-teal-800 mb-2">
-        How to read these Love-style plots
-      </p>
-      <p className="text-[14px] text-gray-700 leading-relaxed mb-3 max-w-4xl">
-        Each row is a <strong>matching feature</strong> used in the <strong>post-refactor</strong>{' '}
-        trend matcher (standardized <code className="text-xs bg-white/80 px-1 rounded">pre_trend_slope</code>{' '}
-        and <code className="text-xs bg-white/80 px-1 rounded">avg_pre_rent</code>, then{' '}
-        <em>k</em>-nearest never-treated neighbours)—not the old slope-only rule. The vertical axis is
-        not time; it is the feature label. Points are{' '}
-        <strong>standardized mean differences (SMD)</strong> between treated and comparison tracts,
-        using the same pooled-SD definition as the pipeline diagnostics /{' '}
-        <code className="text-xs bg-white/80 px-1 rounded">did_story_matching_balance_long.csv</code>.
-      </p>
-      <ul className="text-[13px] text-gray-700 leading-relaxed space-y-1.5 list-disc list-inside max-w-4xl">
-        <li>
-          <strong>Before (grey circles):</strong> treated tracts vs{' '}
-          <em>all</em> never-treated tracts that enter the pre-trend module (enough pre-period months).
-          That is the full pre-match control pool in trend space.
-        </li>
-        <li>
-          <strong>After (maroon diamonds):</strong> treated tracts vs{' '}
-          <em>only</em> the never-treated tracts actually chosen as matches—so balance on the same
-          features after <em>k</em>-NN selection.
-        </li>
-        <li>
-          <strong>Not residualized CS:</strong> this plot says nothing about Callaway–Sant&apos;Anna
-          with-controls, which uses a <em>residualized</em> outcome on pre-treatment months. Here we
-          only summarise <em>design-stage</em> balance on pre-treatment summaries, not ATT magnitudes.
-        </li>
-        <li>
-          <strong>Threshold vs binary:</strong> two treatment definitions; the matching <em>machinery</em>{' '}
-          is the same. Who counts as treated changes, so comparators and counts differ—compare the two
-          panels to the diagnostics tables above.
-        </li>
-      </ul>
-    </div>
+    <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
+      Each row is a matching feature. Grey circles show the standardized mean difference (SMD)
+      between treated and <em>all</em> control tracts before matching; maroon diamonds show the
+      same difference after k-NN selection. Closer to zero is better. The matching machinery is
+      the same for both treatment definitions; only which tracts count as treated changes.
+    </p>
   )
 }
 
@@ -199,16 +168,15 @@ export default function AuditPage() {
 
       <Note>
         The tract panel still depends on ZIP-level ZORI. The refactor improves the mapping
-        logic but does not eliminate the measurement-error problem inherent in ZIP-to-tract
-        allocation. This is an irreducible limitation of using ZORI as the rent proxy.
+        weights and CRS, but does not eliminate the measurement-error problem of interpolating
+        ZIP-level rents to tract boundaries.
       </Note>
 
       {/* ── 2. Sample Lineage ── */}
       <SectionHeading>2. Sample Construction Lineage</SectionHeading>
       <p className="text-[14px] text-gray-500 mb-4 leading-relaxed max-w-2xl">
-        The full tract funnel from the city shapefile to the final matched DiD sample.
-        The biggest drops are at the crosswalk step and the matching step, so the panel
-        construction story needs to be explicit rather than implied.
+        The full tract funnel from 1,332 Chicago tracts to the final matched sample.
+        The two biggest drops are the crosswalk coverage filter and the matching step.
       </p>
 
       <StatTable
@@ -284,42 +252,21 @@ export default function AuditPage() {
         />
       </div>
 
-      <LovePlotCallout />
+      <LovePlotNote />
 
-      <div className="grid grid-cols-2 gap-5 mb-4">
-        <FigureSlot
-          src="/data/threshold/did_story_matching_love.png"
-          alt="Threshold love plot: SMD before and after matching"
-          label="Threshold love plot — SMD before vs after matching (post-refactor matching)"
-        />
-        <FigureSlot
-          src="/data/binary/did_story_matching_love.png"
-          alt="Binary love plot: SMD before and after matching"
-          label="Binary love plot — SMD before vs after matching (post-refactor matching)"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-5 mb-4">
-        <FigureSlot
-          src="/data/threshold/did_story_control_reuse.png"
-          alt="Threshold control reuse distribution"
-          label="Threshold control reuse histogram"
-        />
-        <FigureSlot
-          src="/data/binary/did_story_control_reuse.png"
-          alt="Binary control reuse distribution"
-          label="Binary control reuse histogram"
-        />
-      </div>
+      <FigureSlot
+        src="/data/binary/did_story_matching_love.png"
+        alt="SMD before and after matching on pre-trend slope and average pre-rent"
+        label="Balance on matching features — before and after k-NN matching (binary indicator)"
+        className="mb-6"
+      />
 
       <Note>
-        <ul className="space-y-1 list-disc list-inside">
-          <li>Nearest-neighbour matching with replacement means controls can be reused many times.</li>
-          <li>No hard caliper by default, so some matches may still be weak.</li>
-          <li>Summary-feature matching uses slope plus level rather than the full pre-treatment trajectory.</li>
-          <li>Residual imbalance remains, so matching is a robustness restriction rather than the main identification strategy.</li>
-          <li>The audit panel should explain the rerun because the updated match is a design improvement, not just a cosmetic change.</li>
-        </ul>
+        No caliper was applied in this run. The code supports it (<code className="text-xs bg-white/70 px-1 rounded">caliper=None</code> by default),
+        but it was not set. Nearest-neighbour matching with replacement allows heavy control reuse
+        (max: {matchDiagBinary.control_reuse_max} binary, {matchDiagThreshold.control_reuse_max} threshold).
+        Residual imbalance remains on both features after matching.
+        This is a robustness restriction, not the primary identification strategy.
       </Note>
 
       {/* ── 4. Pre-treatment Balance ── */}
@@ -335,12 +282,6 @@ export default function AuditPage() {
         className="mb-6"
         headers={['Covariate', 'Treated Mean', 'Control Mean', '% Diff', "Cohen's d", 'Significant']}
         rows={balanceRows}
-      />
-
-      <FigureSlot
-        src="/data/binary/did_story_pre_rent_violin.png"
-        alt="Pre-treatment rent distribution violin"
-        label="Pre-treatment rent distribution — never-treated vs ever-treated (matched sample)"
       />
     </div>
   )
