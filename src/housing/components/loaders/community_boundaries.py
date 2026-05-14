@@ -6,7 +6,6 @@ Chicago Data Portal JSON API.
 
 import json
 import logging
-from pathlib import Path
 from typing import Any
 
 import geopandas as gpd
@@ -14,6 +13,7 @@ import requests
 from shapely.geometry import shape
 
 from pipeline.base import DataLoader
+from pipeline.config import default_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class CommunityBoundariesLoader(DataLoader):
             "http://"
         ) or self._original_source.startswith("https://"):
             # Set up cache file path
-            cache_dir = Path("/project/data/.cache")
+            cache_dir = default_data_dir() / ".cache"
             cache_file = cache_dir / "community_boundaries.json"
 
             # Check if cache exists

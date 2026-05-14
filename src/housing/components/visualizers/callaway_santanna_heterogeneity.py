@@ -18,7 +18,7 @@ PLOT_PRE_MONTHS = 12
 PLOT_POST_MONTHS = 36
 
 
-def _fmt_num(x: Any, fmt: str, *, suffix: str = "") -> str:
+def _fmt_num(x: object, fmt: str, *, suffix: str = "") -> str:
     if x is None:
         return "n/a"
     try:
@@ -79,6 +79,7 @@ class CallawaySantAnnaHeterogeneityVisualizer(Visualizer):
     """Save heterogeneity overlay plots and summary CSV."""
 
     def __init__(self, output_dir: str | None = None) -> None:
+        """Configure output directory for heterogeneity figures and CSV."""
         super().__init__(
             "callaway_santanna_heterogeneity_visualizer",
             "Callaway & Sant'Anna heterogeneity plots",
@@ -86,6 +87,7 @@ class CallawaySantAnnaHeterogeneityVisualizer(Visualizer):
         self.output_dir = output_dir or "/project/output/did-cs"
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Persist ``cs_heterogeneity_summary.csv`` and subgroup overlay PNGs."""
         het = context.get("cs_heterogeneity_results")
         if not het:
             logger.warning("cs_heterogeneity_results missing; skip heterogeneity viz.")
@@ -132,6 +134,24 @@ class CallawaySantAnnaHeterogeneityVisualizer(Visualizer):
             )
             if path:
                 out_paths["cs_heterogeneity_renter_share_plot"] = path
+
+        # Airbnb listing density (STR intensity proxy)
+        ab = splits.get("airbnb_density")
+        if ab and isinstance(ab.get("low"), dict):
+            cut = _fmt_num(meta.get("median_airbnb_density_cutoff"), ".2f")
+            path = self._save_split_plot(
+                ab,
+                "did_cs_heterogeneity_airbnb_density.png",
+                "CS heterogeneity: Airbnb listing density (listings/km², winsorized)",
+                (
+                    f"Below/equal median density ({cut})",
+                    "low",
+                    "tab:blue",
+                ),
+                (f"Above median density ({cut})", "high", "tab:orange"),
+            )
+            if path:
+                out_paths["cs_heterogeneity_airbnb_density_plot"] = path
 
         # Dose
         dose = splits.get("dose")
@@ -185,8 +205,16 @@ class CallawaySantAnnaHeterogeneityVisualizer(Visualizer):
 
         fig, ax = plt.subplots(figsize=(10, 6))
         series: list[tuple[str, pd.DataFrame, str]] = [
-            (label_a, es_a if isinstance(es_a, pd.DataFrame) else pd.DataFrame(), color_a),
-            (label_b, es_b if isinstance(es_b, pd.DataFrame) else pd.DataFrame(), color_b),
+            (
+                label_a,
+                es_a if isinstance(es_a, pd.DataFrame) else pd.DataFrame(),
+                color_a,
+            ),
+            (
+                label_b,
+                es_b if isinstance(es_b, pd.DataFrame) else pd.DataFrame(),
+                color_b,
+            ),
         ]
         _plot_overlay_event_study(
             ax,

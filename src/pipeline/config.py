@@ -8,6 +8,7 @@ This module provides configuration management capabilities including:
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Literal
 
@@ -15,6 +16,27 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 logger = logging.getLogger(__name__)
+
+# Chicago Data Portal JSON endpoints (defaults match housing loaders)
+DEFAULT_ZIP_BOUNDARIES_URL = "https://data.cityofchicago.org/resource/unjd-c2ca.json"
+DEFAULT_COMMUNITY_BOUNDARIES_URL = (
+    "https://data.cityofchicago.org/resource/igwz-8jzy.json"
+)
+
+
+def default_data_dir() -> Path:
+    """Root directory for local inputs (ZORI CSV, API caches, etc.)."""
+    return Path(os.environ.get("DATA_DIR", "/project/data"))
+
+
+def default_rental_data_path() -> Path:
+    """ZORI CSV path under :func:`default_data_dir`."""
+    return default_data_dir() / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
+
+
+def default_output_dir() -> Path:
+    """Return ``OUTPUT_DIR`` (or default ``/project/output``) as a :class:`~pathlib.Path`."""
+    return Path(os.environ.get("OUTPUT_DIR", "/project/output"))
 
 
 class DataConfig(BaseModel):
@@ -26,6 +48,19 @@ class DataConfig(BaseModel):
 
     # Allow additional fields from YAML config
     model_config = ConfigDict(extra="allow")
+
+    rental_data_path: Path = Field(
+        default_factory=default_rental_data_path,
+        description="Zillow Observed Rent Index (ZORI) CSV",
+    )
+    zip_boundaries_path: str = Field(
+        default=DEFAULT_ZIP_BOUNDARIES_URL,
+        description="ZIP boundaries file path or Chicago Data Portal URL",
+    )
+    community_boundaries_path: str = Field(
+        default=DEFAULT_COMMUNITY_BOUNDARIES_URL,
+        description="Community boundaries file path or Chicago Data Portal URL",
+    )
 
     @field_validator("*", mode="before")
     @classmethod
@@ -43,7 +78,8 @@ class OutputConfig(BaseModel):
     """Configuration for output settings."""
 
     output_dir: Path = Field(
-        default=Path("/project/output"), description="Directory for output files"
+        default_factory=default_output_dir,
+        description="Directory for output files",
     )
     save_intermediate_results: bool = Field(
         default=True, description="Whether to save intermediate processing results"
@@ -64,10 +100,18 @@ class OutputConfig(BaseModel):
     @field_validator("output_dir", mode="before")
     @classmethod
     def validate_output_dir(cls: type["OutputConfig"], v: str | Path) -> Path:
-        """Convert string to Path and create directory if needed."""
+        """Convert string to Path; create directory when the FS allows."""
         if isinstance(v, str):
             v = Path(v)
-        v.mkdir(parents=True, exist_ok=True)
+        try:
+            v.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            logger.warning(
+                "Could not create output directory %s (%s). "
+                "Writes may fail; set OUTPUT_DIR to a writable path.",
+                v,
+                exc,
+            )
         return v
 
 

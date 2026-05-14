@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 
 from pipeline.base import DataLoader
+from pipeline.config import default_rental_data_path
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class RentalDataLoader(DataLoader):
         """
         super().__init__(
             "rental_data",
-            file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv",
+            file_path or str(default_rental_data_path()),
             "Load rental price data from ZORI dataset",
         )
 

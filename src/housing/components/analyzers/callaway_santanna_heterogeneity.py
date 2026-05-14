@@ -1,6 +1,7 @@
 """Callaway & Sant'Anna subgroup heterogeneity (baseline CS, no covariate adjustment).
 
-Splits treated tracts by ACS neighborhood characteristics or prohibition intensity,
+Splits treated tracts by ACS neighborhood characteristics, prohibition intensity,
+or pre-policy STR proxy (tract Airbnb listing density from a listings snapshot),
 keeps **all never-treated tracts** as the comparison group for each subgroup, and
 re-estimates CS via :meth:`CallawaySantAnnaAnalyzer.estimate_core_from_panel`.
 
@@ -19,6 +20,10 @@ from housing.components.processors.did_covariate_merger import DIDCovariateProce
 from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
+
+# Need at least two treated tracts with the moderator to form low/high median split.
+_MIN_TRACTS_FOR_MEDIAN_SPLIT = 2
+
 
 def _never_treated_tract_geoids(panel: pd.DataFrame) -> list[Any]:
     """Tracts with no treated==1 in the panel."""
@@ -48,6 +53,33 @@ def _tract_census_frame(
         return keys
     merger = DIDCovariateProcessor()
     return merger._merge_census_data(keys, census)  # noqa: SLF001
+
+
+def _tract_airbnb_density_frame(
+    panel: pd.DataFrame, airbnb_tract: object
+) -> pd.DataFrame:
+    """One row per panel tract with ``airbnb_density`` when available."""
+    keys = panel[["tract_geoid"]].drop_duplicates().reset_index(drop=True)
+    if airbnb_tract is None:
+        logger.warning("No airbnb_tract_data; skip airbnb_density heterogeneity.")
+        return keys
+    raw = airbnb_tract
+    if hasattr(raw, "drop_geometry"):
+        airbnb_tbl = pd.DataFrame(raw.drop_geometry())
+    else:
+        airbnb_tbl = pd.DataFrame(raw)
+    if (
+        "tract_geoid" not in airbnb_tbl.columns
+        or "airbnb_density" not in airbnb_tbl.columns
+    ):
+        logger.warning(
+            "airbnb_tract_data missing tract_geoid or airbnb_density; skip airbnb split."
+        )
+        return keys
+    sub = airbnb_tbl[["tract_geoid", "airbnb_density"]].drop_duplicates(
+        subset=["tract_geoid"]
+    )
+    return keys.merge(sub, on="tract_geoid", how="left")
 
 
 def _peak_pct_restricted(panel: pd.DataFrame) -> pd.Series:
@@ -119,15 +151,17 @@ class CallawaySantAnnaHeterogeneityAnalyzer(Analyzer):
         anticipation: int = 0,
         min_cohort_size: int = 5,
     ) -> None:
+        """Configure CS subgroup runs (same knobs as :class:`CallawaySantAnnaAnalyzer`)."""
         super().__init__(
             "callaway_santanna_heterogeneity_analysis",
-            "Callaway & Sant'Anna heterogeneity by neighborhood / dose / timing",
+            "Callaway & Sant'Anna heterogeneity by neighborhood / dose / STR density",
         )
         self.comparison_group = comparison_group
         self.anticipation = anticipation
         self.min_cohort_size = min_cohort_size
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Estimate CS on median splits; write ``cs_heterogeneity_results`` to context."""
         did_panel = context.get("did_panel")
         if did_panel is None or did_panel.empty:
             raise ValueError("did_panel not found or empty")
@@ -157,7 +191,7 @@ class CallawaySantAnnaHeterogeneityAnalyzer(Analyzer):
             inc = tract_acs.loc[
                 tract_acs.index.isin(treated_tr), "median_income"
             ].dropna()
-            if len(inc) >= 2:
+            if len(inc) >= _MIN_TRACTS_FOR_MEDIAN_SPLIT:
                 med_inc = float(inc.median())
                 meta["median_income_cutoff"] = med_inc
                 high_tr = inc[inc > med_inc].index.tolist()
@@ -171,14 +205,16 @@ class CallawaySantAnnaHeterogeneityAnalyzer(Analyzer):
                     summary_rows,
                 )
             else:
-                logger.warning("Too few treated tracts with median_income; skip income.")
+                logger.warning(
+                    "Too few treated tracts with median_income; skip income."
+                )
         else:
             logger.warning("median_income missing after census merge; skip income.")
 
         # --- renter share ---
         if "pct_rented" in tract_acs.columns:
             pr = tract_acs.loc[tract_acs.index.isin(treated_tr), "pct_rented"].dropna()
-            if len(pr) >= 2:
+            if len(pr) >= _MIN_TRACTS_FOR_MEDIAN_SPLIT:
                 med_pr = float(pr.median())
                 meta["median_pct_rented_cutoff"] = med_pr
                 high_tr = pr[pr > med_pr].index.tolist()
@@ -196,10 +232,41 @@ class CallawaySantAnnaHeterogeneityAnalyzer(Analyzer):
         else:
             logger.warning("pct_rented missing; skip renter_share.")
 
+        # --- Airbnb listing density (proxy for pre-prohibition STR intensity) ---
+        tract_airbnb = _tract_airbnb_density_frame(
+            panel, context.get("airbnb_tract_data")
+        )
+        tract_airbnb = tract_airbnb.drop_duplicates(subset=["tract_geoid"]).set_index(
+            "tract_geoid", drop=True
+        )
+        if "airbnb_density" in tract_airbnb.columns:
+            ad = tract_airbnb.loc[
+                tract_airbnb.index.isin(treated_tr), "airbnb_density"
+            ].dropna()
+            if len(ad) >= _MIN_TRACTS_FOR_MEDIAN_SPLIT:
+                med_ad = float(ad.median())
+                meta["median_airbnb_density_cutoff"] = med_ad
+                high_tr = ad[ad > med_ad].index.tolist()
+                low_tr = ad[ad <= med_ad].index.tolist()
+                splits_out["airbnb_density"] = self._two_subgroup_estimate(
+                    panel,
+                    low_tr,
+                    high_tr,
+                    never_tr,
+                    "airbnb_density",
+                    summary_rows,
+                )
+            else:
+                logger.warning(
+                    "Too few treated tracts with airbnb_density; skip airbnb_density."
+                )
+        else:
+            logger.warning("airbnb_density missing; skip airbnb_density split.")
+
         # --- dose: peak pct_units_restricted among treated ---
         peak = _peak_pct_restricted(panel)
         peak_t = peak.reindex(treated_tr).dropna()
-        if len(peak_t) >= 2:
+        if len(peak_t) >= _MIN_TRACTS_FOR_MEDIAN_SPLIT:
             med_d = float(peak_t.median())
             meta["median_peak_pct_restricted_cutoff"] = med_d
             high_tr = peak_t[peak_t > med_d].index.tolist()
@@ -217,7 +284,7 @@ class CallawaySantAnnaHeterogeneityAnalyzer(Analyzer):
 
         # --- early vs late (median first treatment month among treated) ---
         ft = _first_treatment_month(panel).reindex(treated_tr).dropna()
-        if len(ft) >= 2:
+        if len(ft) >= _MIN_TRACTS_FOR_MEDIAN_SPLIT:
             med_dt = pd.Timestamp(ft.median())
             meta["median_first_treatment_month"] = med_dt.isoformat()
             early_tr = ft[ft <= med_dt].index.tolist()
@@ -321,9 +388,7 @@ class CallawaySantAnnaHeterogeneityAnalyzer(Analyzer):
                 label,
                 float((core.get("overall_att") or {}).get("att", float("nan"))),
                 float((core.get("overall_att") or {}).get("se", float("nan"))),
-                int(
-                    core["cohort_info"]["treated_cohorts"]["tract_geoid"].nunique()
-                )
+                int(core["cohort_info"]["treated_cohorts"]["tract_geoid"].nunique())
                 if isinstance(core["cohort_info"].get("treated_cohorts"), pd.DataFrame)
                 and not core["cohort_info"]["treated_cohorts"].empty
                 else 0,

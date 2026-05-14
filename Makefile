@@ -22,7 +22,7 @@ mount_data := $(if $(DATA_DIR),-v $(DATA_DIR):/project/data,)
 CS_BOOTSTRAP_REPS ?= 399
 CS_BOOTSTRAP_SEED ?= 42
 
-.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline-cs run-did-pipeline-cs-bootstrap run-did-pipeline-cs-covariates run-did-pipeline-cs-covariates-bootstrap run-did-pipeline-cs-heterogeneity
+.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline-cs run-did-pipeline-cs-bootstrap run-did-pipeline-cs-covariates run-did-pipeline-cs-covariates-bootstrap run-did-pipeline-cs-heterogeneity run-did-pipeline-cs-spillover
 
 help: ## Show the help message
 	@echo "Available commands:"
@@ -41,7 +41,8 @@ help: ## Show the help message
 	@echo "  run-did-pipeline-cs-bootstrap  Same, plus tract-cluster bootstrap (default $(CS_BOOTSTRAP_REPS) reps; override CS_BOOTSTRAP_REPS / CS_BOOTSTRAP_SEED)"
 	@echo "  run-did-pipeline-cs-covariates  Same pipeline plus covariate-adjusted CS (DR + tract trends)"
 	@echo "  run-did-pipeline-cs-covariates-bootstrap  Same as covariates pipeline with baseline CS bootstrap"
-	@echo "  run-did-pipeline-cs-heterogeneity  Baseline CS + subgroup heterogeneity (income, renter share, dose, early/late)"
+	@echo "  run-did-pipeline-cs-heterogeneity  Baseline CS + subgroup heterogeneity (income, renter share, Airbnb density, dose, early/late)"
+	@echo "  run-did-pipeline-cs-spillover  Baseline CS + spatial spillover (adjacent never-treated vs pure controls)"
 	@echo ""
 	@echo "Optional environment variables (.env file):"
 	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
@@ -91,3 +92,6 @@ run-did-pipeline-cs-covariates-bootstrap: build-only ## Covariates pipeline + ba
 
 run-did-pipeline-cs-heterogeneity: build-only ## Baseline CS + subgroup heterogeneity (no TWFE / no covariate CS)
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna_heterogeneity.py
+
+run-did-pipeline-cs-spillover: build-only ## Baseline CS + Queen-contiguity spillover panel (no TWFE / no covariate CS)
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna_spillover.py

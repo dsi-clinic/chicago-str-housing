@@ -83,6 +83,21 @@ from housing.components.visualizers.callaway_santanna import (
     CallawaySantAnnaVisualizer,
 )
 from housing.components.visualizers.event_study import EventStudyVisualizer
+from housing.did_spec import (
+    DID_CS_ANTICIPATION,
+    DID_CS_COMPARISON_GROUP,
+    DID_CS_MIN_COHORT_SIZE,
+    DID_STR_PROHIBITION_POINTS_AGGREGATE_COLUMNS,
+    DID_STR_PROHIBITION_POINTS_ID_COLUMN,
+    DID_TREATMENT_THRESHOLD_PERCENTILE,
+    DID_TREND_MATCH_K_NEIGHBORS,
+    DID_TREND_MATCH_MIN_PRE_PERIODS,
+    DID_TWFE_POST_PERIODS,
+    DID_TWFE_PRE_PERIODS,
+    did_cs_output_dir,
+    tract_shapefile_path,
+    zori_csv_path,
+)
 from pipeline import Pipeline
 
 logger = logging.getLogger(__name__)
@@ -95,23 +110,19 @@ _ERRNO_RESOURCE_UNAVAILABLE = (
 )
 _LARGE_CS_TWFE_DIFF_DOLLARS = 10.0
 
-# Paths
-DATA_ROOT = Path(os.environ.get("DATA_DIR", "/project/data"))
-TRACT_SHP = DATA_ROOT / "tl_2023_17_tract" / "tl_2023_17_tract.shp"
-ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
-DID_CS_OUTPUT_DIR = "/project/output/did-cs"
-
 
 def _preflight_check() -> None:
     """Verify required data files exist and are readable."""
+    tract_shp = tract_shapefile_path()
+    zori_csv = zori_csv_path()
     missing = []
-    if not TRACT_SHP.exists():
-        missing.append(str(TRACT_SHP))
-    elif TRACT_SHP.stat().st_size == 0:
+    if not tract_shp.exists():
+        missing.append(str(tract_shp))
+    elif tract_shp.stat().st_size == 0:
         logger.warning("Tract shapefile is empty (0 bytes).")
-    if not ZORI_CSV.exists():
-        missing.append(str(ZORI_CSV))
-    elif ZORI_CSV.stat().st_size == 0:
+    if not zori_csv.exists():
+        missing.append(str(zori_csv))
+    elif zori_csv.stat().st_size == 0:
         logger.warning("ZORI CSV is empty (0 bytes).")
     if missing:
         raise FileNotFoundError(
@@ -120,7 +131,7 @@ def _preflight_check() -> None:
             + "\n\nDownload tract boundaries and ZORI (see README). "
         )
     try:
-        with ZORI_CSV.open("rb") as f:
+        with zori_csv.open("rb") as f:
             f.read(1)
     except OSError as e:
         if e.errno == _ERRNO_RESOURCE_UNAVAILABLE:
@@ -164,17 +175,21 @@ def run_did_analysis_with_cs(
     logger.info("=" * 80)
     _preflight_check()
 
-    Path(DID_CS_OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+    out_dir = did_cs_output_dir()
+    zori = zori_csv_path()
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
 
     pipeline = Pipeline("Chicago Housing DiD: TWFE vs. Callaway-Sant'Anna")
 
     # 1. Load Data
     logger.info("\n[1/5] Loading data...")
     pipeline.register_component(ZipBoundariesLoader())
-    pipeline.register_component(TractBoundariesLoader())
+    pipeline.register_component(
+        TractBoundariesLoader(file_path=str(tract_shapefile_path()))
+    )
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
-    pipeline.register_component(TimeSeriesRentalLoader(file_path=ZORI_CSV))
-    pipeline.register_component(RentalDataLoader(file_path=ZORI_CSV))
+    pipeline.register_component(TimeSeriesRentalLoader(file_path=zori))
+    pipeline.register_component(RentalDataLoader(file_path=zori))
     pipeline.register_component(CensusDataLoader(api_key=os.getenv("CENSUS_API_KEY")))
 
     # 2. Process Data
@@ -185,31 +200,30 @@ def run_did_analysis_with_cs(
         PointsToTractProcessor(
             input_key="str_prohibition_data",
             output_key="str_tract_data",
-            id_column="application_id",
-            aggregate_columns={
-                "prohibition_date": "min",
-                "number_of_units": "sum",
-            },
+            id_column=DID_STR_PROHIBITION_POINTS_ID_COLUMN,
+            aggregate_columns=DID_STR_PROHIBITION_POINTS_AGGREGATE_COLUMNS,
             calculate_density=True,
             data_source_name="str_prohibition",
         )
     )
-    pipeline.register_component(
-        TractProhibitionDatesProcessor(output_dir=DID_CS_OUTPUT_DIR)
-    )
+    pipeline.register_component(TractProhibitionDatesProcessor(output_dir=out_dir))
     # pipeline.register_component(
-    # TreatmentIndicatorProcessor(output_dir=DID_CS_OUTPUT_DIR)
+    # TreatmentIndicatorProcessor(output_dir=out_dir)
     # )
     pipeline.register_component(
         TreatmentThresholdProcessor(  # REPLACE TreatmentIndicatorProcessor
-            output_dir=DID_CS_OUTPUT_DIR, percentile=0.25
+            output_dir=out_dir,
+            percentile=DID_TREATMENT_THRESHOLD_PERCENTILE,
         )
     )
 
     # 3. Trend matching (restrict panel to matched treated + control tracts)
     logger.info("\n[3/6] Trend matching for parallel trends...")
     pipeline.register_component(
-        TrendMatchingProcessor(k_neighbors=3, min_pre_periods=6)
+        TrendMatchingProcessor(
+            k_neighbors=DID_TREND_MATCH_K_NEIGHBORS,
+            min_pre_periods=DID_TREND_MATCH_MIN_PRE_PERIODS,
+        )
     )
 
     # 4. Descriptive Analysis (on matched sample)
@@ -220,29 +234,27 @@ def run_did_analysis_with_cs(
     logger.info("\n[5/6] Estimating TWFE event study (matched sample)...")
     pipeline.register_component(
         EventStudyAnalyzer(
-            pre_periods=12,
-            post_periods=36,
-            output_path=f"{DID_CS_OUTPUT_DIR}/event_study_coefficients.csv",
+            pre_periods=DID_TWFE_PRE_PERIODS,
+            post_periods=DID_TWFE_POST_PERIODS,
+            output_path=f"{out_dir}/event_study_coefficients.csv",
         )
     )
-    pipeline.register_component(EventStudyVisualizer(output_dir=DID_CS_OUTPUT_DIR))
+    pipeline.register_component(EventStudyVisualizer(output_dir=out_dir))
 
     # 6. Callaway-Sant'Anna (robust, on matched sample)
     logger.info("\n[6/6] Estimating Callaway-Sant'Anna event study (robust)...")
     pipeline.register_component(
         CallawaySantAnnaAnalyzer(
-            comparison_group="nevertreated",
-            anticipation=0,
-            min_cohort_size=5,
+            comparison_group=DID_CS_COMPARISON_GROUP,
+            anticipation=DID_CS_ANTICIPATION,
+            min_cohort_size=DID_CS_MIN_COHORT_SIZE,
             bootstrap_reps=cs_bootstrap_reps,
             bootstrap_seed=cs_bootstrap_seed,
         )
     )
+    pipeline.register_component(CallawaySantAnnaVisualizer(output_dir=out_dir))
     pipeline.register_component(
-        CallawaySantAnnaVisualizer(output_dir=DID_CS_OUTPUT_DIR)
-    )
-    pipeline.register_component(
-        CallawaySantAnnaComparisonVisualizer(output_dir=DID_CS_OUTPUT_DIR)
+        CallawaySantAnnaComparisonVisualizer(output_dir=out_dir)
     )
 
     # Set execution order
@@ -281,12 +293,12 @@ def run_did_analysis_with_cs(
     logger.info("ANALYSIS COMPLETE")
     logger.info("=" * 80)
 
-    _print_summary(pipeline.context)
+    _print_summary(pipeline.context, output_dir=out_dir)
 
     return pipeline, pipeline.context
 
 
-def _print_summary(results: dict) -> None:
+def _print_summary(results: dict, *, output_dir: str) -> None:
     """Print summary of key findings."""
     logger.info("\n=== KEY FINDINGS ===\n")
 
@@ -329,7 +341,7 @@ def _print_summary(results: dict) -> None:
 
     log_and_export_pre_trend_joint_test(
         results,
-        DID_CS_OUTPUT_DIR,
+        output_dir,
         summary_key="cs_pre_trend_joint_test",
         periods_key="cs_pre_trend_joint_test_periods",
         aggregate_basename="cs_pre_trend_joint_test_aggregate",
@@ -344,7 +356,7 @@ def _print_summary(results: dict) -> None:
         and not boot_df.empty
         and isinstance(boot_meta, dict)
     ):
-        write_cs_bootstrap_csv(boot_df, boot_meta, DID_CS_OUTPUT_DIR)
+        write_cs_bootstrap_csv(boot_df, boot_meta, output_dir)
         logger.info("\nCallaway–Sant'Anna tract-cluster bootstrap (baseline CS):")
         logger.info(
             "  Overall ATT: point $%.2f (analytic SE $%.2f) | bootstrap SE $%.2f, "
@@ -384,7 +396,7 @@ def _print_summary(results: dict) -> None:
                 )
 
     logger.info("\n=== OUTPUT FILES ===\n")
-    logger.info("Check %s/ for:", DID_CS_OUTPUT_DIR)
+    logger.info("Check %s/ for:", output_dir)
     logger.info("  • did_callaway_santanna_event_study.png - Main CS results")
     logger.info("  • did_twfe_vs_cs_comparison.png - Side-by-side comparison")
     logger.info("  • did_cs_twfe_difference.png - Bias visualization")
