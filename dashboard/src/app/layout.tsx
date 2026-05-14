@@ -1,10 +1,7 @@
 import './globals.css'
-import { Inter } from 'next/font/google'
 import Hero from '@/components/Hero'
 import TabNav from '@/components/TabNav'
 import { loadSampleLineage } from '@/lib/data'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = { title: 'Chicago STR Analysis · Andrés F. Camacho' }
 
@@ -18,7 +15,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const nPanel    = stageC?.n_tracts   ?? 842
   const nMonths   = stageC?.n_months   ?? 128
   const nTreated  = stageD?.treated    ?? 373
-  const nPool     = stageD?.never_treated ?? 469
   const nMatched  = stageF?.n_tracts   ?? 556
 
   // matched controls = total matched minus matched treated
@@ -33,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   ]
 
   return (
-    <html lang="en" className={inter.className}>
+    <html lang="en">
       <body className="bg-white min-h-screen">
         <Hero pills={pills} />
         <TabNav />

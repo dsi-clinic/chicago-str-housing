@@ -1,6 +1,7 @@
 import DataCard from '@/components/DataCard'
 import InfoBlock from '@/components/InfoBlock'
 import TreatmentMap from '@/components/TreatmentMap'
+import CohortBarChart from '@/components/CohortBarChart'
 import { loadSampleLineage, loadGroupStats } from '@/lib/data'
 
 const STORY = [
@@ -142,16 +143,16 @@ export default function IntroductionPage() {
         </div>
       </div>
 
-      {/* Interactive treatment indicator maps */}
-      <div className="mb-10">
-        <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
-          Treatment indicators at census-tract level
-        </h3>
+      {/* ── WHERE were the prohibitions? ── */}
+      <div className="mb-12">
+        <h3 className="text-lg font-bold text-gray-900 mb-1">Where were the prohibitions?</h3>
         <p className="text-[13px] text-gray-500 mb-5 leading-relaxed max-w-2xl">
-          The two maps below show the same Chicago tracts coloured by treatment status under
-          each indicator. <span className="font-semibold text-maroon">Red</span> = treated,{' '}
+          Each map colours Chicago census tracts by treatment status under one indicator.
+          <span className="font-semibold text-maroon"> Red</span> = treated,{' '}
           <span className="font-semibold text-blue-600">blue</span> = never-treated controls,
-          grey = outside the rent-panel sample. Hover a tract to see its role.
+          grey = outside the rent panel.
+          Small dots mark tracts with STR prohibition records — use the layer control (top-right) to show/hide.
+          Scroll to zoom · drag to pan · ⌂ to reset.
         </p>
         <div className="grid grid-cols-2 gap-6">
           <TreatmentMap
@@ -167,7 +168,25 @@ export default function IntroductionPage() {
         </div>
       </div>
 
-      {/* Data cards — centered, showing the full audit funnel story */}
+      {/* ── WHEN were the prohibitions? ── */}
+      <div className="mb-12">
+        <h3 className="text-lg font-bold text-gray-900 mb-1">When were the prohibitions?</h3>
+        <p className="text-[13px] text-gray-500 mb-5 leading-relaxed max-w-2xl">
+          Prohibitions rolled out in waves — the 2016 cohort accounts for the majority of treated
+          tracts. The binary indicator (top) counts any prohibition; the threshold indicator (bottom)
+          counts only tracts crossing the share threshold.
+        </p>
+        <div className="border border-gray-100 rounded-xl p-5 mb-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600 mb-3">Binary indicator</p>
+          <CohortBarChart dir="binary" />
+        </div>
+        <div className="border border-gray-100 rounded-xl p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-teal-600 mb-3">Threshold indicator</p>
+          <CohortBarChart dir="threshold" />
+        </div>
+      </div>
+
+      {/* ── Sample construction data cards ── */}
       <p className="text-[11px] font-bold uppercase tracking-wider text-gray-300 mb-4 text-center">
         Sample construction at a glance
       </p>
@@ -184,25 +203,21 @@ export default function IntroductionPage() {
         <InfoBlock
           title="Pre-treatment Rent — Treated vs Matched Controls"
           rows={[
-            { label: 'Mean rent · treated tracts',  value: `$${treated.mean_rent.toFixed(0)} / mo` },
+            { label: 'Mean rent · treated tracts',   value: `$${treated.mean_rent.toFixed(0)} / mo` },
             { label: 'Mean rent · matched controls', value: `$${control.mean_rent.toFixed(0)} / mo` },
-            { label: 'Std dev · treated',           value: `$${treated.std_dev.toFixed(0)}` },
-            { label: 'Std dev · matched controls',  value: `$${control.std_dev.toFixed(0)}` },
-            {
-              label: 'Difference in means',
-              value: `$${(treated.mean_rent - control.mean_rent).toFixed(0)}`,
-              valueClass: 'text-maroon',
-            },
+            { label: 'Std dev · treated',            value: `$${treated.std_dev.toFixed(0)}` },
+            { label: 'Std dev · matched controls',   value: `$${control.std_dev.toFixed(0)}` },
+            { label: 'Difference in means', value: `$${(treated.mean_rent - control.mean_rent).toFixed(0)}`, valueClass: 'text-maroon' },
           ]}
         />
         <InfoBlock
           title="Panel Coverage"
           rows={[
-            { label: 'Total tract-month cells (panel)',   value: (nPanel * nMonths).toLocaleString() },
-            { label: 'Total tract-month cells (matched)', value: (nMatched * nMonths).toLocaleString() },
-            { label: 'Missing rent obs.',                 value: '0.0%',        valueClass: 'text-teal-600' },
-            { label: 'Outcome variable',                  value: 'ZORI ($/mo)' },
-            { label: 'Treatment timing',                  value: 'Staggered'   },
+            { label: 'Tract-month cells (full panel)',   value: (nPanel * nMonths).toLocaleString() },
+            { label: 'Tract-month cells (matched)',      value: (nMatched * nMonths).toLocaleString() },
+            { label: 'Missing rent obs.',                value: '0.0%', valueClass: 'text-teal-600' },
+            { label: 'Outcome variable',                 value: 'ZORI ($/mo)' },
+            { label: 'Treatment timing',                 value: 'Staggered' },
           ]}
         />
       </div>

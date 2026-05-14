@@ -48,37 +48,38 @@ export default function TreatmentMapClient({ geojsonUrl, title, subtitle }: Trea
       const map = L.default.map(el, {
         center:          CHICAGO_CENTER,
         zoom:            CHICAGO_ZOOM,
-        zoomControl:     false,      // we add our own positioned control below
+        zoomControl:     false,
         scrollWheelZoom: true,
         dragging:        true,
         doubleClickZoom: true,
+        touchZoom:       true,
       })
 
-      // Basemap — light, no labels (so tract colours read cleanly)
+      // Basemap
       L.default.tileLayer(
         'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
         { attribution: '© OpenStreetMap © CartoDB', subdomains: 'abcd', maxZoom: 19 }
       ).addTo(map)
 
-      // Zoom control — bottom-right to keep top-left clear for home btn
+      // Zoom control — bottom-right
       L.default.control.zoom({ position: 'bottomright' }).addTo(map)
 
-      // Home button — reset to initial Chicago extent
+      // Home button — reset to Chicago extent
       const HomeControl = L.default.Control.extend({
         onAdd() {
           const btn = L.default.DomUtil.create('button', 'leaflet-bar leaflet-control') as HTMLButtonElement
-          btn.title     = 'Reset to full Chicago view'
-          btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'
+          btn.title     = 'Reset view'
+          btn.innerHTML = '⌂'
           Object.assign(btn.style, {
-            width: '30px', height: '30px', cursor: 'pointer',
-            background: 'white', border: 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#555',
+            width: '30px', height: '30px', lineHeight: '28px',
+            textAlign: 'center', fontSize: '16px',
+            cursor: 'pointer', background: 'white', border: 'none', color: '#555',
           })
-          L.default.DomEvent.on(btn, 'click', (e) => {
+          L.default.DomEvent.on(btn, 'click', e => {
             L.default.DomEvent.stopPropagation(e)
             map.setView(CHICAGO_CENTER, CHICAGO_ZOOM)
           })
+          L.default.DomEvent.disableClickPropagation(btn)
           return btn
         },
         onRemove() {},
@@ -88,8 +89,8 @@ export default function TreatmentMapClient({ geojsonUrl, title, subtitle }: Trea
       fetch(geojsonUrl)
         .then(r => r.json())
         .then((data: GeoJSON.FeatureCollection) => {
-          // ── Tract fill layer ──
-          L.default.geoJSON(data, {
+          // ── Layer 1: Tract fills ──
+          const tractLayer = L.default.geoJSON(data, {
             style: feat => {
               const role = (feat?.properties?.role as string) ?? 'not_in_sample'
               return {
@@ -103,35 +104,41 @@ export default function TreatmentMapClient({ geojsonUrl, title, subtitle }: Trea
               const role  = (feat?.properties?.role as string) ?? 'not_in_sample'
               const units = (feat?.properties?.prohibition_units as number) ?? 0
               lyr.bindTooltip(
-                `<strong>Tract ${feat?.properties?.tract_id}</strong><br/>${ROLE_LABEL[role] ?? role}` +
+                `<strong>Tract ${feat?.properties?.tract_id}</strong>` +
+                `<br/>${ROLE_LABEL[role] ?? role}` +
                 (units > 0 ? `<br/><span style="color:#8B0000">${units} prohibited units</span>` : ''),
                 { sticky: true }
               )
             },
-          }).addTo(map)
+          })
+          tractLayer.addTo(map)
 
-          // ── Prohibition-unit circle overlay ──
-          // Small semi-transparent circles at each tract centroid,
-          // visible only for tracts with prohibited units.
+          // ── Layer 2: Prohibition circles — fixed small size ──
+          const circleGroup = L.default.layerGroup()
           data.features.forEach(feat => {
             const units = (feat?.properties?.prohibition_units as number) ?? 0
             const lat   = feat?.properties?.centroid_lat as number
             const lng   = feat?.properties?.centroid_lng as number
             if (!units || !lat || !lng) return
-
-            // Radius scales from 3px (1 unit) to ~18px (300+ units), log-ish
-            const radius = Math.min(3 + Math.log1p(units) * 2.2, 18)
             L.default.circleMarker([lat, lng], {
-              radius,
-              color:       '#8B0000',
-              weight:      0,
+              radius:      4,          // fixed small, not scaled
+              color:       '#5c0000',
+              weight:      0.5,
               fillColor:   '#8B0000',
-              fillOpacity: 0.30,
-            }).addTo(map).bindTooltip(
-              `${units} prohibited unit${units !== 1 ? 's' : ''}`,
-              { sticky: true }
-            )
+              fillOpacity: 0.45,
+            }).addTo(circleGroup).bindTooltip(`${units} prohibited unit${units !== 1 ? 's' : ''}`, { sticky: true })
           })
+          circleGroup.addTo(map)
+
+          // ── Layer control (toggle tracts / prohibition circles) ──
+          L.default.control.layers(
+            {},
+            {
+              'Tract status':         tractLayer,
+              'Prohibition locations': circleGroup,
+            },
+            { position: 'topright', collapsed: true }
+          ).addTo(map)
         })
 
       mapRef.current = map
@@ -147,12 +154,17 @@ export default function TreatmentMapClient({ geojsonUrl, title, subtitle }: Trea
     <div>
       <p className="text-[13px] font-bold text-gray-800 mb-0.5">{title}</p>
       {subtitle && <p className="text-[11px] text-gray-400 mb-2">{subtitle}</p>}
-      <div ref={containerRef} className="h-[380px] rounded-xl border border-gray-100 overflow-hidden" />
+      {/* touch-action:none + no overflow-hidden = full Leaflet drag support */}
+      <div
+        ref={containerRef}
+        className="h-[380px] rounded-xl border border-gray-100"
+        style={{ touchAction: 'none', position: 'relative', zIndex: 0 }}
+      />
       <div className="flex gap-4 mt-2 text-[10px] text-gray-400 flex-wrap">
-        <span><span className="inline-block w-3 h-3 rounded-sm mr-1" style={{background:'#8B0000',opacity:0.8}}/>Treated</span>
-        <span><span className="inline-block w-3 h-3 rounded-sm mr-1" style={{background:'#2563EB',opacity:0.6}}/>Never-treated</span>
-        <span><span className="inline-block w-3 h-3 rounded-sm mr-1" style={{background:'#D1D5DB',opacity:0.5}}/>Outside sample</span>
-        <span><span className="inline-block w-3 h-3 rounded-full mr-1" style={{background:'#8B0000',opacity:0.35}}/>Prohibited units</span>
+        <span><span className="inline-block w-3 h-2 rounded-sm mr-1 align-middle" style={{background:'#8B0000',opacity:0.8}}/>Treated</span>
+        <span><span className="inline-block w-3 h-2 rounded-sm mr-1 align-middle" style={{background:'#2563EB',opacity:0.6}}/>Never-treated</span>
+        <span><span className="inline-block w-3 h-2 rounded-sm mr-1 align-middle" style={{background:'#D1D5DB',opacity:0.5}}/>Outside sample</span>
+        <span><span className="inline-block w-2 h-2 rounded-full mr-1 align-middle" style={{background:'#8B0000',opacity:0.5}}/>Prohibited units</span>
       </div>
     </div>
   )
