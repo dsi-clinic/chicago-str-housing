@@ -6,5 +6,5 @@ This site hosts the **policy brief** and **technical paper** on how short-term r
 
 ## Documents
 
-- **[Policy brief]({% link str-paper/STR_POLICY_BRIEF.md %})** — one-page summary for city leadership.
-- **[Technical paper]({% link str-paper/STR_PROHIBITION_PAPER.md %})** — full methods, results, figures, and appendix (embedded figures and CSV tables are under `str-paper/figures/` and `str-paper/csv/` in the repo).
+- **[Policy brief]({{ "/str-paper/STR_POLICY_BRIEF/" | relative_url }})** — one-page summary for city leadership.
+- **[Technical paper]({{ "/str-paper/STR_PROHIBITION_PAPER/" | relative_url }})** — full methods, results, figures, and appendix (embedded figures and CSV tables are under `str-paper/figures/` and `str-paper/csv/` in the repo).
