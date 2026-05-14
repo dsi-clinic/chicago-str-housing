@@ -2,16 +2,15 @@
 layout: home
 ---
 
+## The question
+
+Chicago's [Shared Housing Ordinance](https://www.chicago.gov/content/dam/city/depts/bacp/Small%20Business%20Center/sharedhousingordinanceamendments.pdf) lets residential buildings opt into a prohibited-buildings list that bars short-term rentals. Hundreds of buildings have joined since 2015. Does removing Airbnb-style listings make neighborhoods more affordable for long-term renters — or does it actually push rents *up*?
+
+## What we found
+
 > **"STR prohibitions do not lower rents."**
 > Banning short-term rentals in Chicago is associated with a *$3–10/month increase* in long-term rental prices — and the effect grows over time.
 
----
-
-## The question
-
-Chicago's [Shared Housing Ordinance](https://www.chicago.gov/city/en/depts/bacp/supp_info/sharedhousingordinance.html) lets residential buildings opt into a prohibited-buildings list that bars short-term rentals. Hundreds of buildings have joined since 2015. Does removing Airbnb-style listings make neighborhoods more affordable for long-term renters — or does it actually push rents *up*?
-
-## What we found
 
 | Finding | Detail |
 |---------|--------|
@@ -24,7 +23,7 @@ The mechanism is counterintuitive: prohibitions signal residential stability, at
 
 ## Read the research
 
-<div style="display:flex; gap:1.5rem; flex-wrap:wrap; margin-top:0.5rem;">
+<div style="display:flex; gap:1.5rem; flex-wrap:wrap; margin-top:0.5rem; margin-bottom:2rem;">
 <a href="{{ "/str-paper/STR_POLICY_BRIEF/" | relative_url }}" style="flex:1; min-width:200px; padding:1rem 1.25rem; border:1px solid #ddd; border-radius:6px; text-decoration:none; color:inherit;">
 <strong>Policy brief</strong><br>
 <span style="font-size:0.9em; color:#555;">One-page summary for city leadership and stakeholders.</span>
@@ -37,4 +36,4 @@ The mechanism is counterintuitive: prohibitions signal residential stability, at
 
 ## About
 
-This project was produced by the **University of Chicago Data Science Institute Clinic** in partnership with the **City of Chicago Department of Technology and Innovation**. The full analysis pipeline, data, and source code are available in the [GitHub repository](https://github.com/dsi-clinic/chicago-str-housing).
+This project was produced by the **University of Chicago Data Science Institute** in partnership with the **City of Chicago Department of Technology and Innovation**. The full analysis pipeline, data, and source code are available in the [GitHub repository](https://github.com/dsi-clinic/chicago-str-housing).

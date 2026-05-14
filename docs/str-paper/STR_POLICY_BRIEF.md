@@ -13,7 +13,7 @@ May 2026
 
 **STR prohibitions under the Shared Housing Ordinance are associated with a small, persistent increase in long-term rental prices — approximately $3–10 per month in affected neighborhoods.**
 
----
+
 
 ## Background
 
