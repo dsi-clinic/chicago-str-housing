@@ -6,9 +6,8 @@ const TABS = [
   { label: 'Introduction', href: '/' },
   { label: 'Descriptive',  href: '/descriptive' },
   { label: 'Analysis',     href: '/analysis' },
-  { label: 'Models',       href: '/models' },
-  { label: 'Results',      href: '/results' },
-  { label: 'Robustness',   href: '/robustness' },
+  { label: 'Models & Results', href: '/models' },
+  { label: 'Robustness',       href: '/robustness' },
   { label: 'Policy',       href: '/policy' },
   { label: 'Audit',        href: '/audit' },
 ]

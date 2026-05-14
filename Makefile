@@ -44,6 +44,8 @@ help: ## Show the help message
 	@echo ""
 	@echo "Optional environment variables (.env file):"
 	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
+	@echo "  CENSUS_API_KEY - Census Bureau API key for ACS (see .env.example)"
+	@echo "  DID_TREATMENT_MODE - CS pipeline: threshold (default), binary, or both"
 	@echo ""
 
 build-only: ## Build Docker image only

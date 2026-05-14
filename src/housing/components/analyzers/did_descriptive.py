@@ -81,6 +81,9 @@ class DIDDescriptiveAnalyzer(Analyzer):
         # Step 6: Panel coverage (balanced vs unbalanced tract-month structure)
         panel_structure = self._compute_panel_structure(did_panel)
 
+        # Step 7: Track how the tract sample shrinks across loaders/processors
+        sample_lineage = self._compute_sample_lineage(context, did_panel)
+
         # Per-cohort descriptives (uses covariates when merged by DIDCovariateProcessor)
         panel_with_cov = context.get("did_panel_with_covariates")
         cohort_stats = self._compute_cohort_stats(
@@ -91,11 +94,13 @@ class DIDDescriptiveAnalyzer(Analyzer):
         if self.output_dir:
             self._export_tables(
                 output_dir=self.output_dir,
+                context=context,
                 adoption_stats=adoption_stats,
                 pre_balance=pre_balance,
                 summary_stats=summary_stats,
                 balance_test=balance_test,
                 panel_structure=panel_structure,
+                sample_lineage=sample_lineage,
                 did_panel=did_panel,
                 cohort_stats=cohort_stats,
             )
@@ -115,6 +120,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
             "balance_test": balance_test,
             "first_treatment_date": adoption_stats["first_treatment_date"],
             "panel_structure": panel_structure,
+            "sample_lineage": sample_lineage,
             "did_cohort_stats": cohort_stats,
         }
 
@@ -267,6 +273,173 @@ class DIDDescriptiveAnalyzer(Analyzer):
             "tracts_eventually_treated": n_event,
         }
 
+    def _compute_sample_lineage(
+        self,
+        context: dict[str, Any],
+        matched_panel: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """Summarize tract counts from city boundaries to the final analysis sample."""
+        rows: list[dict[str, Any]] = []
+
+        tract_boundaries = context.get("tract_boundaries")
+        n_city_tracts = (
+            int(tract_boundaries["tract_geoid"].nunique())
+            if tract_boundaries is not None and "tract_geoid" in tract_boundaries
+            else None
+        )
+
+        def _pct_city(n_tracts: int | None) -> float | None:
+            if n_city_tracts in (None, 0) or n_tracts is None:
+                return None
+            return round(n_tracts / n_city_tracts, 4)
+
+        def _delta(current: int | None, previous: int | None) -> int | None:
+            if current is None or previous is None:
+                return None
+            return int(current - previous)
+
+        prev_n: int | None = None
+
+        def _append_row(
+            stage_code: str,
+            stage_label: str,
+            n_tracts: int | None,
+            reason: str,
+            treated_tracts: int | None = None,
+            never_treated_tracts: int | None = None,
+            extra: dict[str, Any] | None = None,
+            counts_as_filter_step: bool = True,
+        ) -> None:
+            nonlocal prev_n
+            row = {
+                "stage_code": stage_code,
+                "stage_label": stage_label,
+                "n_tracts": n_tracts,
+                "share_of_city_tracts": _pct_city(n_tracts),
+                "delta_from_previous_stage": (
+                    _delta(n_tracts, prev_n) if counts_as_filter_step else None
+                ),
+                "treated_tracts": treated_tracts,
+                "never_treated_tracts": never_treated_tracts,
+                "reason": reason,
+            }
+            if extra:
+                row.update(extra)
+            rows.append(row)
+            if counts_as_filter_step:
+                prev_n = n_tracts
+
+        _append_row(
+            "A",
+            "Chicago tract boundaries",
+            n_city_tracts,
+            "All census tracts loaded from the shapefile after the Chicago/Cook County study-area filter.",
+        )
+
+        zip_tract_crosswalk = context.get("zip_to_tract_crosswalk")
+        n_crosswalk_tracts = (
+            int(zip_tract_crosswalk["tract_geoid"].nunique())
+            if zip_tract_crosswalk is not None and "tract_geoid" in zip_tract_crosswalk
+            else None
+        )
+        _append_row(
+            "B",
+            "ZIP-tract crosswalk coverage",
+            n_crosswalk_tracts,
+            "Tracts that intersect at least one Chicago ZIP boundary in the geometric crosswalk.",
+        )
+
+        tract_panel_data = context.get("tract_panel_data")
+        n_rent_panel_tracts = (
+            int(tract_panel_data["tract_geoid"].nunique())
+            if tract_panel_data is not None and "tract_geoid" in tract_panel_data
+            else None
+        )
+        months_in_panel = (
+            int(tract_panel_data["month"].nunique())
+            if tract_panel_data is not None and "month" in tract_panel_data
+            else None
+        )
+        _append_row(
+            "C",
+            "Rent panel coverage",
+            n_rent_panel_tracts,
+            "Tracts with observed ZORI rent history after applying ZIP-to-tract weights.",
+            extra={"n_months": months_in_panel},
+        )
+
+        census_data = context.get("census_data")
+        n_acs_tracts_total = (
+            int(census_data["tract_id"].nunique())
+            if census_data is not None and "tract_id" in census_data
+            else None
+        )
+        rent_panel_tracts_with_acs = None
+        if census_data is not None and tract_panel_data is not None:
+            census_ids = set(census_data["tract_id"].astype(str))
+            panel_ids = set(tract_panel_data["tract_geoid"].astype(str))
+            rent_panel_tracts_with_acs = int(len(panel_ids & census_ids))
+
+        raw_did_panel = context.get("did_panel_unmatched")
+        if raw_did_panel is not None and "tract_geoid" in raw_did_panel:
+            ever_treated_raw = raw_did_panel.groupby("tract_geoid")["treated"].max()
+            n_raw = int(ever_treated_raw.index.nunique())
+            n_raw_treated = int((ever_treated_raw >= 1).sum())
+            n_raw_never = int(n_raw - n_raw_treated)
+        else:
+            n_raw = None
+            n_raw_treated = None
+            n_raw_never = None
+        _append_row(
+            "D",
+            "Pre-match DiD panel",
+            n_raw,
+            "Treatment split under the current treatment definition before trend matching.",
+            treated_tracts=n_raw_treated,
+            never_treated_tracts=n_raw_never,
+        )
+
+        _append_row(
+            "E",
+            "ACS coverage within rent panel",
+            rent_panel_tracts_with_acs,
+            "Coverage note only: these tracts have ACS covariates and occupied-unit denominators available after Census cleaning. Tracts missing ACS can still remain in the matched sample, but their controls are less complete.",
+            extra={"acs_tracts_total": n_acs_tracts_total},
+            counts_as_filter_step=False,
+        )
+
+        ever_treated_matched = matched_panel.groupby("tract_geoid")["treated"].max()
+        n_matched = int(ever_treated_matched.index.nunique())
+        n_matched_treated = int((ever_treated_matched >= 1).sum())
+        n_matched_never = int(n_matched - n_matched_treated)
+        _append_row(
+            "F",
+            "Matched DiD panel",
+            n_matched,
+            "Tracts retained after k=3 nearest-neighbor matching on standardized pre-treatment slope and average pre-treatment rent, with at least 6 pre-treatment months.",
+            treated_tracts=n_matched_treated,
+            never_treated_tracts=n_matched_never,
+        )
+
+        cohort_stats = self._compute_cohort_stats(
+            context.get("did_panel_with_covariates", matched_panel),
+            min_cohort_size=MIN_COHORT_SIZE_FOR_DESCRIPTIONS,
+        )
+        if cohort_stats is not None and not cohort_stats.empty:
+            n_cs_treated = int(cohort_stats["n_tracts"].sum())
+            n_cs_cohorts = int(len(cohort_stats))
+            _append_row(
+                "G",
+                "CS-visible treated cohorts",
+                n_cs_treated,
+                "Treated tracts that remain in cohort-level CS figures/tables after dropping adoption months with fewer than 5 treated tracts.",
+                treated_tracts=n_cs_treated,
+                never_treated_tracts=0,
+                extra={"n_cs_cohort_months": n_cs_cohorts},
+            )
+
+        return pd.DataFrame(rows)
+
     def _compute_cohort_stats(
         self,
         panel: pd.DataFrame,
@@ -345,11 +518,13 @@ class DIDDescriptiveAnalyzer(Analyzer):
     def _export_tables(
         self,
         output_dir: str,
+        context: dict[str, Any],
         adoption_stats: dict[str, Any],
         pre_balance: pd.DataFrame,
         summary_stats: pd.DataFrame,
         balance_test: dict[str, float],
         panel_structure: dict[str, Any],
+        sample_lineage: pd.DataFrame,
         did_panel: pd.DataFrame,
         cohort_stats: pd.DataFrame | None,
     ) -> None:
@@ -367,6 +542,34 @@ class DIDDescriptiveAnalyzer(Analyzer):
         pd.DataFrame([panel_structure]).to_csv(
             out / "did_descriptive_panel_overview.csv", index=False
         )
+        if sample_lineage is not None and not sample_lineage.empty:
+            sample_lineage.to_csv(
+                out / "did_descriptive_sample_lineage.csv", index=False
+            )
+
+        crosswalk_diagnostics = context.get("crosswalk_diagnostics")
+        if crosswalk_diagnostics:
+            pd.DataFrame([crosswalk_diagnostics]).drop(
+                columns=["projected_crs"], errors="ignore"
+            ).to_csv(out / "did_crosswalk_diagnostics.csv", index=False)
+
+        crosswalk_coverage = context.get("crosswalk_tract_coverage")
+        if crosswalk_coverage is not None and not crosswalk_coverage.empty:
+            crosswalk_coverage.to_csv(out / "did_crosswalk_tract_coverage.csv", index=False)
+
+        matching_diagnostics = context.get("matching_diagnostics")
+        if matching_diagnostics:
+            matching_row = {
+                k: v
+                for k, v in matching_diagnostics.items()
+                if k != "control_reuse_table"
+            }
+            pd.DataFrame([matching_row]).to_csv(
+                out / "did_matching_diagnostics.csv", index=False
+            )
+            control_reuse = matching_diagnostics.get("control_reuse_table")
+            if control_reuse is not None and not control_reuse.empty:
+                control_reuse.to_csv(out / "did_matching_control_reuse.csv", index=False)
 
         adoption_stats["adoption_by_month"].to_csv(
             out / "did_descriptive_adoption_by_month.csv"

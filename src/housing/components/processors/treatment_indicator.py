@@ -39,15 +39,17 @@ class TreatmentIndicatorProcessor(DataProcessor):
             "treatment_indicator",
             "Add treatment indicators to tract-level rental panel for DiD analysis",
         )
-        self.required_data = ["tract_rental_panel", "tract_prohibition_dates"]
+        self.required_data = ["tract_panel_data", "tract_prohibition_dates"]
         self.output_path = output_path or "/project/output/did_panel_data.csv"
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Add treatment indicators to the rental panel.
 
         Required context keys:
-            - tract_rental_panel: DataFrame with (tract_geoid, month, rental_price)
+            - tract_panel_data: DataFrame with (tract_geoid, month, rental_price)
             - tract_prohibition_dates: DataFrame with (tract_geoid, first_prohibition_date, building_count)
+
+        For backward compatibility, ``tract_rental_panel`` is used if ``tract_panel_data`` is absent.
 
         Returns:
             Dictionary with 'did_panel' containing a DataFrame with columns:
@@ -58,8 +60,13 @@ class TreatmentIndicatorProcessor(DataProcessor):
             - months_since_treatment: relative time (negative before, 0 at, positive after treatment)
             - first_prohibition_date: treatment date (NaT for never-treated)
         """
-        # Get inputs from context
-        panel = context["tract_rental_panel"].copy()
+        panel_src = context.get("tract_panel_data")
+        if panel_src is None:
+            panel_src = context.get("tract_rental_panel")
+        if panel_src is None:
+            msg = "Expected 'tract_panel_data' (or legacy 'tract_rental_panel') in context."
+            raise KeyError(msg)
+        panel = panel_src.copy()
         treatment_dates = context["tract_prohibition_dates"]
 
         logger.info("Adding treatment indicators to tract-level rental panel...")
@@ -128,7 +135,10 @@ class TreatmentIndicatorProcessor(DataProcessor):
         merged.to_csv(output_file, index=False)
         logger.info("  Saved DiD panel to: %s", output_file)
 
-        return {"did_panel": merged}
+        return {
+            "did_panel": merged,
+            "did_panel_unmatched": merged.copy(),
+        }
 
     def _validate_treatment_indicator(self, df: pd.DataFrame) -> None:
         """Validate that treatment indicators are correctly assigned.

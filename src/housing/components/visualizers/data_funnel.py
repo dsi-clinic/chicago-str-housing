@@ -220,8 +220,8 @@ class DataFunnelVisualizer(Visualizer):
         fig.text(
             0.5,
             0.02,
-            "Matched panel keeps all treated tracts; removes never-treated tracts whose pre-rent slope "
-            "does not match any treated tract (k=3 nearest slopes).",
+            "Matched panel keeps all treated tracts; removes never-treated tracts not selected as "
+            "k=3 nearest neighbors on standardized pre-treatment rent slope and average pre-treatment rent.",
             ha="center",
             fontsize=9,
             color="#555555",

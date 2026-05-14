@@ -25,17 +25,17 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
     We normalize these to weights (proportion of ZIP area in each tract)
     and use them to allocate rental prices to tracts.
 
-    Output is exposed as both ``tract_rental_panel`` (legacy DiD scripts) and
-    ``tract_panel_data`` (threshold / intensity treatment pipelines).
+    Output key is ``tract_panel_data`` (canonical for treatment builders and DiD panels).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, weight_column: str = "tract_area_share") -> None:
         """Initialize the time series ZIP to tract processor."""
         super().__init__(
             "zip_to_tract_panel",
             "Convert ZIP-level rental panel to tract-level panel",
         )
         self.required_data = ["rental_panel_data", "zip_to_tract_crosswalk"]
+        self.weight_column = weight_column
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Perform area-weighted conversion from ZIP to tract level.
@@ -45,7 +45,7 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
             - zip_to_tract_crosswalk: DataFrame with (zip_code, tract_geoid, intersection_area)
 
         Returns:
-            Dictionary with ``tract_rental_panel`` and ``tract_panel_data`` (same frame):
+            Dictionary with ``tract_panel_data``:
             - tract_geoid: Census tract GEOID
             - month: datetime of the observation
             - rental_price: area-weighted rental price for that tract-month
@@ -57,9 +57,16 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
         logger.info("  Input ZIP panel: %d observations", len(zip_panel))
         logger.info("  Crosswalk entries: %d ZIP-tract pairs", len(crosswalk))
 
-        crosswalk["weight"] = crosswalk.groupby("zip_code")[
-            "intersection_area"
-        ].transform(lambda x: x / x.sum())
+        if self.weight_column in crosswalk.columns:
+            crosswalk["weight"] = crosswalk[self.weight_column]
+        else:
+            logger.warning(
+                "  Weight column '%s' missing in crosswalk; falling back to ZIP-normalized weights",
+                self.weight_column,
+            )
+            crosswalk["weight"] = crosswalk.groupby("zip_code")[
+                "intersection_area"
+            ].transform(lambda x: x / x.sum())
 
         n_zips_crosswalk = crosswalk["zip_code"].nunique()
         n_tracts_crosswalk = crosswalk["tract_geoid"].nunique()
@@ -132,7 +139,4 @@ class TimeSeriesZipToTractProcessor(DataProcessor):
                 expected_obs,
             )
 
-        return {
-            "tract_rental_panel": tract_panel,
-            "tract_panel_data": tract_panel,
-        }
+        return {"tract_panel_data": tract_panel}

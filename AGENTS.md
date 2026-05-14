@@ -23,15 +23,26 @@ export DATA_DIR="$(pwd)/data"   # or your path
 
 Or Docker: `make run-did-pipeline-cs` (see [`docs/DID_CS_RUNBOOK.md`](docs/DID_CS_RUNBOOK.md)). `DID_TREATMENT_MODE=both` runs the full pipeline twice into `{output}-threshold` and `{output}-binary`.
 
-### Sample flow: tracts, census, trend matching
+### Sample flow: tracts, census, full-panel CS, trend matching
 
 1. **Tract–month panel** — After ZORI + ZIP→tract crosswalk (`TimeSeriesZipToTractProcessor`), you have one row per tract–month for tracts that appear in the rent panel (`tract_panel_data`). That is the geographic/time coverage of rents, not necessarily every census tract in the city shapefile.
 
 2. **Treatment** — `TreatmentThresholdProcessor` (default) or `TreatmentIndicatorProcessor` (`DID_TREATMENT_MODE=binary`) builds `did_panel` with `treated` / timing. Counts of “treated tracts” and “never-treated” come from this step (see pipeline logs and `did_descriptive_*.csv` after a run).
 
-3. **Census** — `CensusDataLoader` + `DIDCovariateProcessor` **add columns** (income, occupancy, etc.) via merge on tract ID. That is mostly **not** dropping tract–months; you may get **missing covariates** where ACS has no match. `TreatmentThresholdProcessor` also uses ACS occupied units for the share threshold—tracts without occupied-units data can behave like missing denominator (see that processor’s fill logic).
+3. **Full-panel CS branch** — The current white-paper pipeline now runs a **full-panel Callaway-Sant'Anna estimate before matching**. This is the primary rent-level DiD design and should generally be treated as the headline estimate before any matched-sample restriction.
 
-4. **Trend matching** — This step **does** shrink the estimand sample **on purpose**: only tracts with at least `min_pre_periods` (default 6) months of data **before the first treated month in the panel** enter the pre-trend calculation; each **ever-treated** tract is matched to `k_neighbors` **never-treated** tracts by pre-treatment rent slope; downstream TWFE/CS use **only** those matched tracts. So you **lose** never-treated tracts that are not selected as matches and **lose** treated tracts that lack enough pre-periods. That is separate from the tract-specific linear trends inside **CS with controls** ([`CS_WITH_CONTROLS.md`](docs/CS_WITH_CONTROLS.md)).
+4. **Census** — `CensusDataLoader` + `DIDCovariateProcessor` **add columns** (income, occupancy, etc.) via merge on tract ID. That is mostly **not** dropping tract–months; you may get **missing covariates** where ACS has no match. `TreatmentThresholdProcessor` also uses ACS occupied units for the share threshold—tracts without occupied-units data can behave like missing denominator (see that processor’s fill logic).
+
+5. **Trend matching** — This step **does** shrink the estimand sample **on purpose**: only tracts with at least `min_pre_periods` (default 6) months of data **before the first treated month in the panel** enter the pre-trend calculation; each **ever-treated** tract is matched to `k_neighbors` **never-treated** tracts using standardized **pre-treatment rent slope plus average pre-treatment rent**; downstream TWFE/CS matched-sample outputs use **only** those matched tracts. So you **lose** never-treated tracts that are not selected as matches and **lose** treated tracts that lack enough pre-periods. That is separate from the tract-specific linear trends inside **CS with controls** ([`CS_WITH_CONTROLS.md`](docs/CS_WITH_CONTROLS.md)).
+
+### Current econometric interpretation
+
+- Treat the **full-panel Callaway-Sant'Anna estimate** as the primary result.
+- Treat **threshold vs. binary treatment definitions** as sensitivity on treatment timing/classification.
+- Treat **matching** as a robustness restriction, not the core identification argument.
+- Treat **CS with ACS covariates + tract-specific linear trends** as a residualized robustness design; its ATT is **not directly comparable in magnitude** to the raw rent-level ATT.
+- Current residualized event studies typically look **better** near treatment than the raw matched/full-panel event studies, but they do **not** fully solve the pre-trend problem. Use them as evidence on sensitivity, not as proof that parallel trends holds exactly.
+- If matching is improved further, prioritize: tract-specific untreated histories, richer lagged pre-treatment outcome features, calipers, geography/submarket restrictions, and explicit control-reuse diagnostics.
 
 ---
 
@@ -62,12 +73,12 @@ Loads (APIs/files) → Processors (geospatial joins, tract panel) → Analyzers 
 
 - **Treatment:** First month a tract has STR prohibition adoption (derived from prohibited buildings aggregate).
 - **Outcome:** Monthly rent proxy (e.g. ZORI interpolated to tract).
-- **Design:** **Staggered DiD.** TWFE/event study compares to **Callaway & Sant'Anna** group-time ATTs (`CallawaySantAnnaAnalyzer`; [`callaway_santanna_with_controls.py`](src/housing/components/analyzers/callaway_santanna_with_controls.py) adds **pre-period-only** residualization: ACS covariates + tract-specific linear trends, then DR-style comparisons).
-- **Sample restriction:** [`TrendMatchingProcessor`](src/housing/components/processors/trend_matching.py) matches treated to never-treated tracts by pre-treatment rent trend slope (**separate from** tract-level linear trends in the CS-with-controls estimator).
+- **Design:** **Staggered DiD.** The preferred current ordering is: full-panel **Callaway & Sant'Anna** group-time ATT, then treatment-definition sensitivity, then matched-sample robustness, then residualized CS with ACS covariates + tract-specific linear trends ([`callaway_santanna_with_controls.py`](src/housing/components/analyzers/callaway_santanna_with_controls.py)).
+- **Sample restriction:** [`TrendMatchingProcessor`](src/housing/components/processors/trend_matching.py) matches treated to never-treated tracts on standardized pre-treatment rent slope plus average pre-treatment rent (**separate from** tract-level linear trends in the CS-with-controls estimator).
 
 Important scripts:
 
-- [`did_pipeline_callaway_santanna.py`](src/housing/scripts/did_pipeline_callaway_santanna.py): TWFE + CS + CS with controls → figures under configurable output (Docker: `/project/output/did-cs/`).
+- [`did_pipeline_callaway_santanna.py`](src/housing/scripts/did_pipeline_callaway_santanna.py): full-panel CS + matched TWFE/CS + CS with controls → figures under configurable output (Docker: `/project/output/did-cs/`).
 
 **Slide / whitepaper tree:** With `DID_WHITEPAPER_MODE=1` (or `make run-did-pipeline-cs-whitepaper`), outputs default to **`output/did-cs-whitepaper/`** and add pretrend heuristic, cohort explainer figure, spatial donut/dose diagnostics, and `tables/tab_*.tex`. See [`docs/DID_CS_RUNBOOK.md`](docs/DID_CS_RUNBOOK.md) and [`docs/white-paper/STORY_OUTLINE.md`](docs/white-paper/STORY_OUTLINE.md).
 Docker / Make: [`Makefile`](Makefile)—`make run-did-pipeline-cs`; `run-did-pipeline-cs-local` copies `data/` to `/tmp` to avoid Box/cloud sync locks.

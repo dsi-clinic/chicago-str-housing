@@ -166,7 +166,9 @@ def run_did_analysis_with_cs() -> tuple:
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(TimeSeriesRentalLoader(file_path=ZORI_CSV))
     pipeline.register_component(RentalDataLoader(file_path=ZORI_CSV))
-    pipeline.register_component(CensusDataLoader(api_key=os.getenv("CENSUS_API_KEY")))
+    pipeline.register_component(
+        CensusDataLoader(state_fips="17", county_fips="031"),
+    )
 
     # 2. Process Data
     logger.info("\n[2/5] Processing panel data...")
@@ -200,7 +202,11 @@ def run_did_analysis_with_cs() -> tuple:
     # 3. Trend matching (restrict panel to matched treated + control tracts)
     logger.info("\n[3/6] Trend matching for parallel trends...")
     pipeline.register_component(
-        TrendMatchingProcessor(k_neighbors=3, min_pre_periods=6)
+        TrendMatchingProcessor(
+            k_neighbors=3,
+            min_pre_periods=6,
+            matching_features=("pre_trend_slope", "avg_pre_rent"),
+        )
     )
 
     # 4. Descriptive Analysis (on matched sample)

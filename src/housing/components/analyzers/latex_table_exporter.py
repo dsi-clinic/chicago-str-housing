@@ -48,6 +48,7 @@ class LaTeXTableExporter(Analyzer):
         written: list[str] = []
 
         # --- Pooled ATTs (context) ---
+        cs_full = context.get("cs_overall_att_full_panel") or {}
         cs = context.get("cs_overall_att") or {}
         csw = context.get("cs_overall_att_with_controls") or {}
         tab_main = [
@@ -56,13 +57,22 @@ class LaTeXTableExporter(Analyzer):
             "\\toprule",
             "Estimator & ATT (\\$/mo.) & SE \\\\",
             "\\midrule",
+        ]
+        if cs_full:
+            tab_main.append(
+                "Callaway--Sant'Anna (full panel) "
+                + f"& {_cell_att_se(_num(cs_full.get('att')), _num(cs_full.get('se')))} \\\\"
+            )
+        tab_main.extend(
+            [
             "Callaway--Sant'Anna (matched sample) "
             + f"& {_cell_att_se(_num(cs.get('att')), _num(cs.get('se')))} \\\\",
-            "Callaway--Sant'Anna w/ ACS + tract trends "
+            "Callaway--Sant'Anna w/ ACS + tract trends (matched sample) "
             + f"& {_cell_att_se(_num(csw.get('att')), _num(csw.get('se')))} \\\\",
             "\\bottomrule",
             "\\end{tabular}",
-        ]
+            ]
+        )
         p_main = tdir / "tab_main_att.tex"
         p_main.write_text("\n".join(tab_main) + "\n", encoding="utf-8")
         written.append(str(p_main))
@@ -157,6 +167,7 @@ class LaTeXTableExporter(Analyzer):
         panel_raw_path = self.output_dir / "did_panel_data.csv"
         panel_ov_path = self.output_dir / "did_descriptive_panel_overview.csv"
         cohort_stats_path = self.output_dir / "did_descriptive_cohort_stats.csv"
+        sample_lineage_path = self.output_dir / "did_descriptive_sample_lineage.csv"
 
         def _currency0(x: float) -> str:
             if x != x:
@@ -164,7 +175,36 @@ class LaTeXTableExporter(Analyzer):
             inner = f"{x:,.0f}".replace(",", "{,}")
             return f"${inner}$"
 
-        if panel_raw_path.exists() and panel_ov_path.exists():
+        if sample_lineage_path.exists():
+            ldf = pd.read_csv(sample_lineage_path)
+            if not ldf.empty:
+                def _fmt_int(value: Any) -> str:
+                    if pd.isna(value):
+                        return "---"
+                    return str(int(value))
+
+                funnel_lines = [
+                    "% Auto-generated",
+                    "\\begin{tabular}{@{} l l r r r @{}}",
+                    "\\toprule",
+                    "Stage & Sample slice & Tracts & Treated & Never-treated \\\\",
+                    "\\midrule",
+                ]
+                for _, rw in ldf.iterrows():
+                    label = str(rw.get("stage_code", ""))
+                    name = str(rw.get("stage_label", ""))
+                    tracts = _fmt_int(rw.get("n_tracts"))
+                    treated = _fmt_int(rw.get("treated_tracts"))
+                    never = _fmt_int(rw.get("never_treated_tracts"))
+                    funnel_lines.append(
+                        f"\\textbf{{{label}}} & {name} & {tracts} & {treated} & {never} \\\\"
+                    )
+                funnel_lines.extend(["\\bottomrule", "\\end{tabular}"])
+                p_funnel = tdir / "tab_data_funnel.tex"
+                p_funnel.write_text("\n".join(funnel_lines) + "\n", encoding="utf-8")
+                written.append(str(p_funnel))
+
+        elif panel_raw_path.exists() and panel_ov_path.exists():
             pdf_raw = pd.read_csv(
                 panel_raw_path,
                 usecols=["tract_geoid", "treated"],
@@ -207,12 +247,12 @@ class LaTeXTableExporter(Analyzer):
                 (
                     r"\textbf{A} & Raw Chicago tract$\times$month panel "
                     r"(ZIP rent crosswalk; prohibited-building timing)."
-                    r" Before slope matching."
+                    r" Before pre-treatment matching."
                     f"& {n_raw} & {n_raw_tr} & {n_raw_nt} \\\\"
                 ),
                 (
                     r"\textbf{B} & Matched DiD panel: retain never-treated tract if "
-                    r"pre-treatment rent slope is among the nearest "
+                    r"standardized pre-treatment slope and average rent are among the nearest "
                     r"$k{=}3$ to at least one treated tract "
                     r"($\geq 6$ pre-months)."
                     f"& {n_ma} & {n_ma_tr} & {n_ma_nt} \\\\"

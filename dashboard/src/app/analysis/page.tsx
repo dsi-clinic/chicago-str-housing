@@ -2,7 +2,8 @@ import FigureSlot from '@/components/FigureSlot'
 import InfoBlock from '@/components/InfoBlock'
 import StatTable from '@/components/StatTable'
 import CohortBarChart from '@/components/CohortBarChart'
-import { loadSampleLineage, loadGroupStats, loadCohortStats, loadCovariateBalance } from '@/lib/data'
+import { loadSampleLineage, loadGroupStats, loadCohortStats, loadCovariateBalance,
+         loadParallelTrendsTest, loadHonestPretrends } from '@/lib/data'
 
 const COVARIATE_LABELS: Record<string, string> = {
   median_income:      'Median income',
@@ -23,6 +24,10 @@ export default function AnalysisPage() {
   const balance = loadCovariateBalance('binary')
     .filter(b => b.covariate in COVARIATE_LABELS)
     .sort((a, b) => b.cohens_d - a.cohens_d)
+  const ptB = loadParallelTrendsTest('binary')
+  const ptT = loadParallelTrendsTest('threshold')
+  const hpB = loadHonestPretrends('binary')
+  const hpT = loadHonestPretrends('threshold')
 
   const stageDbin = linB.find(s => s.stage_code === 'D')
   const stageFbin = linB.find(s => s.stage_code === 'F')
@@ -53,47 +58,47 @@ export default function AnalysisPage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-extrabold tracking-tight mb-2">Treatment Characterization</h2>
+      <h2 className="text-2xl font-extrabold tracking-tight mb-2">Treatment Characterization & Assumption Checks</h2>
       <p className="text-[15px] text-gray-500 mb-10 max-w-2xl leading-relaxed">
-        Who got treated, when, and how the two treatment definitions differ — before asking
-        whether the effect is causal.
+        Who got treated, when, whether treated and control neighborhoods were comparable
+        before the ban, and whether the parallel trends assumption holds.
       </p>
 
-      {/* ── 1. Treatment counts by indicator ── */}
+      {/* ── 1. Treatment counts ── */}
       <h3 className="text-lg font-bold mb-1">Treatment counts by indicator</h3>
       <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
         The binary indicator counts any prohibition in a tract. The threshold indicator
-        requires the share of prohibited units to cross a minimum. The two definitions
-        agree on never-treated tracts but disagree on which tracts cross the threshold.
+        requires the share of prohibited units to cross a minimum. Both definitions agree
+        on never-treated tracts but differ on which tracts cross the threshold.
       </p>
       <div className="grid grid-cols-2 gap-6 mb-10">
         <InfoBlock
           title="Binary indicator"
           rows={[
-            { label: 'Treated tracts (pre-match)',       value: (stageDbin?.treated ?? 373).toLocaleString(),        valueClass: 'text-maroon' },
-            { label: 'Never-treated pool',               value: (stageDbin?.never_treated ?? 469).toLocaleString() },
-            { label: 'Matched analysis sample',          value: (stageFbin?.n_tracts ?? 556).toLocaleString(),       valueClass: 'text-blue-600' },
-            { label: 'Mean rent · treated (matched)',    value: `$${treatedB.mean_rent.toFixed(0)} / mo` },
-            { label: 'Mean rent · controls (matched)',   value: `$${controlB.mean_rent.toFixed(0)} / mo` },
+            { label: 'Treated (pre-match)',       value: (stageDbin?.treated ?? 373).toLocaleString(),   valueClass: 'text-maroon' },
+            { label: 'Never-treated pool',        value: (stageDbin?.never_treated ?? 469).toLocaleString() },
+            { label: 'Matched analysis sample',   value: (stageFbin?.n_tracts ?? 556).toLocaleString(),  valueClass: 'text-blue-600' },
+            { label: 'Mean rent · treated',       value: `$${treatedB.mean_rent.toFixed(0)} / mo` },
+            { label: 'Mean rent · controls',      value: `$${controlB.mean_rent.toFixed(0)} / mo` },
           ]}
         />
         <InfoBlock
           title="Threshold indicator"
           rows={[
-            { label: 'Treated tracts (pre-match)',       value: (stageDthr?.treated ?? 274).toLocaleString(),        valueClass: 'text-teal-600' },
-            { label: 'Never-treated pool',               value: (stageDthr?.never_treated ?? 568).toLocaleString() },
-            { label: 'Matched analysis sample',          value: (stageFthr?.n_tracts ?? 453).toLocaleString(),       valueClass: 'text-teal-600' },
-            { label: 'Mean rent · treated (matched)',    value: `$${treatedT.mean_rent.toFixed(0)} / mo` },
-            { label: 'Mean rent · controls (matched)',   value: `$${controlT.mean_rent.toFixed(0)} / mo` },
+            { label: 'Treated (pre-match)',       value: (stageDthr?.treated ?? 274).toLocaleString(),   valueClass: 'text-teal-600' },
+            { label: 'Never-treated pool',        value: (stageDthr?.never_treated ?? 568).toLocaleString() },
+            { label: 'Matched analysis sample',   value: (stageFthr?.n_tracts ?? 453).toLocaleString(),  valueClass: 'text-teal-600' },
+            { label: 'Mean rent · treated',       value: `$${treatedT.mean_rent.toFixed(0)} / mo` },
+            { label: 'Mean rent · controls',      value: `$${controlT.mean_rent.toFixed(0)} / mo` },
           ]}
         />
       </div>
 
-      {/* ── 2. When did prohibitions arrive? ── */}
+      {/* ── 2. Cohort adoption timeline ── */}
       <h3 className="text-lg font-bold mb-1">When did prohibitions arrive?</h3>
       <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
         Prohibitions rolled out in waves from mid-2016 onward. The July and August 2016
-        cohorts account for the largest share of treated tracts under both definitions.
+        cohorts account for the largest share under both definitions.
         Early cohorts tend to be higher-rent neighborhoods.
       </p>
       <div className="grid grid-cols-2 gap-5 mb-6">
@@ -112,41 +117,72 @@ export default function AnalysisPage() {
         rows={cohortRows}
       />
 
-      {/* ── 3. Pre-treatment rent distributions ── */}
-      <h3 className="text-lg font-bold mb-1">Pre-treatment rent distributions</h3>
+      {/* ── 3. Pre-treatment comparability ── */}
+      <h3 className="text-lg font-bold mb-1">Are treated and control tracts comparable?</h3>
       <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
-        Even before any prohibition, treated tracts had substantially higher rents than
-        never-treated ones. This level gap is one reason the comparison is difficult and
-        motivates the use of CS rather than a simple before-after design.
+        On every measured covariate, treated tracts differ significantly from the
+        never-treated pool before any ban. The education gap is largest (Cohen's d ≈ 1.08).
+        This motivates the use of never-treated controls rather than a simple before-after
+        comparison, and matching as a robustness check.
       </p>
+      <StatTable
+        className="mb-6"
+        headers={['Covariate', 'Treated Mean', 'Control Mean', '% Diff', "Cohen's d", 'Imbalanced']}
+        rows={balanceRows}
+      />
       <FigureSlot
         src="/data/binary/did_story_pre_rent_violin.png"
-        alt="Pre-treatment rent distribution by group"
-        label="Pre-treatment rent — never-treated vs ever-treated (binary, matched sample)"
+        alt="Pre-treatment rent distribution"
+        label="Pre-treatment rent distribution — never-treated vs ever-treated (binary, matched sample)"
         className="mb-10"
       />
 
-      {/* ── 4. Are treated and control tracts comparable? ── */}
-      <h3 className="text-lg font-bold mb-1">Are treated and control tracts comparable?</h3>
+      {/* ── 4. Parallel trends assumption ── */}
+      <h3 className="text-lg font-bold mb-1">The identifying assumption: parallel trends</h3>
       <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
-        On every measured covariate, treated tracts are significantly different from the
-        never-treated pool before any matching. The education gap is the largest
-        (Cohen's d ≈ 1.08). This does not disqualify a causal estimate, but it means the
-        comparison group choice matters — and the full-panel CS result should be accompanied
-        by sensitivity checks on the comparison group (see Robustness tab).
+        For a DiD estimate to be causal, treated and control neighborhoods must have moved
+        in parallel before the ban. We cannot prove this, but we can test whether pre-ban
+        rent trends already diverged.
       </p>
 
-      <FigureSlot
-        src="/data/binary/did_story_matching_love.png"
-        alt="SMD before and after matching on pre-trend features"
-        label="Pre-treatment balance — SMD before matching (grey) and after k-NN matching (maroon)"
-        className="mb-6"
-      />
+      <div className="grid grid-cols-2 gap-6 mb-4">
+        <InfoBlock
+          title="Formal regression test"
+          rows={[
+            { label: 'Binary p-value',      value: ptB.p_value.toFixed(3), valueClass: ptB.significant ? 'text-maroon' : 'text-teal-600' },
+            { label: 'Threshold p-value',   value: ptT.p_value.toFixed(3), valueClass: ptT.significant ? 'text-maroon' : 'text-teal-600' },
+            { label: 'Binary verdict',      value: ptB.significant ? 'Rejects at 5% ✗' : 'Does not reject ✓', valueClass: ptB.significant ? 'text-maroon' : 'text-teal-600' },
+            { label: 'Threshold verdict',   value: ptT.significant ? 'Rejects at 5% ✗' : 'Does not reject ✓', valueClass: ptT.significant ? 'text-maroon' : 'text-teal-600' },
+          ]}
+        />
+        <InfoBlock
+          title="Pre-period TWFE coefficients"
+          rows={[
+            { label: 'Binary max |pre-coef|',    value: `$${hpB.max_abs_twfe_coef_pre.toFixed(1)} / mo` },
+            { label: 'Threshold max |pre-coef|', value: `$${hpT.max_abs_twfe_coef_pre.toFixed(1)} / mo` },
+            { label: 'Sign restriction violated', value: hpB.violates_sign_restriction ? 'Yes ✗' : 'No ✓', valueClass: hpB.violates_sign_restriction ? 'text-maroon' : 'text-teal-600' },
+            { label: 'Pre-periods checked',       value: `${hpB.n_pre_periods}` },
+          ]}
+        />
+      </div>
 
-      <StatTable
-        className="mb-0"
-        headers={['Covariate', 'Treated Mean', 'Control Mean', '% Diff', "Cohen's d", 'Imbalanced']}
-        rows={balanceRows}
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="bg-teal-50 border border-teal-200/60 rounded-xl px-4 py-3 text-[12px] text-gray-700">
+          <strong className="text-teal-700 block mb-1">Formal test does not reject.</strong>
+          Neither binary (p={ptB.p_value.toFixed(2)}) nor threshold (p={ptT.p_value.toFixed(2)})
+          shows a statistically significant pre-trend difference.
+        </div>
+        <div className="bg-amber-50 border border-amber-200/60 rounded-xl px-4 py-3 text-[12px] text-gray-700">
+          <strong className="text-amber-700 block mb-1">Visual evidence is imperfect.</strong>
+          Max pre-period coefficients (~${hpB.max_abs_twfe_coef_pre.toFixed(0)} binary, ${hpT.max_abs_twfe_coef_pre.toFixed(0)} threshold)
+          are roughly half the full-panel ATT. Plausible — not proven.
+        </div>
+      </div>
+
+      <FigureSlot
+        src="/data/binary/did_parallel_trends.png"
+        alt="Pre-treatment rent trends"
+        label="Average rent — treated vs never-treated before the ban (binary, matched sample)"
       />
     </div>
   )

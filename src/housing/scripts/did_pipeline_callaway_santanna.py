@@ -29,6 +29,8 @@ Use CS instead of TWFE when:
 
 **Output:**
 
+- Env ``DID_TREATMENT_MODE`` (or ``run_did_analysis_with_cs(treatment_mode=...)``): ``threshold``,
+  ``binary``, or ``both`` (latter writes ``{output}-threshold`` and ``{output}-binary``).
 - TWFE event study (baseline)
 - Callaway-Sant'Anna event study (robust)
 - Callaway-Sant'Anna with controls (covariates + tract trends; optional census)
@@ -50,6 +52,7 @@ from housing.components.analyzers.callaway_santanna_with_controls import (
     CallawaySantAnnaWithControlsAnalyzer,
 )
 from housing.components.analyzers.did_descriptive import DIDDescriptiveAnalyzer
+from housing.components.analyzers.did_story_tables import DIDStoryTablesAnalyzer
 from housing.components.analyzers.event_study import EventStudyAnalyzer
 from housing.components.analyzers.honest_pretrends import HonestPretrendsAnalyzer
 from housing.components.analyzers.latex_table_exporter import LaTeXTableExporter
@@ -69,6 +72,9 @@ from housing.components.processors.time_series_zip_to_tract import (
 from housing.components.processors.tract_prohibition_dates import (
     TractProhibitionDatesProcessor,
 )
+from housing.components.processors.treatment_indicator import (
+    TreatmentIndicatorProcessor,
+)
 from housing.components.processors.treatment_threshold import (
     TreatmentThresholdProcessor,
 )
@@ -83,6 +89,7 @@ from housing.components.visualizers.cohort_dynamics_explainer import (
 )
 from housing.components.visualizers.data_funnel import DataFunnelVisualizer
 from housing.components.visualizers.did_sample_map import DiDSampleMapVisualizer
+from housing.components.visualizers.did_story_graphics import DIDStoryGraphicsVisualizer
 from housing.components.visualizers.did_story_map import DiDStoryMapVisualizer
 from housing.components.visualizers.did_trends import DIDTrendsVisualizer
 from housing.components.visualizers.event_study import EventStudyVisualizer
@@ -124,6 +131,27 @@ DID_PREFLIGHT_MSG = (
     "  cp -r data /tmp/chicago_data\n"
     "  DATA_DIR=/tmp/chicago_data make run-did-pipeline-cs"
 )
+
+
+def _resolve_treatment_mode(explicit: str | None) -> str:
+    """Normalize treatment mode: ``threshold``, ``binary``, or ``both``."""
+    raw = (
+        (explicit or os.environ.get("DID_TREATMENT_MODE") or "threshold")
+        .strip()
+        .lower()
+    )
+    if raw not in {"threshold", "binary", "both"}:
+        msg = (
+            f"DID_TREATMENT_MODE must be 'threshold', 'binary', or 'both'; got {raw!r}"
+        )
+        raise ValueError(msg)
+    return raw
+
+
+def _output_dir_with_treatment_suffix(base: str, suffix: str) -> str:
+    """Append ``-{suffix}`` to the last path segment (separate artefact trees per mode)."""
+    p = Path(base)
+    return str(p.parent / f"{p.name}-{suffix}")
 
 
 def _preflight_check() -> None:
@@ -179,23 +207,51 @@ def _get_twfe_event_df(results: dict) -> pd.DataFrame | None:
     return twfe_data[twfe_data["rel_time"] != -1].reset_index(drop=True)
 
 
-def run_did_analysis_with_cs() -> tuple:
-    """Run DiD analysis with both TWFE and Callaway-Sant'Anna estimators."""
+def run_did_analysis_with_cs(
+    *,
+    treatment_mode: str | None = None,
+    output_dir: str | None = None,
+) -> tuple:
+    """Run DiD analysis with both TWFE and Callaway-Sant'Anna estimators.
+
+    Args:
+        treatment_mode: ``threshold`` (unit-share rule), ``binary`` (any first prohibition
+            month), or ``both`` (two full pipeline runs). If omitted, uses env
+            ``DID_TREATMENT_MODE`` (default ``threshold``).
+        output_dir: Artefact directory; defaults to ``DID_CS_OUTPUT_DIR``. For
+            ``treatment_mode='both'``, the two runs use ``{base}-threshold`` and
+            ``{base}-binary`` where ``base`` is ``output_dir`` or ``DID_CS_OUTPUT_DIR``.
+    """
+    mode = _resolve_treatment_mode(treatment_mode)
+    if mode == "both":
+        base_out = output_dir or DID_CS_OUTPUT_DIR
+        out_th = _output_dir_with_treatment_suffix(base_out, "threshold")
+        out_bi = _output_dir_with_treatment_suffix(base_out, "binary")
+        logger.info(
+            "DID_TREATMENT_MODE=both: threshold → %s; binary → %s",
+            out_th,
+            out_bi,
+        )
+        run_did_analysis_with_cs(treatment_mode="threshold", output_dir=out_th)
+        return run_did_analysis_with_cs(treatment_mode="binary", output_dir=out_bi)
+
+    out_dir = output_dir or DID_CS_OUTPUT_DIR
+
     logger.info("=" * 80)
     logger.info("DiD Analysis Pipeline: TWFE vs. Callaway-Sant'Anna (2021)")
+    logger.info("Treatment mode: %s", mode)
+    logger.info("Output directory: %s", out_dir)
     logger.info("=" * 80)
     _preflight_check()
 
-    Path(DID_CS_OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
 
     pipeline = Pipeline("Chicago Housing DiD: TWFE vs. Callaway-Sant'Anna")
 
     # 1. Load Data
     logger.info("\n[1/5] Loading data...")
     pipeline.register_component(ZipBoundariesLoader())
-    pipeline.register_component(
-        TractBoundariesLoader(file_path=str(TRACT_SHP))
-    )
+    pipeline.register_component(TractBoundariesLoader(file_path=str(TRACT_SHP)))
     pipeline.register_component(CityBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
     pipeline.register_component(TimeSeriesRentalLoader(file_path=str(ZORI_CSV)))
@@ -217,30 +273,53 @@ def run_did_analysis_with_cs() -> tuple:
             data_source_name="str_prohibition",
         )
     )
+    pipeline.register_component(TractProhibitionDatesProcessor(output_dir=out_dir))
     pipeline.register_component(
-        TractProhibitionDatesProcessor(output_dir=DID_CS_OUTPUT_DIR)
+        CensusDataLoader(state_fips="17", county_fips="031"),
     )
-    pipeline.register_component(
-        CensusDataLoader(
-            state_fips="17",
-            county_fips="031",
-            api_key=os.getenv("CENSUS_API_KEY"),
+    if mode == "threshold":
+        pipeline.register_component(
+            TreatmentThresholdProcessor(
+                output_dir=out_dir,
+                percentile=0.25,
+            )
         )
-    )
-    pipeline.register_component(
-        TreatmentThresholdProcessor(
-            output_dir=DID_CS_OUTPUT_DIR,
-            percentile=0.25,
+    else:
+        pipeline.register_component(
+            TreatmentIndicatorProcessor(
+                output_path=str(Path(out_dir) / "did_panel_data.csv"),
+            ),
         )
+
+    logger.info("\n[2b/5] Estimating full-panel Callaway-Sant'Anna before matching...")
+    cs_full_panel = CallawaySantAnnaAnalyzer(
+        comparison_group="nevertreated",
+        anticipation=0,
+        min_cohort_size=5,
+        result_suffix="_full_panel",
     )
+    cs_full_panel.name = "callaway_santanna_analysis_full_panel"
+    pipeline.register_component(cs_full_panel)
+    cs_full_panel_viz = CallawaySantAnnaVisualizer(
+        output_dir=out_dir,
+        context_suffix="_full_panel",
+        output_suffix="_full_panel",
+        title_suffix=" (full panel)",
+    )
+    cs_full_panel_viz.name = "callaway_santanna_visualizer_full_panel"
+    pipeline.register_component(cs_full_panel_viz)
 
     # 3. Trend matching (restrict panel to matched treated + control tracts)
     logger.info("\n[3/7] Trend matching for parallel trends...")
     pipeline.register_component(
-        TrendMatchingProcessor(k_neighbors=3, min_pre_periods=6)
+        TrendMatchingProcessor(
+            k_neighbors=3,
+            min_pre_periods=6,
+            matching_features=("pre_trend_slope", "avg_pre_rent"),
+        )
     )
 
-    # 3b. Covariates (for CS with controls; census loader must have run before threshold)
+    # 3b. Covariates (for CS with controls; census_data must exist in context)
     logger.info(
         "\n[3b/7] Merging covariates into matched DID panel (CS with controls)..."
     )
@@ -248,16 +327,14 @@ def run_did_analysis_with_cs() -> tuple:
 
     # 4. Descriptive Analysis (on matched sample)
     logger.info("\n[4/7] Running descriptive analysis...")
-    pipeline.register_component(
-        DIDDescriptiveAnalyzer(output_dir=DID_CS_OUTPUT_DIR)
-    )
-    pipeline.register_component(DIDTrendsVisualizer(output_dir=DID_CS_OUTPUT_DIR))
-    pipeline.register_component(
-        PretrendDiagnosticAnalyzer(output_dir=DID_CS_OUTPUT_DIR)
-    )
-    pipeline.register_component(DiDSampleMapVisualizer(output_dir=DID_CS_OUTPUT_DIR))
+    pipeline.register_component(DIDDescriptiveAnalyzer(output_dir=out_dir))
+    pipeline.register_component(DIDStoryTablesAnalyzer(output_dir=out_dir))
+    pipeline.register_component(DIDStoryGraphicsVisualizer(output_dir=out_dir))
+    pipeline.register_component(DIDTrendsVisualizer(output_dir=out_dir))
+    pipeline.register_component(PretrendDiagnosticAnalyzer(output_dir=out_dir))
+    pipeline.register_component(DiDSampleMapVisualizer(output_dir=out_dir))
     if DID_WHITEPAPER_MODE:
-        pipeline.register_component(DiDStoryMapVisualizer(output_dir=DID_CS_OUTPUT_DIR))
+        pipeline.register_component(DiDStoryMapVisualizer(output_dir=out_dir))
 
     # 5. TWFE Event Study (on matched sample)
     logger.info("\n[5/7] Estimating TWFE event study (matched sample)...")
@@ -265,10 +342,10 @@ def run_did_analysis_with_cs() -> tuple:
         EventStudyAnalyzer(
             pre_periods=12,
             post_periods=36,
-            output_path=f"{DID_CS_OUTPUT_DIR}/event_study_coefficients.csv",
+            output_path=f"{out_dir}/event_study_coefficients.csv",
         )
     )
-    pipeline.register_component(EventStudyVisualizer(output_dir=DID_CS_OUTPUT_DIR))
+    pipeline.register_component(EventStudyVisualizer(output_dir=out_dir))
 
     # 6. Callaway-Sant'Anna (robust, on matched sample)
     logger.info("\n[6/7] Estimating Callaway-Sant'Anna event study (robust)...")
@@ -279,11 +356,9 @@ def run_did_analysis_with_cs() -> tuple:
             min_cohort_size=5,
         )
     )
+    pipeline.register_component(CallawaySantAnnaVisualizer(output_dir=out_dir))
     pipeline.register_component(
-        CallawaySantAnnaVisualizer(output_dir=DID_CS_OUTPUT_DIR)
-    )
-    pipeline.register_component(
-        CallawaySantAnnaComparisonVisualizer(output_dir=DID_CS_OUTPUT_DIR)
+        CallawaySantAnnaComparisonVisualizer(output_dir=out_dir)
     )
 
     # 7. Callaway-Sant'Anna with controls (covariates + tract trends)
@@ -299,7 +374,7 @@ def run_did_analysis_with_cs() -> tuple:
         )
     )
     cs_visualizer_with_controls = CallawaySantAnnaVisualizer(
-        output_dir=DID_CS_OUTPUT_DIR,
+        output_dir=out_dir,
         context_suffix="_with_controls",
         output_suffix="_with_controls",
     )
@@ -309,18 +384,20 @@ def run_did_analysis_with_cs() -> tuple:
     wp_order_suffix: list[str] = []
     if DID_WHITEPAPER_MODE:
         logger.info("Whitepaper mode: registering extra diagnostics and LaTeX tables")
-        pipeline.register_component(HonestPretrendsAnalyzer(output_dir=DID_CS_OUTPUT_DIR))
+        pipeline.register_component(HonestPretrendsAnalyzer(output_dir=out_dir))
         pipeline.register_component(
             SUTVADonutDoseAnalyzer(
                 comparison_group="nevertreated",
                 anticipation=0,
                 min_cohort_size=5,
-                output_dir=DID_CS_OUTPUT_DIR,
+                output_dir=out_dir,
             )
         )
-        pipeline.register_component(CohortDynamicsExplainerVisualizer(output_dir=DID_CS_OUTPUT_DIR))
-        pipeline.register_component(DataFunnelVisualizer(output_dir=DID_CS_OUTPUT_DIR))
-        pipeline.register_component(LaTeXTableExporter(output_dir=DID_CS_OUTPUT_DIR))
+        pipeline.register_component(
+            CohortDynamicsExplainerVisualizer(output_dir=out_dir)
+        )
+        pipeline.register_component(DataFunnelVisualizer(output_dir=out_dir))
+        pipeline.register_component(LaTeXTableExporter(output_dir=out_dir))
         wp_order_suffix.extend(
             [
                 "honest_pretrends_analysis",
@@ -330,6 +407,10 @@ def run_did_analysis_with_cs() -> tuple:
                 "latex_whitepaper_tables",
             ]
         )
+
+    treatment_step = (
+        "treatment_threshold" if mode == "threshold" else "treatment_indicator"
+    )
 
     # Set execution order
     exec_order_core = [
@@ -343,10 +424,14 @@ def run_did_analysis_with_cs() -> tuple:
         "points_to_tract_str_prohibition_data",
         "tract_prohibition_dates",
         "census_data",
-        "treatment_threshold",
+        treatment_step,
+        "callaway_santanna_analysis_full_panel",
+        "callaway_santanna_visualizer_full_panel",
         "trend_matching",
         "did_panel_with_covariates",
         "did_descriptive_analysis",
+        "did_story_tables",
+        "did_story_graphics",
         "did_trends_visualization",
         "pretrend_diagnostic",
         "did_sample_map_visualization",
@@ -373,14 +458,29 @@ def run_did_analysis_with_cs() -> tuple:
     logger.info("ANALYSIS COMPLETE")
     logger.info("=" * 80)
 
-    _print_summary(pipeline.context)
+    _print_summary(pipeline.context, output_dir=out_dir)
 
     return pipeline, pipeline.context
 
 
-def _print_summary(results: dict) -> None:
+def _print_summary(results: dict, *, output_dir: str) -> None:
     """Print summary of key findings."""
     logger.info("\n=== KEY FINDINGS ===\n")
+
+    cs_full_panel = results.get("cs_overall_att_full_panel", {})
+    if cs_full_panel:
+        att = cs_full_panel.get("att", float("nan"))
+        se = cs_full_panel.get("se", float("nan"))
+        p_val = cs_full_panel.get("p_value", float("nan"))
+        ci_low = cs_full_panel.get("ci_low", float("nan"))
+        ci_high = cs_full_panel.get("ci_high", float("nan"))
+
+        logger.info("Callaway-Sant'Anna Overall ATT (full panel):")
+        logger.info("  Point Estimate: $%.2f", att)
+        logger.info("  Standard Error: $%.2f", se)
+        logger.info("  95%% CI: [$%.2f, $%.2f]", ci_low, ci_high)
+        logger.info("  P-value: %.4f", p_val)
+        logger.info("  Significant: %s", "Yes" if p_val < SIGNIFICANCE_LEVEL else "No")
 
     # Overall ATT from CS
     cs_overall = results.get("cs_overall_att", {})
@@ -467,7 +567,7 @@ def _print_summary(results: dict) -> None:
                 )
 
     logger.info("\n=== OUTPUT FILES ===\n")
-    logger.info("Check %s/ for:", DID_CS_OUTPUT_DIR)
+    logger.info("Check %s/ for:", output_dir)
     logger.info("  • did_callaway_santanna_event_study.png - Main CS results")
     logger.info(
         "  • did_callaway_santanna_event_study_with_controls.png - CS with controls"
@@ -475,7 +575,9 @@ def _print_summary(results: dict) -> None:
     logger.info("  • did_twfe_vs_cs_comparison.png - Side-by-side comparison")
     logger.info("  • did_cs_twfe_difference.png - Bias visualization")
     logger.info("  • did_cohort_dynamics.png - Cohort-specific effects")
-    logger.info("  • did_adoption_curve.png, did_parallel_trends.png — temporal/sample dynamics")
+    logger.info(
+        "  • did_adoption_curve.png, did_parallel_trends.png — temporal/sample dynamics"
+    )
     logger.info(
         "  • did_spatial_sample*.png, pretrend_*.csv — geography and parallel-trends diagnostics"
     )

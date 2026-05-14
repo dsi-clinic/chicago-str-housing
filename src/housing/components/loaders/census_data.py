@@ -6,6 +6,7 @@ and population for calculating population density by census tract.
 """
 
 import logging
+import os
 from typing import Any
 
 import pandas as pd
@@ -16,7 +17,24 @@ from pipeline.base import DataLoader
 # Constants
 MIN_API_RESPONSE_LENGTH = 2  # Header row + at least one data row
 
+# Bundled key for local/demo parity when ``CENSUS_API_KEY`` is unset; prefer env in production.
+_LEGACY_DEMO_CENSUS_API_KEY = "2a9cd1fa2e1158252a3f3810be0589b6d9ef41a0"
+
 logger = logging.getLogger(__name__)
+
+
+def resolve_census_api_key(explicit: str | None = None) -> str | None:
+    """Resolve Census Bureau API key: explicit arg, then ``CENSUS_API_KEY``, then legacy demo."""
+    if explicit:
+        return explicit
+    env_key = os.environ.get("CENSUS_API_KEY")
+    if env_key:
+        return env_key
+    logger.warning(
+        "CENSUS_API_KEY not set; using bundled demo key for ACS fetches. "
+        "Set CENSUS_API_KEY in the environment for production.",
+    )
+    return _LEGACY_DEMO_CENSUS_API_KEY
 
 
 class CensusDataLoader(DataLoader):
@@ -52,8 +70,9 @@ class CensusDataLoader(DataLoader):
         """Load 2023 ACS census data from Census API."""
         logger.info("Fetching 2023 ACS census data from Census API")
 
-        # Get API key from context or environment
-        api_key = self.api_key or context.get("census_api_key")
+        api_key = resolve_census_api_key(
+            self.api_key or context.get("census_api_key"),
+        )
         if not api_key:
             logger.warning(
                 "No Census API key provided. Using demo mode with limited data."

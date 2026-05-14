@@ -148,15 +148,35 @@ export default function RobustnessPage() {
       {/* ── TWFE vs CS ── */}
       <h3 className="text-lg font-bold mb-1">TWFE vs CS bias — binary vs threshold</h3>
       <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
-        The gap between TWFE and CS is present under both definitions, confirming that the
-        staggered-adoption bias is a real concern independent of how treatment is classified.
-        CS corrects for this; TWFE does not.
+        The staggered-adoption bias in TWFE is present under both definitions. CS corrects
+        for this regardless of which indicator is used.
       </p>
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-6 mb-10">
         <FigureSlot src="/data/threshold/did_twfe_vs_cs_comparison.png"
           alt="TWFE vs CS — threshold" label="Threshold indicator" />
         <FigureSlot src="/data/binary/did_twfe_vs_cs_comparison.png"
           alt="TWFE vs CS — binary"    label="Binary indicator" />
+      </div>
+
+      {/* ── SUTVA ── */}
+      <h3 className="text-lg font-bold mb-1">SUTVA — spatial spillover checks</h3>
+      <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
+        Two tests check whether prohibitions in one tract affect neighboring tracts&apos; rents.
+        The donut test excludes control tracts within a short radius to detect spatial contamination.
+        The dose-response checks whether the effect scales with prohibition density.
+        If spillovers bias results, excluding nearby neighbors should shift the ATT meaningfully.
+      </p>
+      <div className="grid grid-cols-2 gap-6 mb-6">
+        <FigureSlot src="/data/binary/sutva_donut.png"
+          alt="SUTVA donut — binary" label="Donut test (binary)" />
+        <FigureSlot src="/data/binary/sutva_dose_response.png"
+          alt="SUTVA dose-response — binary" label="Dose-response (binary)" />
+      </div>
+      <div className="grid grid-cols-2 gap-6">
+        <FigureSlot src="/data/threshold/sutva_donut.png"
+          alt="SUTVA donut — threshold" label="Donut test (threshold)" />
+        <FigureSlot src="/data/threshold/sutva_dose_response.png"
+          alt="SUTVA dose-response — threshold" label="Dose-response (threshold)" />
       </div>
     </div>
   )

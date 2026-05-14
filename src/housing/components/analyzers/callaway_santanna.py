@@ -62,6 +62,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         comparison_group: str = "nevertreated",
         anticipation: int = 0,
         min_cohort_size: int = 10,
+        result_suffix: str = "",
     ) -> None:
         """Initialize the Callaway & Sant'Anna analyzer.
 
@@ -72,6 +73,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
             anticipation: Number of periods before treatment that may have anticipation effects.
                          If anticipation=1, we assume treatment effects may begin 1 period early.
             min_cohort_size: Minimum number of units in a cohort to estimate ATT.
+            result_suffix: Optional suffix appended to all output context keys.
         """
         super().__init__(
             "callaway_santanna_analysis",
@@ -80,6 +82,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         self.comparison_group = comparison_group
         self.anticipation = anticipation
         self.min_cohort_size = min_cohort_size
+        self.result_suffix = result_suffix
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Estimate group-time ATTs and aggregate to event study."""
@@ -122,13 +125,16 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         # Step 5: Compute cohort-specific dynamic effects
         cohort_dynamics = self._compute_cohort_dynamics(group_time_atts)
 
+        def _key(base: str) -> str:
+            return f"{base}{self.result_suffix}"
+
         return {
-            "cs_group_time_atts": group_time_atts,
-            "cs_event_study": event_study_agg,
-            "cs_overall_att": overall_att,
-            "cs_cohort_dynamics": cohort_dynamics,
-            "cs_cohort_info": cohort_info,
-            "cs_comparison_group": self.comparison_group,
+            _key("cs_group_time_atts"): group_time_atts,
+            _key("cs_event_study"): event_study_agg,
+            _key("cs_overall_att"): overall_att,
+            _key("cs_cohort_dynamics"): cohort_dynamics,
+            _key("cs_cohort_info"): cohort_info,
+            _key("cs_comparison_group"): self.comparison_group,
         }
 
     def _identify_cohorts(self, panel: pd.DataFrame) -> dict[str, Any]:

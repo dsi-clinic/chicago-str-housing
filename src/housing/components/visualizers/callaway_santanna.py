@@ -56,6 +56,7 @@ class CallawaySantAnnaVisualizer(Visualizer):
         output_dir: str | None = None,
         context_suffix: str = "",
         output_suffix: str = "",
+        title_suffix: str = "",
     ) -> None:
         """Initialize the visualizer.
 
@@ -64,6 +65,7 @@ class CallawaySantAnnaVisualizer(Visualizer):
             context_suffix: Optional suffix for context keys (e.g. "_with_controls" to read
                 cs_event_study_with_controls, cs_overall_att_with_controls).
             output_suffix: Optional suffix for output filenames (e.g. "_with_controls").
+            title_suffix: Optional human-readable title suffix for figure subtitles.
         """
         super().__init__(
             "callaway_santanna_visualizer",
@@ -72,6 +74,7 @@ class CallawaySantAnnaVisualizer(Visualizer):
         self.output_dir = output_dir or "/project/output"
         self.context_suffix = context_suffix
         self.output_suffix = output_suffix
+        self.title_suffix = title_suffix
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Create Callaway & Sant'Anna visualizations."""
@@ -177,7 +180,9 @@ class CallawaySantAnnaVisualizer(Visualizer):
 
         ax.set_xlabel("Months since STR prohibition", fontsize=12)
         ax.set_ylabel("Average Treatment Effect on Rental Price ($)", fontsize=12)
-        title_suffix = " (with controls)" if self.output_suffix else ""
+        title_suffix = self.title_suffix
+        if not title_suffix and self.output_suffix == "_with_controls":
+            title_suffix = " (with controls)"
         ax.set_title(
             "Event Study: Callaway & Sant'Anna (2021) Estimator\n"
             f"Robust to Heterogeneous Treatment Effects{title_suffix}",

@@ -89,11 +89,11 @@
 {\footnotesize Still no causal estimator --- uniform panel structure is prerequisite for every subsequent plot.}
 \end{frame}
 
-\begin{frame}{Step 2 --- Why shrink controls? (\emph{slope matching})}
+\begin{frame}{Step 2 --- Why shrink controls? (\emph{pre-treatment matching})}
 \begin{itemize}\setlength\itemsep{0.4em}
-  \item Compared neighbourhoods differ in baseline prices; we nonetheless need untreated tracts whose \emph{pre-prohibition monthly rent trajectory} resembles treated tracts' trajectories as closely as feasible.
-  \item \textbf{Procedure:} for each treated tract, retain up to three never-treated tracts with closest pre-period rent slopes ($k{=}3$ NN in slope space); require $\geq 6$ pre months.
-  \item \textbf{Treated preservation:} \emph{all} prohibition tracts survive this filter; removals apply only to never-treated tracts that never serve as usable counterfactual slopes.
+  \item Compared neighbourhoods differ in baseline prices and rent growth; we nonetheless need untreated tracts whose \emph{pre-prohibition rent path} resembles treated tracts' paths as closely as feasible.
+  \item \textbf{Procedure:} for each treated tract, retain up to three never-treated tracts with closest standardized pre-period rent slope and average pre-period rent ($k{=}3$ nearest neighbours); require $\geq 6$ pre months.
+  \item \textbf{Treated preservation:} \emph{all} prohibition tracts survive this filter; removals apply only to never-treated tracts that never serve as usable counterfactual matches.
 \end{itemize}
 \end{frame}
 
