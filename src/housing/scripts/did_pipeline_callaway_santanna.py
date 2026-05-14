@@ -437,7 +437,7 @@ def run_did_analysis_with_cs(
         "did_sample_map_visualization",
         *(["did_story_map_visualization"] if DID_WHITEPAPER_MODE else []),
         "event_study_analysis",
-        "event_study_visualization",
+        "event_study_visualizer",
         "callaway_santanna_analysis",
         "callaway_santanna_visualizer",
         "cs_comparison_visualizer",
