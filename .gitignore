@@ -150,3 +150,6 @@ output/
 
 # data files
 data/
+
+# scratch files
+ignore/

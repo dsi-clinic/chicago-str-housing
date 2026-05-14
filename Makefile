@@ -22,7 +22,7 @@ mount_data := $(if $(DATA_DIR),-v $(DATA_DIR):/project/data,)
 CS_BOOTSTRAP_REPS ?= 399
 CS_BOOTSTRAP_SEED ?= 42
 
-.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline-cs run-did-pipeline-cs-bootstrap run-did-pipeline-cs-covariates run-did-pipeline-cs-covariates-bootstrap run-did-pipeline-cs-heterogeneity run-did-pipeline-cs-spillover run-did-pipeline-cs-trajectory
+.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline-cs run-did-pipeline-cs-bootstrap run-did-pipeline-cs-covariates run-did-pipeline-cs-covariates-bootstrap run-did-pipeline-cs-heterogeneity run-did-pipeline-cs-spillover run-did-pipeline-cs-trajectory sync-str-paper-figures
 
 help: ## Show the help message
 	@echo "Available commands:"
@@ -44,6 +44,7 @@ help: ## Show the help message
 	@echo "  run-did-pipeline-cs-heterogeneity  Baseline CS + subgroup heterogeneity (income, renter share, Airbnb density, dose, early/late)"
 	@echo "  run-did-pipeline-cs-spillover  Baseline CS + spatial spillover (adjacent never-treated vs pure controls)"
 	@echo "  run-did-pipeline-cs-trajectory  Baseline CS + post-treatment trajectory (growth vs. plateau; no TWFE)"
+	@echo "  sync-str-paper-figures  Copy DiD PNGs + CSV tables to docs/str-paper/ (GitHub-friendly)"
 	@echo ""
 	@echo "Optional environment variables (.env file):"
 	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
@@ -99,3 +100,42 @@ run-did-pipeline-cs-spillover: build-only ## Baseline CS + Queen-contiguity spil
 
 run-did-pipeline-cs-trajectory: build-only ## Baseline CS + post-treatment trajectory analysis (growth vs. plateau)
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna_trajectory.py
+
+# Curated CSVs + full figure set for docs/str-paper/ (paths relative to repo root)
+STR_PAPER_FIGURES := \
+	did_callaway_santanna_event_study.png \
+	did_callaway_santanna_event_study_with_controls.png \
+	did_twfe_vs_cs_comparison.png \
+	did_cs_twfe_difference.png \
+	did_cohort_dynamics.png \
+	did_cs_trajectory_fit.png \
+	did_cs_trajectory_phases.png \
+	did_cs_heterogeneity_income.png \
+	did_cs_heterogeneity_renter_share.png \
+	did_cs_heterogeneity_airbnb_density.png \
+	did_cs_heterogeneity_dose.png \
+	did_cs_cohort_early_vs_late.png \
+	did_cs_spillover_event_study.png
+
+STR_PAPER_CSVS := \
+	did_twfe_cs_comparison_table.csv \
+	cs_heterogeneity_summary.csv \
+	cs_event_study_tract_bootstrap.csv \
+	cs_tract_bootstrap_meta.csv \
+	cs_spillover_summary.csv \
+	cs_trajectory_summary.csv
+
+sync-str-paper-figures: ## Copy DiD figures + CSV tables to docs/str-paper/ (for GitHub)
+	@test -d output/did-cs || (echo "Missing output/did-cs — run DiD pipelines locally first (e.g. make run-did-pipeline-cs)." && exit 1)
+	@mkdir -p docs/str-paper/figures docs/str-paper/csv
+	@for f in $(STR_PAPER_FIGURES); do \
+		test -f "output/did-cs/$$f" || (echo "Missing output/did-cs/$$f — run the pipelines that produce this figure." && exit 1); \
+		cp "output/did-cs/$$f" "docs/str-paper/figures/$$f"; \
+		echo "Copied figures/$$f"; \
+	done
+	@for f in $(STR_PAPER_CSVS); do \
+		test -f "output/did-cs/$$f" || (echo "Missing output/did-cs/$$f — run the pipelines that produce this table." && exit 1); \
+		cp "output/did-cs/$$f" "docs/str-paper/csv/$$f"; \
+		echo "Copied csv/$$f"; \
+	done
+	@echo "Done. Commit docs/str-paper/figures/ and docs/str-paper/csv/ when outputs change."
