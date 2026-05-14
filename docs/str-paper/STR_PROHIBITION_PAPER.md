@@ -46,7 +46,7 @@ The geographic scope of our analysis is Cook County, Illinois, which encompasses
 
 The analysis draws on six public data sources:
 
-1. **Zillow Observed Rent Index (ZORI)**: Monthly smoothed rental price estimates at the ZIP code level, covering the period from 2015 through 2024. ZORI measures the typical observed market rent across the rental housing stock, combining single-family, condominium, and multifamily properties.
+1. **Zillow Observed Rent Index (ZORI)**: Monthly smoothed rental price estimates at the ZIP code level, covering the period from 2015 through 2025. ZORI measures the typical observed market rent across the rental housing stock, combining single-family, condominium, and multifamily properties.
 
 2. **House Share Prohibited Buildings List** (Chicago Data Portal): Building-level records of addresses banned from short-term rental activity under the Shared Housing Ordinance, including location coordinates, number of units, and the date of prohibition.
 
