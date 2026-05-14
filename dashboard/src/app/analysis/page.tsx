@@ -2,7 +2,7 @@ import FigureSlot from '@/components/FigureSlot'
 import InfoBlock from '@/components/InfoBlock'
 import StatTable from '@/components/StatTable'
 import CohortBarChart from '@/components/CohortBarChart'
-import { loadSampleLineage, loadGroupStats, loadCohortStats, loadCovariateBalance,
+import { loadCohortStats, loadCovariateBalance,
          loadParallelTrendsTest, loadHonestPretrends } from '@/lib/data'
 
 const COVARIATE_LABELS: Record<string, string> = {
@@ -16,10 +16,6 @@ const COVARIATE_LABELS: Record<string, string> = {
 }
 
 export default function AnalysisPage() {
-  const linB = loadSampleLineage('binary')
-  const linT = loadSampleLineage('threshold')
-  const gsB  = loadGroupStats('binary')
-  const gsT  = loadGroupStats('threshold')
   const cohorts = loadCohortStats('binary').slice(0, 10)
   const balance = loadCovariateBalance('binary')
     .filter(b => b.covariate in COVARIATE_LABELS)
@@ -28,16 +24,6 @@ export default function AnalysisPage() {
   const ptT = loadParallelTrendsTest('threshold')
   const hpB = loadHonestPretrends('binary')
   const hpT = loadHonestPretrends('threshold')
-
-  const stageDbin = linB.find(s => s.stage_code === 'D')
-  const stageFbin = linB.find(s => s.stage_code === 'F')
-  const stageDthr = linT.find(s => s.stage_code === 'D')
-  const stageFthr = linT.find(s => s.stage_code === 'F')
-
-  const treatedB = gsB.find(g => g.group.includes('Eventually')) ?? { mean_rent: 0, std_dev: 0 }
-  const controlB = gsB.find(g => g.group.includes('Never'))      ?? { mean_rent: 0, std_dev: 0 }
-  const treatedT = gsT.find(g => g.group.includes('Eventually')) ?? { mean_rent: 0, std_dev: 0 }
-  const controlT = gsT.find(g => g.group.includes('Never'))      ?? { mean_rent: 0, std_dev: 0 }
 
   const cohortRows = cohorts.map(c => [
     c.first_prohibition_month,
@@ -58,43 +44,13 @@ export default function AnalysisPage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-extrabold tracking-tight mb-2">Treatment Characterization & Assumption Checks</h2>
+      <h2 className="text-2xl font-extrabold tracking-tight mb-2">Analysis</h2>
       <p className="text-[15px] text-gray-500 mb-10 max-w-2xl leading-relaxed">
-        Who got treated, when, whether treated and control neighborhoods were comparable
-        before the ban, and whether the parallel trends assumption holds.
+        When did prohibitions arrive, how similar are treated and control neighborhoods,
+        and does the parallel trends assumption hold?
       </p>
 
-      {/* ── 1. Treatment counts ── */}
-      <h3 className="text-lg font-bold mb-1">Treatment counts by indicator</h3>
-      <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
-        The binary indicator counts any prohibition in a tract. The threshold indicator
-        requires the share of prohibited units to cross a minimum. Both definitions agree
-        on never-treated tracts but differ on which tracts cross the threshold.
-      </p>
-      <div className="grid grid-cols-2 gap-6 mb-10">
-        <InfoBlock
-          title="Binary indicator"
-          rows={[
-            { label: 'Treated (pre-match)',       value: (stageDbin?.treated ?? 373).toLocaleString(),   valueClass: 'text-maroon' },
-            { label: 'Never-treated pool',        value: (stageDbin?.never_treated ?? 469).toLocaleString() },
-            { label: 'Matched analysis sample',   value: (stageFbin?.n_tracts ?? 556).toLocaleString(),  valueClass: 'text-blue-600' },
-            { label: 'Mean rent · treated',       value: `$${treatedB.mean_rent.toFixed(0)} / mo` },
-            { label: 'Mean rent · controls',      value: `$${controlB.mean_rent.toFixed(0)} / mo` },
-          ]}
-        />
-        <InfoBlock
-          title="Threshold indicator"
-          rows={[
-            { label: 'Treated (pre-match)',       value: (stageDthr?.treated ?? 274).toLocaleString(),   valueClass: 'text-teal-600' },
-            { label: 'Never-treated pool',        value: (stageDthr?.never_treated ?? 568).toLocaleString() },
-            { label: 'Matched analysis sample',   value: (stageFthr?.n_tracts ?? 453).toLocaleString(),  valueClass: 'text-teal-600' },
-            { label: 'Mean rent · treated',       value: `$${treatedT.mean_rent.toFixed(0)} / mo` },
-            { label: 'Mean rent · controls',      value: `$${controlT.mean_rent.toFixed(0)} / mo` },
-          ]}
-        />
-      </div>
-
-      {/* ── 2. Cohort adoption timeline ── */}
+      {/* ── 1. Cohort adoption timeline ── */}
       <h3 className="text-lg font-bold mb-1">When did prohibitions arrive?</h3>
       <p className="text-[13px] text-gray-500 mb-5 max-w-2xl leading-relaxed">
         Prohibitions rolled out in waves from mid-2016 onward. The July and August 2016
