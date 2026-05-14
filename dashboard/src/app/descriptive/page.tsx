@@ -2,18 +2,41 @@ import PipelineStepper from '@/components/PipelineStepper'
 import FigureSlot from '@/components/FigureSlot'
 import InfoBlock from '@/components/InfoBlock'
 import StatTable from '@/components/StatTable'
-import { loadPanelOverview, loadGroupStats, loadCohortStats } from '@/lib/data'
+import { loadSampleLineage, loadGroupStats, loadCohortStats } from '@/lib/data'
 
 export default function DescriptivePage() {
-  const ov       = loadPanelOverview('binary')
+  // Use sample lineage (not panel overview) so numbers reflect the full pipeline audit
+  const linB = loadSampleLineage('binary')
+  const linT = loadSampleLineage('threshold')
+
+  const stageC   = linB.find(s => s.stage_code === 'C')
+  const stageDbin = linB.find(s => s.stage_code === 'D')
+  const stageFbin = linB.find(s => s.stage_code === 'F')
+  const stageDthr = linT.find(s => s.stage_code === 'D')
+  const stageFthr = linT.find(s => s.stage_code === 'F')
+
+  const nPanel   = stageC?.n_tracts   ?? 842
+  const nMonths  = stageC?.n_months   ?? 128
+
+  const nTreatedBin = stageDbin?.treated       ?? 373
+  const nPoolBin    = stageDbin?.never_treated ?? 469
+  const nMatchedBin = stageFbin?.n_tracts      ?? 556
+  const nControlBin = nMatchedBin - nTreatedBin
+
+  const nTreatedThr = stageDthr?.treated       ?? 274
+  const nPoolThr    = stageDthr?.never_treated ?? 568
+  const nMatchedThr = stageFthr?.n_tracts      ?? 453
+  const nControlThr = nMatchedThr - nTreatedThr
+
+  // Group stats for rent balance (from matched binary sample)
   const gs       = loadGroupStats('binary')
   const gsT      = loadGroupStats('threshold')
-  const cohorts  = loadCohortStats('binary').slice(0, 8)
-  const treated  = gs.find(g => g.group.includes('Eventually'))  ?? { n_tracts: 373, mean_rent: 0, std_dev: 0 }
-  const control  = gs.find(g => g.group.includes('Never'))       ?? { n_tracts: 183, mean_rent: 0, std_dev: 0 }
-  const treatedT = gsT.find(g => g.group.includes('Eventually')) ?? { n_tracts: 274, mean_rent: 0, std_dev: 0 }
-  const controlT = gsT.find(g => g.group.includes('Never'))      ?? { n_tracts: 179, mean_rent: 0, std_dev: 0 }
+  const treated  = gs.find(g => g.group.includes('Eventually'))  ?? { n_tracts: nTreatedBin, mean_rent: 0, std_dev: 0 }
+  const control  = gs.find(g => g.group.includes('Never'))       ?? { n_tracts: nControlBin,  mean_rent: 0, std_dev: 0 }
+  const treatedT = gsT.find(g => g.group.includes('Eventually')) ?? { n_tracts: nTreatedThr, mean_rent: 0, std_dev: 0 }
+  const controlT = gsT.find(g => g.group.includes('Never'))      ?? { n_tracts: nControlThr,  mean_rent: 0, std_dev: 0 }
 
+  const cohorts = loadCohortStats('binary').slice(0, 8)
   const cohortRows = cohorts.map(c => [
     c.first_prohibition_month,
     c.n_tracts.toLocaleString(),
@@ -32,12 +55,19 @@ export default function DescriptivePage() {
       </p>
 
       <PipelineStepper
-        nTracts={ov.n_tracts}
-        nTreated={treated.n_tracts}
-        nControl={control.n_tracts}
+        nPanel={nPanel}
+        nMonths={nMonths}
+        nTreatedBin={nTreatedBin}
+        nPoolBin={nPoolBin}
+        nMatchedBin={nMatchedBin}
+        nControlBin={nControlBin}
+        nTreatedThr={nTreatedThr}
+        nPoolThr={nPoolThr}
+        nMatchedThr={nMatchedThr}
+        nControlThr={nControlThr}
       />
 
-      {/* ── Sample funnel figure ── */}
+      {/* ── Sample funnel ── */}
       <div className="mt-10 mb-10">
         <FigureSlot
           src="/data/binary/did_story_sample_lineage.png"
@@ -50,27 +80,28 @@ export default function DescriptivePage() {
       <h3 className="text-lg font-bold mb-1">Treatment Group Distributions</h3>
       <p className="text-[14px] text-gray-500 mb-6 max-w-2xl leading-relaxed">
         Treated and never-treated tracts differ under each definition.
-        The threshold indicator is stricter, selecting a smaller treated group that tends
-        toward even higher baseline rents.
+        The threshold indicator is stricter — fewer treated tracts, higher average rents.
       </p>
 
       <div className="grid grid-cols-2 gap-5 mb-6">
         <InfoBlock
           title="Binary indicator"
           rows={[
-            { label: 'Treated tracts',          value: treated.n_tracts.toLocaleString(),  valueClass: 'text-maroon' },
-            { label: 'Never-treated tracts',    value: control.n_tracts.toLocaleString() },
-            { label: 'Mean rent · treated',     value: `$${treated.mean_rent.toFixed(0)} / mo` },
-            { label: 'Mean rent · control',     value: `$${control.mean_rent.toFixed(0)} / mo` },
+            { label: 'Treated (pre-match)',       value: nTreatedBin.toLocaleString(),  valueClass: 'text-maroon' },
+            { label: 'Control pool (pre-match)',  value: nPoolBin.toLocaleString() },
+            { label: 'Matched sample',            value: nMatchedBin.toLocaleString(),  valueClass: 'text-blue-600' },
+            { label: 'Mean rent · treated',       value: `$${treated.mean_rent.toFixed(0)} / mo` },
+            { label: 'Mean rent · control',       value: `$${control.mean_rent.toFixed(0)} / mo` },
           ]}
         />
         <InfoBlock
           title="Threshold indicator"
           rows={[
-            { label: 'Treated tracts',          value: treatedT.n_tracts.toLocaleString(), valueClass: 'text-teal-600' },
-            { label: 'Never-treated tracts',    value: controlT.n_tracts.toLocaleString() },
-            { label: 'Mean rent · treated',     value: `$${treatedT.mean_rent.toFixed(0)} / mo` },
-            { label: 'Mean rent · control',     value: `$${controlT.mean_rent.toFixed(0)} / mo` },
+            { label: 'Treated (pre-match)',       value: nTreatedThr.toLocaleString(),  valueClass: 'text-teal-600' },
+            { label: 'Control pool (pre-match)',  value: nPoolThr.toLocaleString() },
+            { label: 'Matched sample',            value: nMatchedThr.toLocaleString(),  valueClass: 'text-teal-600' },
+            { label: 'Mean rent · treated',       value: `$${treatedT.mean_rent.toFixed(0)} / mo` },
+            { label: 'Mean rent · control',       value: `$${controlT.mean_rent.toFixed(0)} / mo` },
           ]}
         />
       </div>
@@ -85,14 +116,14 @@ export default function DescriptivePage() {
       {/* ── Cohort adoption ── */}
       <h3 className="text-lg font-bold mb-1">When Did Prohibitions Hit?</h3>
       <p className="text-[14px] text-gray-500 mb-6 max-w-2xl leading-relaxed">
-        The 2016 cohort accounts for the majority of treated tracts. Early adopters
-        tend to be higher-rent, higher-income neighborhoods.
+        The 2016 cohort accounts for the majority of treated tracts.
+        Early adopters tend to be higher-rent, higher-income neighborhoods.
       </p>
 
       <FigureSlot
         src="/data/binary/did_story_cumulative_adoption.png"
         alt="Cumulative STR prohibition adoption"
-        label="Cumulative treated-tract adoption over time"
+        label="Cumulative treated-tract adoption over time (binary)"
         className="mb-6"
       />
 
@@ -106,8 +137,8 @@ export default function DescriptivePage() {
       {/* ── Rent trends ── */}
       <h3 className="text-lg font-bold mb-1">Pre-treatment Rent Trajectories</h3>
       <p className="text-[14px] text-gray-500 mb-6 max-w-2xl leading-relaxed">
-        Treated tracts had persistently higher rents before 2016. The gap is stable
-        pre-treatment — a visual check that supports the parallel trends assumption.
+        Treated tracts had persistently higher rents before 2016. The stable gap
+        pre-treatment supports the parallel trends assumption.
       </p>
       <FigureSlot
         src="/data/binary/did_parallel_trends.png"

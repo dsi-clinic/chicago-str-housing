@@ -1,117 +1,127 @@
 'use client'
 import { useState } from 'react'
-import FigureSlot from './FigureSlot'
 
-interface StepCounts { nTracts: number; nTreated: number; nControl: number }
-
-interface StepDef {
-  id: number
-  label: string
-  count: string
-  badge: string
-  title: string
-  pillValue: string
-  pillSub: string
-  leftLabel: string
-  leftText: string
-  chips: { val: string; label: string; color: string }[]
-  rightLabel: string
-  rightText: string
-  retention: { pct: number; label: string; color: 'teal' | 'amber' }
-  figFile: string | null
-  figAlt: string | null
-  isTreatmentStep?: true
+export interface PipelineStepperProps {
+  // Stage C — full rent panel (before any matching)
+  nPanel:       number   // 842
+  nMonths:      number   // 128
+  // Binary indicator (stage D / F)
+  nTreatedBin:  number   // 373
+  nPoolBin:     number   // 469
+  nMatchedBin:  number   // 556
+  nControlBin:  number   // 183
+  // Threshold indicator (stage D / F)
+  nTreatedThr:  number   // 274
+  nPoolThr:     number   // 568
+  nMatchedThr:  number   // 453
+  nControlThr:  number   // 179
 }
 
-function buildSteps(c: StepCounts): StepDef[] {
+interface StepDef {
+  id:         number
+  label:      string
+  count:      string
+  badge:      string
+  title:      string
+  pillValue:  string
+  pillSub:    string
+  leftLabel:  string
+  leftContent: 'text' | 'treatment-def' | 'matching-results'
+  leftText:   string
+  chips:      { val: string; label: string; color: string }[]
+  rightLabel: string
+  rightText:  string
+  retention:  { pct: number; label: string; color: 'teal' | 'amber' }
+}
+
+function buildSteps(p: PipelineStepperProps): StepDef[] {
+  const obs = (p.nPanel * p.nMonths).toLocaleString()
   return [
     {
       id: 1, label: 'All Chicago\nTracts', count: '1,332',
       badge: 'Step 1 of 6', title: 'All Chicago Census Tracts',
       pillValue: '1,332', pillSub: 'Census Tracts',
-      leftLabel: 'Data Source',
-      leftText: 'The analysis begins with all <b>1,332 census tracts</b> in Chicago from the 2023 TIGER/Line shapefile (Cook County, IL). These define the geographic units of observation — each tract covers roughly 1,200–8,000 residents.',
+      leftLabel: 'Data source',
+      leftContent: 'text',
+      leftText: 'The analysis begins with all <b>1,332 census tracts</b> in Chicago from the 2023 TIGER/Line shapefile (Cook County, IL). Each tract covers roughly 1,200–8,000 residents and is the spatial unit of analysis throughout.',
       chips: [
-        { val: '1,332', label: 'Total tracts', color: 'maroon' },
+        { val: '1,332', label: 'All tracts', color: 'maroon' },
         { val: '2023', label: 'TIGER vintage', color: 'blue' },
       ],
-      rightLabel: 'Starting Point',
-      rightText: 'This is the starting universe — no tracts have been dropped yet. All subsequent steps apply filters that reduce this number.',
+      rightLabel: 'Starting point',
+      rightText: 'This is the starting universe — no tracts have been dropped yet. All subsequent steps apply geographic or data filters.',
       retention: { pct: 100, label: 'Starting universe', color: 'teal' },
-      figFile: null, figAlt: null,
     },
     {
       id: 2, label: 'ZIP→Tract\nCrosswalk', count: 'crosswalk built',
       badge: 'Step 2 of 6', title: 'ZIP Code → Census Tract Crosswalk',
       pillValue: 'built', pillSub: 'Crosswalk',
-      leftLabel: 'What Happens Here',
-      leftText: 'ZORI (Zillow Observed Rent Index) provides monthly rent data at the <b>ZIP code level</b>, but our unit of analysis is <b>census tracts</b>. <code>ZipTractCrosswalkProcessor</code> uses spatial overlay to map each ZIP code to the census tracts it intersects, weighted by area overlap.',
+      leftLabel: 'What happens here',
+      leftContent: 'text',
+      leftText: 'ZORI (Zillow Observed Rent Index) provides monthly rent data at the <b>ZIP code level</b>. <code>ZipTractCrosswalkProcessor</code> uses spatial overlay in a projected CRS (EPSG:3435) to compute tract-area weights — how much of each tract lies within each ZIP. This is the correct weight for a <em>tract-level</em> outcome.',
       chips: [
         { val: 'ZIP', label: 'Input unit', color: 'blue' },
         { val: 'Tract', label: 'Output unit', color: 'teal' },
+        { val: '867', label: 'Tracts with crosswalk', color: 'maroon' },
       ],
       rightLabel: 'Retention',
-      rightText: 'No tracts are dropped at this step — the crosswalk only builds the mapping. Tracts are dropped in the next step when rent data is unavailable for their ZIP codes.',
-      retention: { pct: 100, label: 'No tracts dropped — crosswalk only', color: 'teal' },
-      figFile: null, figAlt: null,
+      rightText: 'No tracts are dropped here — the crosswalk only builds the geographic mapping. Tracts without any overlapping ZORI ZIP codes are dropped in the next step.',
+      retention: { pct: 100, label: 'No tracts dropped — mapping only', color: 'teal' },
     },
     {
-      id: 3, label: 'Rent Panel\nMatch', count: `${c.nTracts.toLocaleString()} tracts`,
-      badge: 'Step 3 of 6', title: 'ZIP→Tract Rent Panel (ZORI)',
-      pillValue: c.nTracts.toLocaleString(), pillSub: 'Tracts Retained',
-      leftLabel: 'What Happens Here',
-      leftText: `<code>TimeSeriesZipToTractProcessor</code> assigns monthly ZORI rent values to each census tract via the crosswalk. Only tracts matched to at least one ZORI-covered ZIP code enter the panel.<br/><b>${c.nTracts.toLocaleString()} tracts × 128 months = 62,336 tract-month observations.</b>`,
+      id: 3, label: 'Rent Panel\nMatch', count: `${p.nPanel.toLocaleString()} tracts`,
+      badge: 'Step 3 of 6', title: 'Rent Panel — ZORI matched to census tracts',
+      pillValue: p.nPanel.toLocaleString(), pillSub: 'Rent-panel Tracts',
+      leftLabel: 'What happens here',
+      leftContent: 'text',
+      leftText: `<code>TimeSeriesZipToTractProcessor</code> assigns monthly ZORI rent values to each census tract using the area-weighted crosswalk. Only tracts overlapping at least one ZORI-covered ZIP enter the panel.<br/><b>${p.nPanel.toLocaleString()} tracts × ${p.nMonths} months = ${obs} tract-month observations.</b> This is the full panel used for the primary full-panel CS estimate.`,
       chips: [
-        { val: c.nTracts.toLocaleString(), label: 'Tracts in panel', color: 'teal' },
-        { val: '128', label: 'Panel months', color: 'blue' },
-        { val: '62,336', label: 'Observations', color: 'maroon' },
+        { val: p.nPanel.toLocaleString(), label: 'Tracts in panel', color: 'teal' },
+        { val: p.nMonths.toLocaleString(), label: 'Panel months', color: 'blue' },
+        { val: obs, label: 'Observations', color: 'maroon' },
       ],
       rightLabel: 'Retention from Step 1',
-      rightText: '845 of the original 1,332 tracts are dropped — they fall in areas not covered by any ZORI ZIP code (industrial zones, O\'Hare, sparse suburban edges).',
-      retention: { pct: 37, label: `${c.nTracts.toLocaleString()} / 1,332 tracts (36.6%)`, color: 'amber' },
-      figFile: '/data/binary/data_funnel.png', figAlt: 'Data funnel showing tract counts at each pipeline stage',
+      rightText: `${(1332 - p.nPanel).toLocaleString()} of the original 1,332 tracts are dropped — they fall in areas not covered by any ZORI ZIP code (industrial zones, O'Hare, sparse suburban edges). The remaining ${p.nPanel.toLocaleString()} form the <b>full rent panel</b> used in the primary CS estimation.`,
+      retention: { pct: Math.round((p.nPanel / 1332) * 100), label: `${p.nPanel.toLocaleString()} / 1,332 tracts (${((p.nPanel / 1332) * 100).toFixed(0)}%)`, color: 'amber' },
     },
     {
-      id: 4, label: 'STR Prohibition\nDates → Tract', count: 'dates assigned',
-      badge: 'Step 4 of 6', title: 'STR Prohibition Dates Aggregated to Tract',
-      pillValue: c.nTracts.toLocaleString(), pillSub: 'All Retained',
-      leftLabel: 'What Happens Here',
-      leftText: '<code>TractProhibitionDatesProcessor</code> aggregates building-level STR prohibition records to the census tract level. For each tract, it finds the <b>first month any STR prohibition took effect</b> — the treatment timing variable used in all DiD models.',
+      id: 4, label: 'Treatment\nDefinition', count: '2 indicators',
+      badge: 'Step 4 of 6', title: 'Treatment Indicators — Binary vs Threshold',
+      pillValue: '2', pillSub: 'Definitions',
+      leftLabel: 'Two ways to define treatment',
+      leftContent: 'treatment-def',
+      leftText: '',
+      chips: [],
+      rightLabel: 'Retention',
+      rightText: 'All rent-panel tracts are retained at this step — treatment assignment only <em>labels</em> tracts as treated or never-treated. The number of tracts differs between definitions because each uses a different threshold for what counts as a prohibited tract.',
+      retention: { pct: 100, label: `100% of ${p.nPanel.toLocaleString()} panel tracts retained`, color: 'teal' },
+    },
+    {
+      id: 5, label: 'Full-panel\nCS — Primary', count: 'primary estimate',
+      badge: 'Step 5 of 6', title: 'Full-panel Callaway & Sant\'Anna — Primary Estimate',
+      pillValue: 'primary', pillSub: 'Full-panel CS',
+      leftLabel: 'Why this comes before matching',
+      leftContent: 'text',
+      leftText: 'The Callaway & Sant\'Anna estimator runs on the <b>full rent panel</b> (all matched rent-panel tracts, not-yet-treated or never-treated as controls). This is the <b>primary estimate</b> because it is robust to staggered adoption and heterogeneous effects without restricting the comparison group. Matching is kept as a robustness check — it does not strengthen identification, it only narrows comparators.',
       chips: [
-        { val: c.nTreated.toLocaleString(), label: 'Tracts with prohibition', color: 'maroon' },
-        { val: c.nControl.toLocaleString(), label: 'No prohibition', color: 'teal' },
+        { val: '+56.0', label: 'Threshold ATT ($/mo)', color: 'teal' },
+        { val: '+48.8', label: 'Binary ATT ($/mo)', color: 'maroon' },
       ],
-      rightLabel: 'Retention',
-      rightText: 'All rent-panel tracts are retained. Prohibition dates are assigned where available — tracts with no prohibition remain as never-treated controls.',
-      retention: { pct: 100, label: '100% of rent-panel tracts retained', color: 'teal' },
-      figFile: '/data/binary/did_story_map.png', figAlt: 'Map of ever-treated vs never-treated tracts',
+      rightLabel: 'Primary results',
+      rightText: 'Both treatment definitions yield positive full-panel ATT estimates (threshold: +$56/mo, binary: +$49/mo). These are the headline estimates presented in the Results and Models tabs. The matched and residualized specifications are sensitivity checks shown in the Models and Robustness tabs.',
+      retention: { pct: 100, label: 'Full panel used — no sample restriction here', color: 'teal' },
     },
     {
-      id: 5, label: 'Treatment\nAssignment', count: `${c.nTreated}+${c.nControl}`,
-      badge: 'Step 5 of 6', title: 'Treatment Assignment',
-      pillValue: `${c.nTreated}+${c.nControl}`, pillSub: 'Treated + Control',
-      leftLabel: 'Treatment Definition',
-      leftText: '', chips: [],
-      rightLabel: 'Retention',
-      rightText: 'All rent-panel tracts are retained — treatment assignment <i>labels</i> tracts, it does not remove them. Only the threshold of what counts as treated changes between the two definitions.',
-      retention: { pct: 100, label: '100% retained — only labels change', color: 'teal' },
-      figFile: '/data/binary/did_adoption_curve.png', figAlt: 'Cumulative treated tracts over time',
-      isTreatmentStep: true,
-    },
-    {
-      id: 6, label: 'Trend Matching\n& Pre-trend Filter', count: 'final sample',
-      badge: 'Step 6 of 6', title: 'Trend Matching & Pre-treatment Filter',
-      pillValue: 'matched', pillSub: 'DiD Sample',
-      leftLabel: 'What Happens Here',
-      leftText: '<code>TrendMatchingProcessor</code> applies two filters: (1) keeps only tracts with at least <b>6 months of pre-treatment data</b> before the first treated month, and (2) matches each ever-treated tract to its <b>k nearest never-treated neighbors</b> by pre-treatment rent slope. This is the final estimand sample for all TWFE and CS models.',
-      chips: [
-        { val: '≥6', label: 'Pre-periods required', color: 'blue' },
-        { val: 'k', label: 'Matched controls', color: 'teal' },
-      ],
-      rightLabel: 'Retention',
-      rightText: 'Some tracts are dropped: treated tracts lacking enough pre-treatment months, and never-treated tracts not selected as matches. Exact count depends on k and the panel window.',
-      retention: { pct: 75, label: 'Varies — depends on k and panel window', color: 'amber' },
-      figFile: '/data/binary/did_parallel_trends.png', figAlt: 'Pre-treatment rent trends: treated vs matched controls',
+      id: 6, label: 'Trend Matching\n(Robustness)', count: 'robustness only',
+      badge: 'Step 6 of 6', title: 'Trend Matching — Robustness Restriction',
+      pillValue: 'matched', pillSub: 'Robustness Sample',
+      leftLabel: 'What the matching does',
+      leftContent: 'matching-results',
+      leftText: '',
+      chips: [],
+      rightLabel: 'Why it shrinks the sample',
+      rightText: '<code>TrendMatchingProcessor</code> keeps only tracts with ≥ 6 pre-treatment months and matches each ever-treated tract to its k=3 nearest never-treated neighbours on two standardized features: <b>pre-treatment rent slope</b> and <b>average pre-treatment rent level</b>. This improves balance on rent levels (the main weakness of slope-only matching) but makes the comparison group much smaller. Present as robustness, not primary.',
+      retention: { pct: Math.round((p.nMatchedThr / p.nPanel) * 100), label: `Binary: ${p.nMatchedBin} matched · Threshold: ${p.nMatchedThr} matched`, color: 'amber' },
     },
   ]
 }
@@ -131,15 +141,14 @@ const CHIP_BG: Record<string, string> = {
   amber:  'bg-amber-50 text-amber-600',
 }
 
-export default function PipelineStepper({ nTracts, nTreated, nControl }: StepCounts) {
+export default function PipelineStepper(p: PipelineStepperProps) {
   const [active, setActive] = useState(1)
-  const [treatMode, setTreatMode] = useState<'binary' | 'threshold'>('binary')
-  const steps = buildSteps({ nTracts, nTreated, nControl })
+  const steps = buildSteps(p)
   const s = steps[active - 1]
 
   return (
     <div>
-      {/* Step circles */}
+      {/* Step circles + connectors */}
       <div className="flex items-start mb-8 relative">
         {steps.map((step, i) => {
           const done     = i + 1 < active
@@ -150,8 +159,17 @@ export default function PipelineStepper({ nTracts, nTreated, nControl }: StepCou
               className="flex-1 flex flex-col items-center relative cursor-pointer group"
               onClick={() => setActive(step.id)}
             >
+              {/* Connector line — inline styles avoid Tailwind v4 arbitrary-value issues */}
               {i < steps.length - 1 && (
-                <div className={`absolute left-1/2 right-[-50%] top-[22px] h-0.5 z-0 ${done ? 'bg-teal-500' : 'bg-gray-200'}`} />
+                <div style={{
+                  position: 'absolute',
+                  left: '50%',
+                  right: '-50%',
+                  top: '22px',
+                  height: '2px',
+                  zIndex: 0,
+                  background: done ? '#14b8a6' : '#e5e7eb',
+                }} />
               )}
               <div className={[
                 'w-11 h-11 rounded-full z-10 flex items-center justify-center text-[15px] font-bold transition-all',
@@ -178,6 +196,7 @@ export default function PipelineStepper({ nTracts, nTreated, nControl }: StepCou
 
       {/* Detail panel */}
       <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-lg">
+        {/* Header */}
         <div className="flex items-start justify-between px-8 py-5 border-b border-gray-100 bg-gradient-to-br from-maroon/5 to-white">
           <div>
             <span className="inline-block bg-maroon/10 text-maroon text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded mb-2">
@@ -192,12 +211,17 @@ export default function PipelineStepper({ nTracts, nTreated, nControl }: StepCou
         </div>
 
         <div className="grid grid-cols-2">
-          {/* Left */}
+          {/* Left col */}
           <div className="p-7 border-r border-gray-50">
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-300 mb-3">{s.leftLabel}</p>
-            {s.isTreatmentStep ? (
-              <TreatmentToggle treatMode={treatMode} setTreatMode={setTreatMode} nTreated={nTreated} nControl={nControl} />
-            ) : (
+
+            {s.leftContent === 'treatment-def' && (
+              <TreatmentDefPanel p={p} />
+            )}
+            {s.leftContent === 'matching-results' && (
+              <MatchingResultsPanel p={p} />
+            )}
+            {s.leftContent === 'text' && (
               <>
                 <p className="text-sm text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: s.leftText }} />
                 {s.chips.length > 0 && (
@@ -214,7 +238,7 @@ export default function PipelineStepper({ nTracts, nTreated, nControl }: StepCou
             )}
           </div>
 
-          {/* Right */}
+          {/* Right col — retention only, no figures */}
           <div className="p-7">
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-300 mb-3">{s.rightLabel}</p>
             <p className="text-sm text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: s.rightText }} />
@@ -231,9 +255,6 @@ export default function PipelineStepper({ nTracts, nTreated, nControl }: StepCou
               </div>
               <p className="text-[10px] text-gray-300 mt-1.5">{s.retention.label}</p>
             </div>
-            {s.figFile && (
-              <FigureSlot src={s.figFile} alt={s.figAlt ?? ''} label="Figure" className="mt-5" />
-            )}
           </div>
         </div>
 
@@ -260,74 +281,99 @@ export default function PipelineStepper({ nTracts, nTreated, nControl }: StepCou
   )
 }
 
-function TreatmentToggle({
-  treatMode, setTreatMode, nTreated, nControl,
-}: {
-  treatMode: 'binary' | 'threshold'
-  setTreatMode: (m: 'binary' | 'threshold') => void
-  nTreated: number
-  nControl: number
-}) {
+/* ── Step 4: Treatment Definition side-by-side ── */
+function TreatmentDefPanel({ p }: { p: PipelineStepperProps }) {
   return (
-    <div>
-      <div className="flex border border-gray-200 rounded-lg overflow-hidden w-fit mb-4">
-        {(['binary', 'threshold'] as const).map(m => (
-          <button
-            key={m}
-            onClick={() => setTreatMode(m)}
-            className={[
-              'px-5 py-2 text-[13px] font-semibold transition capitalize',
-              m === 'binary'    && treatMode === 'binary'    ? 'bg-blue-50 text-blue-600' : '',
-              m === 'threshold' && treatMode === 'threshold' ? 'bg-teal-50 text-teal-600' : '',
-              treatMode !== m ? 'text-gray-400 hover:text-gray-600' : '',
-            ].join(' ')}
-          >
-            {m === 'binary' ? 'Binary' : 'Threshold'}
-          </button>
-        ))}
+    <div className="space-y-3">
+      <div className="bg-blue-50 border border-blue-200/60 rounded-xl p-4">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600 mb-2">Binary indicator</p>
+        <p className="text-[12px] text-gray-600 leading-relaxed mb-3">
+          A tract is treated as soon as <em>any</em> STR prohibition takes effect within its
+          boundaries, regardless of how many units are affected.
+        </p>
+        <div className="flex gap-2">
+          {[
+            { val: p.nTreatedBin.toLocaleString(), label: 'Treated' },
+            { val: p.nPoolBin.toLocaleString(),    label: 'Control pool' },
+            { val: `${((p.nTreatedBin / (p.nTreatedBin + p.nPoolBin)) * 100).toFixed(0)}%`, label: 'Share treated' },
+          ].map(c => (
+            <div key={c.label} className="bg-blue-100 rounded-lg px-3 py-1.5 text-center flex-1">
+              <span className="block text-base font-extrabold text-blue-600">{c.val}</span>
+              <span className="block text-[9px] text-gray-500">{c.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {treatMode === 'binary' ? (
-        <div className="bg-blue-50 border border-blue-200/70 rounded-xl p-5">
-          <p className="text-[13px] text-gray-600 leading-relaxed">
-            A tract is <strong>treated</strong> as soon as <em>any</em> STR prohibition takes effect
-            within its boundaries — regardless of how many units are affected.
-          </p>
-          <div className="flex gap-3 mt-4">
+      <div className="bg-teal-50 border border-teal-200/60 rounded-xl p-4">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-teal-600 mb-2">Threshold indicator</p>
+        <p className="text-[12px] text-gray-600 leading-relaxed mb-3">
+          A tract is treated only when the share of prohibited STR units exceeds a minimum
+          threshold of occupied housing units — stricter, fewer treated tracts.
+        </p>
+        <div className="flex gap-2">
+          {[
+            { val: p.nTreatedThr.toLocaleString(), label: 'Treated' },
+            { val: p.nPoolThr.toLocaleString(),    label: 'Control pool' },
+            { val: `${((p.nTreatedThr / (p.nTreatedThr + p.nPoolThr)) * 100).toFixed(0)}%`, label: 'Share treated' },
+          ].map(c => (
+            <div key={c.label} className="bg-teal-100 rounded-lg px-3 py-1.5 text-center flex-1">
+              <span className="block text-base font-extrabold text-teal-600">{c.val}</span>
+              <span className="block text-[9px] text-gray-500">{c.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Step 6: Matching results side-by-side ── */
+function MatchingResultsPanel({ p }: { p: PipelineStepperProps }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-[12px] text-gray-600 leading-relaxed">
+        Nearest-neighbour matching (k=3) on two standardized features:
+        <b> pre-treatment rent slope</b> and <b>average pre-treatment rent level</b>.
+        The two-feature match improves balance on rent levels vs slope-only matching.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-blue-50 border border-blue-200/60 rounded-xl p-4">
+          <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-2">Binary</p>
+          <div className="space-y-1.5">
             {[
-              { val: nTreated.toLocaleString(), label: 'Treated tracts' },
-              { val: nControl.toLocaleString(), label: 'Never-treated' },
-              { val: `${((nTreated / (nTreated + nControl)) * 100).toFixed(1)}%`, label: 'Share treated' },
-            ].map(c => (
-              <div key={c.label} className="bg-blue-100 rounded-lg px-4 py-2 text-center">
-                <span className="block text-xl font-extrabold text-blue-600">{c.val}</span>
-                <span className="block text-[10px] text-gray-500">{c.label}</span>
+              { label: 'Matched sample',     val: p.nMatchedBin.toLocaleString() },
+              { label: 'Treated matched',    val: p.nTreatedBin.toLocaleString() },
+              { label: 'Control matched',    val: p.nControlBin.toLocaleString() },
+            ].map(r => (
+              <div key={r.label} className="flex justify-between text-[11px]">
+                <span className="text-gray-500">{r.label}</span>
+                <span className="font-bold text-blue-700">{r.val}</span>
               </div>
             ))}
           </div>
         </div>
-      ) : (
-        <div className="bg-teal-50 border border-teal-200/70 rounded-xl p-5">
-          <p className="text-[13px] text-gray-600 leading-relaxed">
-            A tract is treated only when the share of prohibited STR units exceeds a minimum
-            threshold of occupied housing units — a stricter definition with <em>fewer treated tracts</em>.
-          </p>
-          <div className="flex gap-3 mt-4">
+        <div className="bg-teal-50 border border-teal-200/60 rounded-xl p-4">
+          <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wider mb-2">Threshold</p>
+          <div className="space-y-1.5">
             {[
-              { val: `< ${nTreated}`, label: 'Treated tracts' },
-              { val: `> ${nControl}`, label: 'Never-treated' },
-              { val: 'stricter', label: 'Definition' },
-            ].map(c => (
-              <div key={c.label} className="bg-teal-100 rounded-lg px-4 py-2 text-center">
-                <span className="block text-xl font-extrabold text-teal-600">{c.val}</span>
-                <span className="block text-[10px] text-gray-500">{c.label}</span>
+              { label: 'Matched sample',     val: p.nMatchedThr.toLocaleString() },
+              { label: 'Treated matched',    val: p.nTreatedThr.toLocaleString() },
+              { label: 'Control matched',    val: p.nControlThr.toLocaleString() },
+            ].map(r => (
+              <div key={r.label} className="flex justify-between text-[11px]">
+                <span className="text-gray-500">{r.label}</span>
+                <span className="font-bold text-teal-700">{r.val}</span>
               </div>
             ))}
           </div>
         </div>
-      )}
-      <p className="text-[11px] text-gray-300 italic mt-3">
-        Both definitions compared side-by-side in the <strong>Robustness</strong> tab.
+      </div>
+
+      <p className="text-[10px] text-gray-400 italic">
+        This matched sample is used only in robustness specifications.
+        The primary estimate (Step 5) uses the full panel.
       </p>
     </div>
   )

@@ -33,6 +33,48 @@ function Note({ children }: { children: React.ReactNode }) {
   )
 }
 
+function LovePlotCallout() {
+  return (
+    <div className="border-l-4 border-teal-600 bg-teal-50/50 rounded-r-xl px-6 py-5 mb-5">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-teal-800 mb-2">
+        How to read these Love-style plots
+      </p>
+      <p className="text-[14px] text-gray-700 leading-relaxed mb-3 max-w-4xl">
+        Each row is a <strong>matching feature</strong> used in the <strong>post-refactor</strong>{' '}
+        trend matcher (standardized <code className="text-xs bg-white/80 px-1 rounded">pre_trend_slope</code>{' '}
+        and <code className="text-xs bg-white/80 px-1 rounded">avg_pre_rent</code>, then{' '}
+        <em>k</em>-nearest never-treated neighbours)—not the old slope-only rule. The vertical axis is
+        not time; it is the feature label. Points are{' '}
+        <strong>standardized mean differences (SMD)</strong> between treated and comparison tracts,
+        using the same pooled-SD definition as the pipeline diagnostics /{' '}
+        <code className="text-xs bg-white/80 px-1 rounded">did_story_matching_balance_long.csv</code>.
+      </p>
+      <ul className="text-[13px] text-gray-700 leading-relaxed space-y-1.5 list-disc list-inside max-w-4xl">
+        <li>
+          <strong>Before (grey circles):</strong> treated tracts vs{' '}
+          <em>all</em> never-treated tracts that enter the pre-trend module (enough pre-period months).
+          That is the full pre-match control pool in trend space.
+        </li>
+        <li>
+          <strong>After (maroon diamonds):</strong> treated tracts vs{' '}
+          <em>only</em> the never-treated tracts actually chosen as matches—so balance on the same
+          features after <em>k</em>-NN selection.
+        </li>
+        <li>
+          <strong>Not residualized CS:</strong> this plot says nothing about Callaway–Sant&apos;Anna
+          with-controls, which uses a <em>residualized</em> outcome on pre-treatment months. Here we
+          only summarise <em>design-stage</em> balance on pre-treatment summaries, not ATT magnitudes.
+        </li>
+        <li>
+          <strong>Threshold vs binary:</strong> two treatment definitions; the matching <em>machinery</em>{' '}
+          is the same. Who counts as treated changes, so comparators and counts differ—compare the two
+          panels to the diagnostics tables above.
+        </li>
+      </ul>
+    </div>
+  )
+}
+
 export default function AuditPage() {
   const lineageBinary   = loadSampleLineage('binary')
   const lineageThreshold = loadSampleLineage('threshold')
@@ -242,16 +284,18 @@ export default function AuditPage() {
         />
       </div>
 
+      <LovePlotCallout />
+
       <div className="grid grid-cols-2 gap-5 mb-4">
         <FigureSlot
           src="/data/threshold/did_story_matching_love.png"
           alt="Threshold love plot: SMD before and after matching"
-          label="Threshold love plot — SMD before vs after matching"
+          label="Threshold love plot — SMD before vs after matching (post-refactor matching)"
         />
         <FigureSlot
           src="/data/binary/did_story_matching_love.png"
           alt="Binary love plot: SMD before and after matching"
-          label="Binary love plot — SMD before vs after matching"
+          label="Binary love plot — SMD before vs after matching (post-refactor matching)"
         />
       </div>
 

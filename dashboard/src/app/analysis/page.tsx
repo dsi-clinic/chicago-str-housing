@@ -44,17 +44,28 @@ export default function AnalysisPage() {
 
       {/* ── Covariate balance ── */}
       <h3 className="text-lg font-bold mb-1">Pre-treatment Covariate Balance</h3>
-      <p className="text-[14px] text-gray-500 mb-6 max-w-2xl leading-relaxed">
+      <p className="text-[14px] text-gray-500 mb-4 max-w-2xl leading-relaxed">
         All seven covariates are significantly imbalanced before matching. Treated tracts
         are higher-income, higher-education, and higher-rent. The education gap is the
         largest (Cohen&apos;s d ≈ 1.08). This pattern motivates matching as a design-stage
         restriction, though it does not fully eliminate selection concerns.
       </p>
 
+      <div className="border-l-4 border-teal-600 bg-teal-50/50 rounded-r-xl px-5 py-4 mb-4 max-w-2xl">
+        <p className="text-[13px] text-gray-700 leading-relaxed">
+          The Love-style figure below uses the <strong>post-refactor</strong> matcher (standardized{' '}
+          <code className="text-xs bg-white/80 px-1 rounded">pre_trend_slope</code> +{' '}
+          <code className="text-xs bg-white/80 px-1 rounded">avg_pre_rent</code>, <em>k</em>-NN).{' '}
+          <strong>Before</strong> = treated vs all never-treated tracts in the pre-trend pool;{' '}
+          <strong>after</strong> = treated vs matched controls only. It is not the residualized
+          Callaway–Sant&apos;Anna-with-controls step (see Methodology Audit for the full explainer).
+        </p>
+      </div>
+
       <FigureSlot
         src="/data/binary/did_story_matching_love.png"
         alt="Love plot: standardized mean differences before and after matching"
-        label="Love plot — SMD before vs after matching on trend features"
+        label="Love plot — SMD before vs after matching (post-refactor matching)"
         className="mb-6"
       />
 
