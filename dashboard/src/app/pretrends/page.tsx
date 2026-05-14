@@ -89,13 +89,32 @@ export default function PretrendsPage() {
         />
       </div>
 
-      <div className="bg-teal-50 border border-teal-200/60 rounded-xl px-5 py-4 mb-8">
+      <div className="border border-gray-200 rounded-xl px-5 py-4 mb-8 grid grid-cols-2 gap-4">
+        <div className="bg-teal-50 border border-teal-200/60 rounded-xl px-4 py-3">
+          <p className="text-[12px] text-gray-700 leading-relaxed">
+            <strong className="text-teal-700">✓ Formal test does not reject:</strong> The interaction
+            term is not statistically significant (binary p = {ptB.p_value.toFixed(2)},
+            threshold p = {ptT.p_value.toFixed(2)}). We cannot reject null parallel trends.
+          </p>
+        </div>
+        <div className="bg-amber-50 border border-amber-200/60 rounded-xl px-4 py-3">
+          <p className="text-[12px] text-gray-700 leading-relaxed">
+            <strong className="text-amber-700">⚠ Visual evidence is imperfect:</strong> The
+            full-panel and matched CS event studies show <strong>sizable pre-period deviations</strong>.
+            Residualized CS (Models Spec ③) looks better near treatment but still not perfectly flat.
+            Do not interpret this as &ldquo;parallel trends proved.&rdquo;
+          </p>
+        </div>
+      </div>
+      <div className="bg-gray-50 border border-gray-200 rounded-xl px-5 py-4 mb-8">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2">Correct framing for this evidence</p>
         <p className="text-[12px] text-gray-700 leading-relaxed">
-          <strong className="text-teal-700">✓ Both definitions pass:</strong> The interaction
-          term is positive but not statistically significant (binary p = {ptB.p_value.toFixed(2)},
-          threshold p = {ptT.p_value.toFixed(2)}). This means we cannot reject the null hypothesis
-          that pre-ban rent trends were parallel. This is supportive — but not proof.
-          Parallel trends is fundamentally untestable for the post-ban counterfactual.
+          The formal regression test supports parallel trends (p &gt; 0.20). Visual event-study
+          inspection shows non-trivial pre-period movement. Residualization of pre-trend differences
+          partially addresses this but does not eliminate it. <strong>Recommended language: </strong>
+          &ldquo;Parallel trends is plausible based on formal testing, but meaningful pre-period
+          deviations remain in the event studies. Results should be interpreted with sensitivity
+          to this limitation.&rdquo;
         </p>
       </div>
 
