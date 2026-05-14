@@ -16,7 +16,8 @@ const TABS = [
 export default function TabNav() {
   const pathname = usePathname()
   return (
-    <nav className="flex border-b-2 border-gray-100 px-14 sticky top-0 bg-white z-10 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
+    <nav className="border-b-2 border-gray-100 sticky top-0 bg-white z-10 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
+      <div className="max-w-5xl mx-auto px-14 flex">
       {TABS.map(t => {
         const active = t.href === '/' ? pathname === '/' : pathname.startsWith(t.href)
         return (
@@ -34,6 +35,7 @@ export default function TabNav() {
           </Link>
         )
       })}
+      </div>
     </nav>
   )
 }
