@@ -31,20 +31,29 @@ const STORY = [
 ]
 
 export default function IntroductionPage() {
-  // Load from sample lineage so numbers reflect the full audit story
+  // Binary lineage
   const lineage  = loadSampleLineage('binary')
   const stageA   = lineage.find(s => s.stage_code === 'A')
   const stageC   = lineage.find(s => s.stage_code === 'C')
-  const stageD   = lineage.find(s => s.stage_code === 'D')
-  const stageF   = lineage.find(s => s.stage_code === 'F')
+  const stageDbin = lineage.find(s => s.stage_code === 'D')
+  const stageFbin = lineage.find(s => s.stage_code === 'F')
 
-  const nAll      = stageA?.n_tracts   ?? 1332
-  const nPanel    = stageC?.n_tracts   ?? 842
-  const nMonths   = stageC?.n_months   ?? 128
-  const nTreated  = stageD?.treated    ?? 373
-  const nPool     = stageD?.never_treated ?? 469
-  const nMatched  = stageF?.n_tracts   ?? 556
+  const nAll      = stageA?.n_tracts       ?? 1332
+  const nPanel    = stageC?.n_tracts       ?? 842
+  const nMonths   = stageC?.n_months       ?? 128
+  const nTreated  = stageDbin?.treated     ?? 373
+  const nPool     = stageDbin?.never_treated ?? 469
+  const nMatched  = stageFbin?.n_tracts    ?? 556
   const nControls = nMatched - nTreated
+
+  // Threshold lineage — exact counts for the threshold indicator box
+  const lineageT   = loadSampleLineage('threshold')
+  const stageDthr  = lineageT.find(s => s.stage_code === 'D')
+  const stageFthr  = lineageT.find(s => s.stage_code === 'F')
+  const nTreatedT  = stageDthr?.treated      ?? 274
+  const nPoolT     = stageDthr?.never_treated ?? 568
+  const nMatchedT  = stageFthr?.n_tracts     ?? 453
+  const nControlsT = nMatchedT - nTreatedT
 
   // Group stats for rent balance info block (from matched binary sample)
   const gs       = loadGroupStats('binary')
@@ -113,11 +122,22 @@ export default function IntroductionPage() {
             <p className="text-[11px] font-bold uppercase tracking-wider text-teal-600 mb-3">Threshold Indicator</p>
             <p className="text-[13px] text-gray-600 leading-relaxed">
               A tract is treated only when the share of prohibited STR units exceeds a minimum
-              threshold of occupied housing units — a stricter, more conservative definition.
+              threshold of occupied housing units — stricter, fewer treated tracts.
             </p>
-            <p className="mt-4 text-[12px] text-gray-400 italic">
-              Comparison of both definitions in the Robustness tab.
-            </p>
+            <div className="flex gap-3 mt-4">
+              <div className="bg-teal-100 rounded-lg px-4 py-2 text-center">
+                <span className="block text-xl font-extrabold text-teal-600">{nTreatedT.toLocaleString()}</span>
+                <span className="block text-[10px] text-gray-500">Treated tracts</span>
+              </div>
+              <div className="bg-teal-100 rounded-lg px-4 py-2 text-center">
+                <span className="block text-xl font-extrabold text-teal-600">{nPoolT.toLocaleString()}</span>
+                <span className="block text-[10px] text-gray-500">Control pool (pre-match)</span>
+              </div>
+              <div className="bg-teal-100 rounded-lg px-4 py-2 text-center">
+                <span className="block text-xl font-extrabold text-teal-600">{nControlsT.toLocaleString()}</span>
+                <span className="block text-[10px] text-gray-500">Matched controls</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -137,12 +157,12 @@ export default function IntroductionPage() {
           <TreatmentMap
             geojsonUrl="/data/binary/tracts_treatment.geojson"
             title="Binary indicator"
-            subtitle={`${nTreated.toLocaleString()} treated · ${nPool.toLocaleString()} never-treated pool`}
+            subtitle={`${nTreated.toLocaleString()} treated · ${nPool.toLocaleString()} control pool · ${nMatched.toLocaleString()} matched sample`}
           />
           <TreatmentMap
             geojsonUrl="/data/threshold/tracts_treatment.geojson"
             title="Threshold indicator"
-            subtitle="Stricter definition — fewer treated tracts"
+            subtitle={`${nTreatedT.toLocaleString()} treated · ${nPoolT.toLocaleString()} control pool · ${nMatchedT.toLocaleString()} matched sample`}
           />
         </div>
       </div>
