@@ -10,6 +10,7 @@ const TABS = [
   { label: 'Robustness',   href: '/robustness' },
   { label: 'Pre-trends',   href: '/pretrends' },
   { label: 'Policy',       href: '/policy' },
+  { label: 'Audit',        href: '/audit' },
 ]
 
 export default function TabNav() {
