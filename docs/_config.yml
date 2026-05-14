@@ -14,6 +14,12 @@ kramdown:
   input: GFM
   syntax_highlighter: rouge
 
+# jekyll-titles-from-headings (on by default on GitHub Pages): use first
+# heading as title but do not also render it in the body (avoids duplicate
+# headings with Minima home / page layouts).
+titles_from_headings:
+  strip_title: true
+
 header_pages:
   - str-paper/STR_POLICY_BRIEF.md
   - str-paper/STR_PROHIBITION_PAPER.md
