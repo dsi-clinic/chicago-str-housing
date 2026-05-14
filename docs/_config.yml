@@ -14,9 +14,9 @@ kramdown:
   input: GFM
   syntax_highlighter: rouge
 
-# jekyll-titles-from-headings (on by default on GitHub Pages): use first
-# heading as title but do not also render it in the body (avoids duplicate
-# headings with Minima home / page layouts).
+# jekyll-titles-from-headings (GitHub Pages default): strip the in-body
+# heading when it becomes page.title. Site layouts also avoid a second
+# template h1 on the home page (home) and on STR docs (page + hide_title).
 titles_from_headings:
   strip_title: true
 

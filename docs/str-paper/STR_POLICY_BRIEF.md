@@ -1,6 +1,7 @@
 ---
 layout: page
 title: "Policy brief"
+hide_title: true
 ---
 
 # Short-Term Rental Prohibitions and Rental Prices in Chicago

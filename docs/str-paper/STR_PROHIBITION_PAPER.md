@@ -1,6 +1,7 @@
 ---
 layout: page
 title: "Paper"
+hide_title: true
 ---
 
 # Do Short-Term Rental Prohibitions Raise Long-Term Rents? Evidence from Chicago's Shared Housing Ordinance
