@@ -35,7 +35,9 @@ def main() -> None:
     parser.add_argument(
         "--panel_csv",
         type=Path,
-        default=Path(os.environ.get("DID_PANEL_CSV", "output/did-cs/did_panel_data.csv")),
+        default=Path(
+            os.environ.get("DID_PANEL_CSV", "output/did-cs/did_panel_data.csv")
+        ),
         help="Tract-month panel CSV from the DiD pipeline (default: DID_PANEL_CSV or output/).",
     )
     args = parser.parse_args()

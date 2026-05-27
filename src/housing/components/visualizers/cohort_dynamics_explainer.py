@@ -21,7 +21,8 @@ PLOT_POST = 36
 class CohortDynamicsExplainerVisualizer(Visualizer):
     """Overlay baseline vs residualized CS event studies plus largest-cohort rents."""
 
-    def __init__(self, output_dir: str | Path | None = None) -> None:
+    def __init__(self, output_dir: str | Path) -> None:
+        """Configure output directory for the cohort dynamics explainer figure."""
         super().__init__(
             "cohort_dynamics_explainer",
             "Cohort heterogeneity narrative: CS curves + raw rents for top cohorts",
@@ -29,6 +30,7 @@ class CohortDynamicsExplainerVisualizer(Visualizer):
         self.output_dir = Path(output_dir or "/project/output")
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Render baseline vs residualized CS curves with raw-rent cohort paths."""
         base = context.get("cs_event_study")
         ctrl = context.get("cs_event_study_with_controls")
         cohort_info = context.get("cs_cohort_info") or {}
@@ -105,19 +107,27 @@ class CohortDynamicsExplainerVisualizer(Visualizer):
         pdata["tract_geoid"] = pdata["tract_geoid"].astype(str)
         ever = pdata.groupby("tract_geoid")["treated"].max().astype(bool)
         never_avg = (
-            pdata[pdata["tract_geoid"].isin(ever[~ever].index)][["month", "rental_price"]]
+            pdata[pdata["tract_geoid"].isin(ever[~ever].index)][
+                ["month", "rental_price"]
+            ]
             .groupby("month")["rental_price"]
             .mean()
         )
 
-        if cohort_sizes is not None and cohort_df is not None and not cohort_sizes.empty:
-            top_cohorts = cohort_sizes.sort_values(ascending=False).head(4).index.to_list()
+        if (
+            cohort_sizes is not None
+            and cohort_df is not None
+            and not cohort_sizes.empty
+        ):
+            top_cohorts = (
+                cohort_sizes.sort_values(ascending=False).head(4).index.to_list()
+            )
 
             cmap = plt.cm.tab10(np.linspace(0, 1, len(top_cohorts)))
             for rank, cohort_date in enumerate(top_cohorts):
-                tg = cohort_df[
-                    cohort_df["first_treatment_month"] == cohort_date
-                ]["tract_geoid"].astype(str)
+                tg = cohort_df[cohort_df["first_treatment_month"] == cohort_date][
+                    "tract_geoid"
+                ].astype(str)
 
                 rents = (
                     pdata[pdata["tract_geoid"].isin(tg)][["month", "rental_price"]]
@@ -127,7 +137,13 @@ class CohortDynamicsExplainerVisualizer(Visualizer):
                 label = f"Treated cohort {pd.Timestamp(cohort_date).strftime('%Y-%m')} (n={len(tg)})"
                 rents.plot(ax=ax_bot, color=cmap[rank], linewidth=1.9, label=label)
 
-            never_avg.plot(ax=ax_bot, color="black", linewidth=2.0, linestyle="--", label="Never treated (matched)")
+            never_avg.plot(
+                ax=ax_bot,
+                color="black",
+                linewidth=2.0,
+                linestyle="--",
+                label="Never treated (matched)",
+            )
 
         ax_bot.grid(True, alpha=0.3)
         ax_bot.set_title("B. Mean raw rent trajectories — largest prohibition cohorts")
@@ -142,7 +158,12 @@ class CohortDynamicsExplainerVisualizer(Visualizer):
         plt.close()
 
         csv_path = self.output_dir / "cohort_dynamics_explainer_data.csv"
-        plot_base.rename(columns={"att": "att_baseline_CS"}).to_csv(csv_path, index=False)
+        plot_base.rename(columns={"att": "att_baseline_CS"}).to_csv(
+            csv_path, index=False
+        )
 
         logger.info("Cohort dynamics explainer saved to %s", out_png)
-        return {"cohort_dynamics_explainer_plot": str(out_png), "cohort_explainer_csv": str(csv_path)}
+        return {
+            "cohort_dynamics_explainer_plot": str(out_png),
+            "cohort_explainer_csv": str(csv_path),
+        }

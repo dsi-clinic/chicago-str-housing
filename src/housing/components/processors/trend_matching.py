@@ -42,6 +42,7 @@ class TrendMatchingProcessor(DataProcessor):
             k_neighbors: Number of control matches per treated tract
             min_pre_periods: Minimum pre-treatment months required
             caliper: Maximum allowed difference in trend slopes (None = no limit)
+            matching_features: Standardized pre-treatment columns used for k-NN matching
         """
         super().__init__(
             "trend_matching",
@@ -297,8 +298,12 @@ class TrendMatchingProcessor(DataProcessor):
             "distance_max": float(matching_info["distance"].max()),
             "control_reuse_mean": float(control_reuse["n_treated_matches"].mean()),
             "control_reuse_median": float(control_reuse["n_treated_matches"].median()),
-            "control_reuse_p90": float(control_reuse["n_treated_matches"].quantile(0.90)),
-            "control_reuse_p95": float(control_reuse["n_treated_matches"].quantile(0.95)),
+            "control_reuse_p90": float(
+                control_reuse["n_treated_matches"].quantile(0.90)
+            ),
+            "control_reuse_p95": float(
+                control_reuse["n_treated_matches"].quantile(0.95)
+            ),
             "control_reuse_max": int(control_reuse["n_treated_matches"].max()),
             "control_reuse_table": control_reuse,
         }

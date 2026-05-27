@@ -44,7 +44,9 @@ class DiDSampleMapVisualizer(Visualizer):
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         tract_df = self._tract_level_frame(did_panel)
-        tract_df.to_csv(self.output_dir / "did_spatial_sample_tract_table.csv", index=False)
+        tract_df.to_csv(
+            self.output_dir / "did_spatial_sample_tract_table.csv", index=False
+        )
 
         common_bounds = (
             city_boundaries.total_bounds if city_boundaries is not None else None

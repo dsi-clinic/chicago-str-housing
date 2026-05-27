@@ -14,6 +14,9 @@ from pipeline.base import DataProcessor
 
 logger = logging.getLogger(__name__)
 
+COVERAGE_HIGH_SHARE = 0.95
+COVERAGE_MED_SHARE = 0.50
+
 
 class ZipTractCrosswalkProcessor(DataProcessor):
     """Create a crosswalk mapping ZIP codes to census tracts.
@@ -132,8 +135,8 @@ class ZipTractCrosswalkProcessor(DataProcessor):
         n_tracts = crosswalk["tract_geoid"].nunique()
         avg_tracts_per_zip = len(crosswalk) / n_zips if n_zips > 0 else 0
         coverage_summary = tract_coverage["tract_coverage_share"]
-        n_tracts_95 = int((coverage_summary >= 0.95).sum())
-        n_tracts_50 = int((coverage_summary >= 0.50).sum())
+        n_tracts_95 = int((coverage_summary >= COVERAGE_HIGH_SHARE).sum())
+        n_tracts_50 = int((coverage_summary >= COVERAGE_MED_SHARE).sum())
 
         logger.info("Crosswalk created successfully:")
         logger.info("  ZIP codes in crosswalk: %d", n_zips)
@@ -156,7 +159,9 @@ class ZipTractCrosswalkProcessor(DataProcessor):
                 "avg_tracts_per_zip": float(avg_tracts_per_zip),
                 "tracts_with_coverage_ge_95pct": n_tracts_95,
                 "tracts_with_coverage_ge_50pct": n_tracts_50,
-                "tracts_with_coverage_lt_50pct": int((coverage_summary < 0.50).sum()),
+                "tracts_with_coverage_lt_50pct": int(
+                    (coverage_summary < COVERAGE_MED_SHARE).sum()
+                ),
             },
             "crosswalk_tract_coverage": tract_coverage,
         }

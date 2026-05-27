@@ -13,12 +13,14 @@ from pipeline.base import Visualizer
 
 logger = logging.getLogger(__name__)
 
+MIN_YM_LEN = 7
 
 
 class DataFunnelVisualizer(Visualizer):
     """Write ``data_funnel.png``: three-stage funnel with matched split + cohort bars."""
 
     def __init__(self, output_dir: str | Path) -> None:
+        """Configure output directory for the data-funnel graphic."""
         super().__init__(
             "data_funnel_visualization",
             "Matplotlib funnel: raw → matched → CS cohorts",
@@ -26,6 +28,7 @@ class DataFunnelVisualizer(Visualizer):
         self.output_dir = Path(output_dir)
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Build ``data_funnel.png`` from descriptive CSVs in the output directory."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
         panel_raw = self.output_dir / "did_panel_data.csv"
         panel_ov = self.output_dir / "did_descriptive_panel_overview.csv"
@@ -55,7 +58,7 @@ class DataFunnelVisualizer(Visualizer):
             if not cdf.empty:
                 for _, rw in cdf.iterrows():
                     m_raw = str(rw.get("first_prohibition_month", ""))
-                    ym = m_raw[:7] if len(m_raw) >= 7 else m_raw
+                    ym = m_raw[:MIN_YM_LEN] if len(m_raw) >= MIN_YM_LEN else m_raw
                     cohort_labels.append(ym)
                     cohort_ns.append(int(rw["n_tracts"]))
 
@@ -90,7 +93,12 @@ class DataFunnelVisualizer(Visualizer):
         ax0.set_xlim(0, max(n_raw, 1) * 1.08)
         ax0.set_yticks([])
         ax0.set_xlabel("Tracts", fontsize=10, color=gray)
-        ax0.set_title(f"A. Raw panel\n({n_raw} tracts)", fontsize=11, color=maroon, fontweight="semibold")
+        ax0.set_title(
+            f"A. Raw panel\n({n_raw} tracts)",
+            fontsize=11,
+            color=maroon,
+            fontweight="semibold",
+        )
         ax0.text(
             n_raw_nt / 2,
             0,

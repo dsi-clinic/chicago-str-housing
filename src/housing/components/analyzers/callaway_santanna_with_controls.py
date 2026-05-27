@@ -55,6 +55,7 @@ MAX_POST_TIME = 36  # Maximum post-treatment periods
 # Detailed run notes: ``docs/DID_CS_RUNBOOK.md``
 # -----------------------------------------------------------------------------
 
+
 class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
     """CS estimator with covariate adjustment and tract-specific trends."""
 

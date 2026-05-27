@@ -15,6 +15,11 @@ from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
 
+MIN_CS_TRACTS = 12
+MIN_CS_OBS = 800
+MIN_NT_FOR_DOSE = 16
+NEIGHBOUR_SHARE_THRESHOLD = 0.5
+
 
 def _run_cs_subset(
     analyzer: CallawaySantAnnaAnalyzer,
@@ -34,8 +39,13 @@ def _run_cs_subset(
         "att": float("nan"),
         "se": float("nan"),
     }
-    if row["n_tracts"] < 12 or len(subset) < 800:
-        logger.info("Skipping CS for %s: small subset (n_tr=%s obs=%s)", label, row["n_tracts"], len(subset))
+    if row["n_tracts"] < MIN_CS_TRACTS or len(subset) < MIN_CS_OBS:
+        logger.info(
+            "Skipping CS for %s: small subset (n_tr=%s obs=%s)",
+            label,
+            row["n_tracts"],
+            len(subset),
+        )
         return row
     try:
         out = analyzer.execute({"did_panel": subset})
@@ -55,7 +65,7 @@ def _dose_bins(
     panel: pd.DataFrame,
 ) -> pd.DataFrame:
     """Quartiles of mid-panel neighbour-treated share among never-treated; re-run CS per bin."""
-    if len(nt_ids) < 16:
+    if len(nt_ids) < MIN_NT_FOR_DOSE:
         return pd.DataFrame(
             [
                 {
@@ -81,7 +91,9 @@ def _dose_bins(
                     "quartile": "NA",
                     "label": "",
                     "n_never_tr": len(nt_ids),
-                    "mean_neighbour_share_treated_mid": float(s.mean()) if len(s) else float("nan"),
+                    "mean_neighbour_share_treated_mid": float(s.mean())
+                    if len(s)
+                    else float("nan"),
                     "att": float("nan"),
                     "se": float("nan"),
                 }
@@ -92,7 +104,9 @@ def _dose_bins(
     for iq, (_, sub) in enumerate(s.groupby(bin_labels, observed=True), start=1):
         lst = sorted(sub.index.astype(str).tolist())
         mean_share = float(sub.mean())
-        subset = panel[panel["tract_geoid"].astype(str).isin(sorted(set(lst) | set(treated_ids)))].copy()
+        subset = panel[
+            panel["tract_geoid"].astype(str).isin(sorted(set(lst) | set(treated_ids)))
+        ].copy()
         r = {
             "quartile": str(iq),
             "label": f"Q{iq}",
@@ -101,7 +115,10 @@ def _dose_bins(
             "att": float("nan"),
             "se": float("nan"),
         }
-        if subset["tract_geoid"].nunique() >= 12 and len(subset) >= 800:
+        if (
+            subset["tract_geoid"].nunique() >= MIN_CS_TRACTS
+            and len(subset) >= MIN_CS_OBS
+        ):
             try:
                 out = analyzer.execute({"did_panel": subset})
                 oo = out.get("cs_overall_att") or {}
@@ -126,11 +143,19 @@ def _forest_plot(df: pd.DataFrame, baseline: float, path: Path) -> None:
     dd = df.dropna(subset=["att"]).reset_index(drop=True)
     errs = dd["se"].astype(float).fillna(0) * 1.96
     ypos = np.arange(len(dd))
-    labels = [_PRETTY_SUBGROUP.get(str(s), str(s).replace("_", " ")) for s in dd["subgroup"]]
+    labels = [
+        _PRETTY_SUBGROUP.get(str(s), str(s).replace("_", " ")) for s in dd["subgroup"]
+    ]
 
     plt.figure(figsize=(8.8, max(3.4, 1.6 + 0.7 * len(dd))))
     if baseline == baseline:  # not NaN
-        plt.axvline(float(baseline), color="grey", linestyle=":", linewidth=1.5, label="Full-sample CS ATT")
+        plt.axvline(
+            float(baseline),
+            color="grey",
+            linestyle=":",
+            linewidth=1.5,
+            label="Full-sample CS ATT",
+        )
     plt.errorbar(
         dd["att"].astype(float),
         ypos,
@@ -161,12 +186,10 @@ def _dose_plot(dose: pd.DataFrame, path: Path) -> None:
     plt.axhline(0.0, color="lightgray", linestyle="--")
     errs = (d["se"].astype(float).fillna(0) * 1.96).to_numpy()
 
-    lbl = (
-        d["label"].astype(str)
-        if "label" in d.columns
-        else d["quartile"].astype(str)
+    lbl = d["label"].astype(str) if "label" in d.columns else d["quartile"].astype(str)
+    plt.errorbar(
+        xs, d["att"].astype(float), yerr=errs, fmt="o-", capsize=4, color="#800000"
     )
-    plt.errorbar(xs, d["att"].astype(float), yerr=errs, fmt="o-", capsize=4, color="#800000")
 
     plt.xticks(xs, lbl, rotation=0)
     plt.xlabel("Never-treated quartile by neighbour-treated share at mid-sample")
@@ -188,6 +211,7 @@ class SUTVADonutDoseAnalyzer(Analyzer):
         anticipation: int = 0,
         min_cohort_size: int = 5,
     ) -> None:
+        """Configure CS re-estimation settings for spatial subsample probes."""
         super().__init__(
             "sutva_donut_dose_analysis",
             "Spatial donut / dose-response style neighbourhood exposure checks",
@@ -198,6 +222,7 @@ class SUTVADonutDoseAnalyzer(Analyzer):
         self.min_cohort_size = min_cohort_size
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Compare pooled CS ATTs across isolated vs adjacent never-treated tracts."""
         pdf = context.get("did_panel")
         gdf = context.get("tract_boundaries")
         baseline = context.get("cs_overall_att") or {}
@@ -213,7 +238,9 @@ class SUTVADonutDoseAnalyzer(Analyzer):
 
         mids = sorted(panel["month"].unique())
         mc = mids[len(mids) // 2]
-        midslice = panel[panel["month"] == mc][["tract_geoid", "treated"]].drop_duplicates("tract_geoid")
+        midslice = panel[panel["month"] == mc][
+            ["tract_geoid", "treated"]
+        ].drop_duplicates("tract_geoid")
         mser = midslice.set_index("tract_geoid")["treated"].astype(float)
 
         ever = panel.groupby("tract_geoid")["treated"].max().astype(bool)
@@ -243,7 +270,9 @@ class SUTVADonutDoseAnalyzer(Analyzer):
             if len(neigh) == 0:
                 iso.append(tg_s)
                 continue
-            has_treated_neighbour = any(nb in ever.index and bool(ever.loc[nb]) for nb in neigh)
+            has_treated_neighbour = any(
+                nb in ever.index and bool(ever.loc[nb]) for nb in neigh
+            )
             if has_treated_neighbour:
                 adj.append(tg_s)
             else:
@@ -257,7 +286,10 @@ class SUTVADonutDoseAnalyzer(Analyzer):
                 share[tg_s] = 0.0
             else:
                 treated_neigh_at_mid = sum(
-                    1 for n in neigh if n in mser.index and float(mser.loc[n]) >= 0.5
+                    1
+                    for n in neigh
+                    if n in mser.index
+                    and float(mser.loc[n]) >= NEIGHBOUR_SHARE_THRESHOLD
                 )
                 share[tg_s] = treated_neigh_at_mid / len(neigh)
 
@@ -284,7 +316,11 @@ class SUTVADonutDoseAnalyzer(Analyzer):
         donut_df.to_csv(self.output_dir / "sutva_donut_summary.csv", index=False)
         dose.to_csv(self.output_dir / "sutva_dose_quartiles.csv", index=False)
 
-        _forest_plot(donut_df.dropna(subset=["att"]), float(baseline.get("att", np.nan)), self.output_dir / "sutva_donut.png")
+        _forest_plot(
+            donut_df.dropna(subset=["att"]),
+            float(baseline.get("att", np.nan)),
+            self.output_dir / "sutva_donut.png",
+        )
         _dose_plot(dose, self.output_dir / "sutva_dose_response.png")
 
         return {

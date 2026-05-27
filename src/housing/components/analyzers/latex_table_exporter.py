@@ -12,8 +12,10 @@ from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
 
+MIN_YM_LEN = 7
 
-def _num(x: Any) -> float:
+
+def _num(x: object) -> float:
     try:
         v = float(x)
     except (TypeError, ValueError):
@@ -35,6 +37,7 @@ class LaTeXTableExporter(Analyzer):
     """Write ``tables/tab_*.tex`` under the DiD output directory."""
 
     def __init__(self, output_dir: str | Path) -> None:
+        """Configure the DiD output directory for LaTeX table fragments."""
         super().__init__(
             "latex_whitepaper_tables",
             "Emit booktabs-ready LaTeX fragments for slides / paper appendix",
@@ -42,6 +45,7 @@ class LaTeXTableExporter(Analyzer):
         self.output_dir = Path(output_dir)
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Write ``tables/tab_*.tex`` fragments from pipeline CSV/context artifacts."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
         tdir = self.output_dir / "tables"
         tdir.mkdir(parents=True, exist_ok=True)
@@ -65,12 +69,12 @@ class LaTeXTableExporter(Analyzer):
             )
         tab_main.extend(
             [
-            "Callaway--Sant'Anna (matched sample) "
-            + f"& {_cell_att_se(_num(cs.get('att')), _num(cs.get('se')))} \\\\",
-            "Callaway--Sant'Anna w/ ACS + tract trends (matched sample) "
-            + f"& {_cell_att_se(_num(csw.get('att')), _num(csw.get('se')))} \\\\",
-            "\\bottomrule",
-            "\\end{tabular}",
+                "Callaway--Sant'Anna (matched sample) "
+                + f"& {_cell_att_se(_num(cs.get('att')), _num(cs.get('se')))} \\\\",
+                "Callaway--Sant'Anna w/ ACS + tract trends (matched sample) "
+                + f"& {_cell_att_se(_num(csw.get('att')), _num(csw.get('se')))} \\\\",
+                "\\bottomrule",
+                "\\end{tabular}",
             ]
         )
         p_main = tdir / "tab_main_att.tex"
@@ -178,7 +182,8 @@ class LaTeXTableExporter(Analyzer):
         if sample_lineage_path.exists():
             ldf = pd.read_csv(sample_lineage_path)
             if not ldf.empty:
-                def _fmt_int(value: Any) -> str:
+
+                def _fmt_int(value: object) -> str:
                     if pd.isna(value):
                         return "---"
                     return str(int(value))
@@ -285,23 +290,15 @@ class LaTeXTableExporter(Analyzer):
                 ]
                 for _, rw in cstat_rd.iterrows():
                     m_raw = str(rw.get("first_prohibition_month", ""))
-                    ym = m_raw[:7] if len(m_raw) >= 7 else m_raw
+                    ym = m_raw[:MIN_YM_LEN] if len(m_raw) >= MIN_YM_LEN else m_raw
                     nt_val = rw.get("n_tracts", "")
                     nt_s = str(int(nt_val)) if pd.notna(nt_val) else ""
                     shr = rw.get("share_of_treated_tracts")
                     shr_s = f"{float(shr):.2f}" if pd.notna(shr) else "---"
                     br_val = rw.get("mean_baseline_rent")
                     inc_val = rw.get("mean_median_income")
-                    br_s = (
-                        _currency0(float(br_val))
-                        if pd.notna(br_val)
-                        else "---"
-                    )
-                    inc_s = (
-                        _currency0(float(inc_val))
-                        if pd.notna(inc_val)
-                        else "---"
-                    )
+                    br_s = _currency0(float(br_val)) if pd.notna(br_val) else "---"
+                    inc_s = _currency0(float(inc_val)) if pd.notna(inc_val) else "---"
                     pb = rw.get("mean_pct_bachelor")
                     pr = rw.get("mean_pct_rented")
                     pb_s = f"{float(pb):.1f}" if pd.notna(pb) else "---"

@@ -238,7 +238,6 @@ class DIDDescriptiveAnalyzer(Analyzer):
 
         return summary
 
-
     def _compute_panel_structure(self, df: pd.DataFrame) -> dict[str, Any]:
         """Summarize tract--time coverage (how 'balanced' the panel is)."""
         n_tracts = df["tract_geoid"].nunique()
@@ -264,10 +263,18 @@ class DIDDescriptiveAnalyzer(Analyzer):
             "n_observations": n_obs,
             "share_missing_rental_price": float(miss_share),
             "tracts_with_full_month_span": full_span_tracts,
-            "share_tracts_full_span": float(full_span_tracts / n_tracts) if n_tracts else 0.0,
-            "tract_months_min": int(counts_per_tract.min()) if len(counts_per_tract) else 0,
-            "tract_months_median": float(counts_per_tract.median()) if len(counts_per_tract) else 0.0,
-            "tract_months_max": int(counts_per_tract.max()) if len(counts_per_tract) else 0,
+            "share_tracts_full_span": float(full_span_tracts / n_tracts)
+            if n_tracts
+            else 0.0,
+            "tract_months_min": int(counts_per_tract.min())
+            if len(counts_per_tract)
+            else 0,
+            "tract_months_median": float(counts_per_tract.median())
+            if len(counts_per_tract)
+            else 0.0,
+            "tract_months_max": int(counts_per_tract.max())
+            if len(counts_per_tract)
+            else 0,
             "notional_balanced_cells": total_cells,
             "tracts_never_treated": n_never,
             "tracts_eventually_treated": n_event,
@@ -488,9 +495,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
                     "%Y-%m-%d"
                 ),
                 "n_tracts": int(n_c),
-                "share_of_treated_tracts": round(
-                    n_c / n_treated_matched, 4
-                )
+                "share_of_treated_tracts": round(n_c / n_treated_matched, 4)
                 if n_treated_matched
                 else float("nan"),
             }
@@ -555,7 +560,9 @@ class DIDDescriptiveAnalyzer(Analyzer):
 
         crosswalk_coverage = context.get("crosswalk_tract_coverage")
         if crosswalk_coverage is not None and not crosswalk_coverage.empty:
-            crosswalk_coverage.to_csv(out / "did_crosswalk_tract_coverage.csv", index=False)
+            crosswalk_coverage.to_csv(
+                out / "did_crosswalk_tract_coverage.csv", index=False
+            )
 
         matching_diagnostics = context.get("matching_diagnostics")
         if matching_diagnostics:
@@ -569,7 +576,9 @@ class DIDDescriptiveAnalyzer(Analyzer):
             )
             control_reuse = matching_diagnostics.get("control_reuse_table")
             if control_reuse is not None and not control_reuse.empty:
-                control_reuse.to_csv(out / "did_matching_control_reuse.csv", index=False)
+                control_reuse.to_csv(
+                    out / "did_matching_control_reuse.csv", index=False
+                )
 
         adoption_stats["adoption_by_month"].to_csv(
             out / "did_descriptive_adoption_by_month.csv"
@@ -591,9 +600,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
         tract_cov.to_csv(out / "did_descriptive_tract_coverage.csv", index=False)
 
         if cohort_stats is not None and not cohort_stats.empty:
-            cohort_stats.to_csv(
-                out / "did_descriptive_cohort_stats.csv", index=False
-            )
+            cohort_stats.to_csv(out / "did_descriptive_cohort_stats.csv", index=False)
             logger.info(
                 "Wrote cohort descriptive table (%d rows)",
                 len(cohort_stats),
@@ -659,9 +666,7 @@ class DIDDescriptiveAnalyzer(Analyzer):
                     )
 
         logger.info("\nPanel structure:")
-        logger.info(
-            "  Periods (distinct months): %d", panel_structure["n_periods"]
-        )
+        logger.info("  Periods (distinct months): %d", panel_structure["n_periods"])
         logger.info(
             "  Tracts with observations in all %d months: %d (%.1f%%)",
             panel_structure["n_periods"],

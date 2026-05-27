@@ -22,6 +22,7 @@ class HonestPretrendsAnalyzer(Analyzer):
     """Summarize TWFE pretrend magnitudes from the housing event study table."""
 
     def __init__(self, output_dir: str | Path) -> None:
+        """Configure output directory for pretrend heuristic CSV."""
         super().__init__(
             "honest_pretrends_analysis",
             "TWFE pretrend heuristic summary for whitepaper narration",
@@ -29,21 +30,25 @@ class HonestPretrendsAnalyzer(Analyzer):
         self.output_dir = Path(output_dir)
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Summarize pre-period TWFE coefficients from the event-study table."""
         coef_df = context.get("event_study_coefficients")
         if coef_df is None or (isinstance(coef_df, pd.DataFrame) and coef_df.empty):
             logger.warning("honest_pretrends: missing event_study_coefficients")
             return {}
 
-        df = coef_df.copy()
-        if "relative_time" in df.columns and "rel_time" not in df.columns:
-            df = df.rename(columns={"relative_time": "rel_time"})
-        if "coefficient" in df.columns and "coef" not in df.columns:
-            df = df.rename(columns={"coefficient": "coef"})
-        if "rel_time" not in df.columns or "coef" not in df.columns:
+        coef_table = coef_df.copy()
+        if (
+            "relative_time" in coef_table.columns
+            and "rel_time" not in coef_table.columns
+        ):
+            coef_table = coef_table.rename(columns={"relative_time": "rel_time"})
+        if "coefficient" in coef_table.columns and "coef" not in coef_table.columns:
+            coef_table = coef_table.rename(columns={"coefficient": "coef"})
+        if "rel_time" not in coef_table.columns or "coef" not in coef_table.columns:
             logger.warning("honest_pretrends: expected rel_time and coef columns")
             return {}
 
-        pre = df[df["rel_time"] < -1].sort_values("rel_time")
+        pre = coef_table[coef_table["rel_time"] < -1].sort_values("rel_time")
         if pre.empty:
             row = {"error": "No pre-period coefficients"}
         else:

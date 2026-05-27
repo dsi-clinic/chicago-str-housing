@@ -52,6 +52,7 @@ class DataConfig(BaseModel):
         / "tl_2023_17_tract.shp",
         description="Path to census tract boundaries shapefile",
     )
+
     @field_validator("*", mode="before")
     @classmethod
     def validate_paths(cls: type["DataConfig"], v: str | Path) -> Path | str:
