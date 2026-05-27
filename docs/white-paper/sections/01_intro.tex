@@ -1,0 +1,10 @@
+\section{Introduction}\label{sec:intro}
+
+Chicago restricts short-term rental (STR) activity through ordinance-driven prohibitions aggregated to building addresses; after registration, policymakers block qualifying units so they cannot circulate through platforms such as Airbnb.
+Whether those prohibitions materially change neighborhood rents motivates this brief: owners may repurpose dwellings toward long-term contracts, relieving pressure on rents, yet compositional shocks and macro trends can confound simple before--after contrasts.
+
+\Citet{goodman-bacon2021difference} demonstrate that conventional two-way fixed effects with staggered treatment timing implicitly mix ``clean'' comparisons with contrasts among already-treated units, potentially overturning causal sign or magnitude whenever treatment effects evolve across cohorts.
+We therefore anchor evidence on staggered Difference-in-Differences tooling that aggregates transparent group--time average treatment effects (ATT), implemented through \texttt{CallawaySantAnnaAnalyzer} paired with ACS-backed residualization routines (\texttt{CallawaySantAnnaWithControlsAnalyzer}) tuned to tract-specific linear dynamics fit only on months prior to prohibition (see Sections~\ref{sec:data}--\ref{sec:methods}).
+
+The analytic scope is narrowly administrative: prohibition dates come from disclosed city records coupled to spatial assignments of buildings to Census tracts, while rents combine Zillow's Observed Rent Index with HUD-style ZIP--tract crosswalks emitted by downstream processors.
+Slides and appendix tables summarize adoption momentum (\texttt{did\_trends}), parallel-trends regression excerpts (\texttt{pretrend\_*.csv}), and geography (\texttt{did\_spatial\_sample*.png}); these artifacts originate from ``\texttt{run\_did\_analysis\_with\_cs}'' (see \texttt{docs/DID\_CS\_RUNBOOK.md}) so city partners may reproduce results under committed parameters.

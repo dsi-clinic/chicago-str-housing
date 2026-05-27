@@ -5,6 +5,8 @@ which provides zip code level rental price estimates.
 """
 
 import logging
+import os
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -26,9 +28,13 @@ class RentalDataLoader(DataLoader):
         Args:
             file_path: Optional path to rental data file
         """
+        default_zori = (
+            Path(os.environ.get("DATA_DIR", "/project/data"))
+            / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
+        )
         super().__init__(
             "rental_data",
-            file_path or "/project/data/Zip_zori_uc_sfrcondomfr_sm_month.csv",
+            str(file_path) if file_path else str(default_zori),
             "Load rental price data from ZORI dataset",
         )
 

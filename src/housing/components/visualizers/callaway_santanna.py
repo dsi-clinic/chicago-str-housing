@@ -1,4 +1,4 @@
-"""Visualizations for Callaway & Sant'Anna (2020) estimator results.
+"""Visualizations for Callaway & Sant'Anna (2021) estimator results.
 
 Creates event study plots and comparison with TWFE estimates to highlight
 differences when treatment effects are heterogeneous.
@@ -36,7 +36,7 @@ def _get_twfe_results_df(context: dict[str, Any]) -> pd.DataFrame | None:
     if coef_df is None or coef_df.empty:
         return None
     # Map housing column names to TWFE comparison format; drop k=-1 reference period
-    twfe_coef = coef_df.rename(
+    twfe_data = coef_df.rename(
         columns={
             "relative_time": "rel_time",
             "coefficient": "coef",
@@ -45,31 +45,47 @@ def _get_twfe_results_df(context: dict[str, Any]) -> pd.DataFrame | None:
             "std_error": "se",
         }
     )[["rel_time", "coef", "ci_low", "ci_high", "se"]].copy()
-    return twfe_coef[twfe_coef["rel_time"] != -1].reset_index(drop=True)
+    return twfe_data[twfe_data["rel_time"] != -1].reset_index(drop=True)
 
 
 class CallawaySantAnnaVisualizer(Visualizer):
     """Visualize Callaway & Sant'Anna event study results."""
 
-    def __init__(self, output_dir: str | None = None) -> None:
+    def __init__(
+        self,
+        output_dir: str | None = None,
+        context_suffix: str = "",
+        output_suffix: str = "",
+        title_suffix: str = "",
+    ) -> None:
         """Initialize the visualizer.
 
         Args:
             output_dir: Optional output directory for figures.
+            context_suffix: Optional suffix for context keys (e.g. "_with_controls" to read
+                cs_event_study_with_controls, cs_overall_att_with_controls).
+            output_suffix: Optional suffix for output filenames (e.g. "_with_controls").
+            title_suffix: Optional human-readable title suffix for figure subtitles.
         """
         super().__init__(
             "callaway_santanna_visualizer",
             "Callaway & Sant'Anna event study visualization",
         )
         self.output_dir = output_dir or "/project/output"
+        self.context_suffix = context_suffix
+        self.output_suffix = output_suffix
+        self.title_suffix = title_suffix
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Create Callaway & Sant'Anna visualizations."""
         logger.info("Creating Callaway & Sant'Anna visualizations...")
 
-        cs_event_study = context.get("cs_event_study")
+        cs_event_study = context.get(f"cs_event_study{self.context_suffix}")
         if cs_event_study is None or cs_event_study.empty:
-            logger.warning("cs_event_study not found or empty. Skipping visualization.")
+            logger.warning(
+                "cs_event_study%s not found or empty. Skipping visualization.",
+                self.context_suffix,
+            )
             return {}
 
         output_paths = {}
@@ -79,15 +95,17 @@ class CallawaySantAnnaVisualizer(Visualizer):
         if event_study_path:
             output_paths["cs_event_study_plot"] = event_study_path
 
-        # 2. Comparison with TWFE
-        comparison_path = self._plot_twfe_comparison(cs_event_study, context)
-        if comparison_path:
-            output_paths["cs_twfe_comparison_plot"] = comparison_path
+        # 2. Comparison with TWFE (only for base CS, not for with_controls)
+        if not self.context_suffix:
+            comparison_path = self._plot_twfe_comparison(cs_event_study, context)
+            if comparison_path:
+                output_paths["cs_twfe_comparison_plot"] = comparison_path
 
-        # 3. Cohort-specific dynamics
+        # 3. Cohort-specific dynamics (run for baseline AND residualized CS so
+        #    the deck can compare cohort heterogeneity with and without controls).
         cohort_path = self._plot_cohort_dynamics(context)
         if cohort_path:
-            output_paths["cs_cohort_dynamics_plot"] = cohort_path
+            output_paths[f"cs_cohort_dynamics_plot{self.output_suffix}"] = cohort_path
 
         return output_paths
 
@@ -146,7 +164,7 @@ class CallawaySantAnnaVisualizer(Visualizer):
         )
 
         # Get overall ATT for annotation
-        overall_att = context.get("cs_overall_att", {})
+        overall_att = context.get(f"cs_overall_att{self.context_suffix}", {})
         if overall_att and "att" in overall_att:
             att_val = overall_att["att"]
             se_val = overall_att.get("se", 0)
@@ -162,16 +180,22 @@ class CallawaySantAnnaVisualizer(Visualizer):
 
         ax.set_xlabel("Months since STR prohibition", fontsize=12)
         ax.set_ylabel("Average Treatment Effect on Rental Price ($)", fontsize=12)
+        title_suffix = self.title_suffix
+        if not title_suffix and self.output_suffix == "_with_controls":
+            title_suffix = " (with controls)"
         ax.set_title(
-            "Event Study: Callaway & Sant'Anna (2020) Estimator\n"
-            "Robust to Heterogeneous Treatment Effects",
+            "Event Study: Callaway & Sant'Anna (2021) Estimator\n"
+            f"Robust to Heterogeneous Treatment Effects{title_suffix}",
             fontsize=13,
         )
         ax.legend(loc="best", fontsize=9)
         ax.grid(True, alpha=0.3)
         ax.set_xlim(-PLOT_PRE_MONTHS - 0.5, PLOT_POST_MONTHS + 0.5)
 
-        out_path = Path(self.output_dir) / "did_callaway_santanna_event_study.png"
+        out_path = (
+            Path(self.output_dir)
+            / f"did_callaway_santanna_event_study{self.output_suffix}.png"
+        )
         setup_figure_and_save(fig, out_path, "CS Event Study", logger=logger)
 
         logger.info("Saved Callaway-Sant'Anna event study to %s", out_path)
@@ -229,7 +253,7 @@ class CallawaySantAnnaVisualizer(Visualizer):
 
         # Overall title
         fig.suptitle(
-            "Comparison: TWFE vs. Callaway-Sant'Anna (2020)\n"
+            "Comparison: TWFE vs. Callaway-Sant'Anna (2021)\n"
             "Differences indicate heterogeneous treatment effects",
             fontsize=14,
             y=1.00,
@@ -359,7 +383,7 @@ class CallawaySantAnnaVisualizer(Visualizer):
 
     def _plot_cohort_dynamics(self, context: dict[str, Any]) -> str | None:
         """Plot dynamic effects for each treatment cohort separately."""
-        cohort_dynamics = context.get("cs_cohort_dynamics")
+        cohort_dynamics = context.get(f"cs_cohort_dynamics{self.context_suffix}")
         if cohort_dynamics is None or cohort_dynamics.empty:
             logger.warning("No cohort dynamics data. Skipping cohort plot.")
             return None
@@ -422,14 +446,20 @@ class CallawaySantAnnaVisualizer(Visualizer):
         for idx in range(n_cohorts, len(axes)):
             axes[idx].axis("off")
 
+        scale_note = (
+            " (residualized: ACS + tract trends)"
+            if self.context_suffix == "_with_controls"
+            else ""
+        )
         fig.suptitle(
-            "Cohort-Specific Dynamic Treatment Effects\n"
+            "Cohort-Specific Dynamic Treatment Effects" + scale_note + "\n"
             "Each panel shows effects for one treatment cohort",
             fontsize=14,
         )
         plt.tight_layout()
 
-        out_path = Path(self.output_dir) / "did_cohort_dynamics.png"
+        filename = f"did_cohort_dynamics{self.output_suffix}.png"
+        out_path = Path(self.output_dir) / filename
         setup_figure_and_save(fig, out_path, "Cohort Dynamics", logger=logger)
 
         logger.info("Saved cohort dynamics plot to %s", out_path)

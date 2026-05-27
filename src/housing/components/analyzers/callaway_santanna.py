@@ -1,4 +1,4 @@
-"""Callaway & Sant'Anna (2020) estimator for staggered DiD.
+"""Callaway & Sant'Anna (2021) estimator for staggered DiD.
 
 Implements the group-time average treatment effect estimator that is robust
 to heterogeneous treatment effects in staggered adoption designs.
@@ -55,13 +55,14 @@ MAX_POST_TIME = 36  # Maximum post-treatment periods (3 years)
 
 
 class CallawaySantAnnaAnalyzer(Analyzer):
-    """Estimate Callaway & Sant'Anna (2020) group-time ATTs for staggered DiD."""
+    """Estimate Callaway & Sant'Anna (2021) group-time ATTs for staggered DiD."""
 
     def __init__(
         self,
         comparison_group: str = "nevertreated",
         anticipation: int = 0,
         min_cohort_size: int = 10,
+        result_suffix: str = "",
     ) -> None:
         """Initialize the Callaway & Sant'Anna analyzer.
 
@@ -72,14 +73,16 @@ class CallawaySantAnnaAnalyzer(Analyzer):
             anticipation: Number of periods before treatment that may have anticipation effects.
                          If anticipation=1, we assume treatment effects may begin 1 period early.
             min_cohort_size: Minimum number of units in a cohort to estimate ATT.
+            result_suffix: Optional suffix appended to all output context keys.
         """
         super().__init__(
             "callaway_santanna_analysis",
-            "Callaway & Sant'Anna (2020) group-time ATT estimator",
+            "Callaway & Sant'Anna (2021) group-time ATT estimator",
         )
         self.comparison_group = comparison_group
         self.anticipation = anticipation
         self.min_cohort_size = min_cohort_size
+        self.result_suffix = result_suffix
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Estimate group-time ATTs and aggregate to event study."""
@@ -122,20 +125,23 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         # Step 5: Compute cohort-specific dynamic effects
         cohort_dynamics = self._compute_cohort_dynamics(group_time_atts)
 
+        def _key(base: str) -> str:
+            return f"{base}{self.result_suffix}"
+
         return {
-            "cs_group_time_atts": group_time_atts,
-            "cs_event_study": event_study_agg,
-            "cs_overall_att": overall_att,
-            "cs_cohort_dynamics": cohort_dynamics,
-            "cs_cohort_info": cohort_info,
-            "cs_comparison_group": self.comparison_group,
+            _key("cs_group_time_atts"): group_time_atts,
+            _key("cs_event_study"): event_study_agg,
+            _key("cs_overall_att"): overall_att,
+            _key("cs_cohort_dynamics"): cohort_dynamics,
+            _key("cs_cohort_info"): cohort_info,
+            _key("cs_comparison_group"): self.comparison_group,
         }
 
-    def _identify_cohorts(self, df: pd.DataFrame) -> dict[str, Any]:
+    def _identify_cohorts(self, panel: pd.DataFrame) -> dict[str, Any]:
         """Identify treatment cohorts and never-treated units."""
         # Get first treatment date for each tract
         tract_first_treatment = (
-            df[df["treated"] == 1]
+            panel[panel["treated"] == 1]
             .groupby("tract_geoid")["month"]
             .min()
             .reset_index()
@@ -144,7 +150,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
 
         # Identify never-treated tracts
         treated_tracts = tract_first_treatment["tract_geoid"].unique()
-        all_tracts = df["tract_geoid"].unique()
+        all_tracts = panel["tract_geoid"].unique()
         never_treated_tracts = set(all_tracts) - set(treated_tracts)
 
         # Get cohort sizes
@@ -167,7 +173,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         }
 
     def _estimate_group_time_atts(
-        self, df: pd.DataFrame, cohort_info: dict[str, Any]
+        self, panel: pd.DataFrame, cohort_info: dict[str, Any]
     ) -> pd.DataFrame:
         """Estimate ATT(g,t) for each cohort g and time period t."""
         cohorts_df = cohort_info["treated_cohorts"]
@@ -177,7 +183,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
 
         # Get unique cohorts and time periods
         cohorts = sorted(cohorts_df["first_treatment_month"].unique())
-        time_periods = sorted(df["month"].unique())
+        time_periods = sorted(panel["month"].unique())
 
         for cohort_date in cohorts:
             # Get tracts in this cohort
@@ -221,7 +227,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
 
                 # Estimate ATT(g,t) using difference-in-differences
                 att_result = self._estimate_single_att(
-                    df=df,
+                    panel=panel,
                     cohort_tracts=cohort_tracts,
                     comparison_tracts=comparison_tracts,
                     cohort_date=cohort_date,
@@ -250,7 +256,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
 
     def _estimate_single_att(
         self,
-        df: pd.DataFrame,
+        panel: pd.DataFrame,
         cohort_tracts: np.ndarray,
         comparison_tracts: list,
         cohort_date: pd.Timestamp,
@@ -262,11 +268,11 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         """
         pre_period = cohort_date - pd.DateOffset(months=1)
 
-        treated_df = df[
-            (df["tract_geoid"].isin(cohort_tracts))
-            & (df["month"].isin([current_date, pre_period]))
+        treated_subset = panel[
+            (panel["tract_geoid"].isin(cohort_tracts))
+            & (panel["month"].isin([current_date, pre_period]))
         ][["tract_geoid", "month", "rental_price"]]
-        treated_diff = treated_df.pivot_table(
+        treated_diff = treated_subset.pivot_table(
             index="tract_geoid", columns="month", values="rental_price"
         )
         if (
@@ -276,11 +282,11 @@ class CallawaySantAnnaAnalyzer(Analyzer):
             return None
         treated_diff["change"] = treated_diff[current_date] - treated_diff[pre_period]
 
-        control_df = df[
-            (df["tract_geoid"].isin(comparison_tracts))
-            & (df["month"].isin([current_date, pre_period]))
+        control_subset = panel[
+            (panel["tract_geoid"].isin(comparison_tracts))
+            & (panel["month"].isin([current_date, pre_period]))
         ][["tract_geoid", "month", "rental_price"]]
-        control_diff = control_df.pivot_table(
+        control_diff = control_subset.pivot_table(
             index="tract_geoid", columns="month", values="rental_price"
         )
         if (
@@ -305,7 +311,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         return {"att": att, "se": se}
 
     def _aggregate_to_event_study(
-        self, group_time_atts: pd.DataFrame, df: pd.DataFrame
+        self, group_time_atts: pd.DataFrame, panel: pd.DataFrame
     ) -> pd.DataFrame:
         """Aggregate group-time ATTs to event study by relative time.
 

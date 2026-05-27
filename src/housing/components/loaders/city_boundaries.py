@@ -5,6 +5,7 @@ This module loads the Chicago city boundary from the Chicago Data Portal API.
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +34,9 @@ class CityBoundariesLoader(DataLoader):
             file_path: URL to the city boundaries API endpoint
         """
         super().__init__(
-            "city_boundaries", "Load Chicago city boundaries from API", file_path
+            "city_boundaries",
+            file_path,
+            "Load Chicago city boundaries from API",
         )
         self._original_source = file_path
 
@@ -47,7 +50,7 @@ class CityBoundariesLoader(DataLoader):
             logger.info("Loading city boundaries from: %s", file_path_str)
 
             # Set up cache directory and file
-            cache_dir = Path("/project/data/.cache")
+            cache_dir = Path(os.environ.get("DATA_DIR", "/project/data")) / ".cache"
             cache_dir.mkdir(parents=True, exist_ok=True)
             cache_file = cache_dir / "city_boundaries.json"
 

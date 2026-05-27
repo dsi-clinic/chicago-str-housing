@@ -11,11 +11,14 @@ from typing import Any
 
 import pandas as pd
 from linearmodels import PanelOLS
-from linearmodels.panel.results import PanelEffectsResults
 
 from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
+
+SIGNIFICANCE_LEVEL = 0.05
+PRE_TREND_VIOLATION_THRESHOLD = 0.2
+LARGE_PRE_COEF_THRESHOLD = 20
 
 
 class EventStudyAnalyzer(Analyzer):
@@ -132,7 +135,7 @@ class EventStudyAnalyzer(Analyzer):
 
     def _estimate_event_study(
         self, panel: pd.DataFrame, rel_time_cols: list[str]
-    ) -> PanelEffectsResults:
+    ) -> Any:  # noqa: ANN401
         """Estimate the event study model."""
         logger.info("  Estimating model with entity and time fixed effects...")
 
@@ -148,7 +151,9 @@ class EventStudyAnalyzer(Analyzer):
         return results
 
     def _extract_coefficients(
-        self, results: PanelEffectsResults, rel_time_cols: list[str]
+        self,
+        results: Any,  # noqa: ANN401
+        rel_time_cols: list[str],
     ) -> pd.DataFrame:
         """Extract coefficients and confidence intervals."""
 
@@ -199,7 +204,9 @@ class EventStudyAnalyzer(Analyzer):
         return coef_df
 
     def _test_parallel_trends(
-        self, results: PanelEffectsResults, coef_df: pd.DataFrame
+        self,
+        results: Any,  # noqa: ANN401
+        coef_df: pd.DataFrame,
     ) -> dict[str, Any]:
         """Test whether pre-treatment coefficients are jointly zero."""
         # Get pre-treatment coefficients (excluding reference period)
@@ -216,10 +223,7 @@ class EventStudyAnalyzer(Analyzer):
             }
 
         # Count individually significant coefficients
-        _ALPHA_005 = 0.05
-        _PCT_SIGNIFICANT_THRESHOLD = 0.2
-        _AVG_ABS_COEF_THRESHOLD_DOLLARS = 20.0
-        n_significant = (pre_coefs["p_value"] < _ALPHA_005).sum()
+        n_significant = (pre_coefs["p_value"] < SIGNIFICANCE_LEVEL).sum()
         n_pre_periods = len(pre_coefs)
 
         # Average absolute pre-treatment coefficient
@@ -227,11 +231,11 @@ class EventStudyAnalyzer(Analyzer):
 
         # Simple heuristic: if more than 20% of pre-treatment coefficients
         # are significant, parallel trends may be violated
-        if n_significant / n_pre_periods > _PCT_SIGNIFICANT_THRESHOLD:
+        if n_significant / n_pre_periods > PRE_TREND_VIOLATION_THRESHOLD:
             conclusion = (
                 "Potential violation: multiple significant pre-treatment effects"
             )
-        elif avg_abs_coef > _AVG_ABS_COEF_THRESHOLD_DOLLARS:
+        elif avg_abs_coef > LARGE_PRE_COEF_THRESHOLD:
             conclusion = "Potential violation: large pre-treatment coefficients"
         else:
             conclusion = "Parallel trends plausible: pre-treatment effects near zero"

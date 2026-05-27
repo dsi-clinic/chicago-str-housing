@@ -1,0 +1,16 @@
+\section{Methods}\label{sec:methods}
+
+\paragraph{Staggered timing.}
+Treatments arrive at different calendar times; na\"ive TWFE can reweight cohorts implicitly in ways that distort economic interpretation \citep{goodman-bacon2021difference}.
+
+\paragraph{Group--time ATT and event studies.}
+Following \citet{callaway2021difference}, we summarize average treatment effects on the treated (ATT) at different horizons relative to first prohibition.
+Residualization optionally removes tract-specific linear trends and ACS covariates fit on \emph{pre-treatment} months only (\texttt{CallawaySantAnnaWithControlsAnalyzer}); see \texttt{docs/CS\_WITH\_CONTROLS.md}.
+Outcome regression and propensity-adjusted comparisons follow doubly robust ideas in \citet{santanna2020doubly}.
+
+\paragraph{Pipeline evidence layers.}
+The script \texttt{housing.scripts.did\_pipeline\_callaway\_santanna} registers descriptive balance (\texttt{DIDDescriptiveAnalyzer}), temporal diagnostics (\texttt{DIDTrendsVisualizer}), geography (\texttt{DiDSampleMapVisualizer}), regression-based parallel-trends exports (\texttt{PretrendDiagnosticAnalyzer}), TWFE event studies, and CS estimators with figure writers—all targeting \texttt{output/did-cs}; see \texttt{docs/DID\_CS\_RUNBOOK.md}.
+
+\paragraph{Exploratory extensions (planned).}
+Synthetic control / synthetic DiD analogues may complement staggered ATT estimates \citep{arkhangelsky2021synthetic,abadie2010synthetic}; implementation is intentionally scoped secondary to validated CS estimates.
+

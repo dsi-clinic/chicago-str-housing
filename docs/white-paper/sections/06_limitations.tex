@@ -1,0 +1,12 @@
+\section{Limitations and threats to validity}\label{sec:limits}
+
+\textbf{Measurement.} ZIP-indexed rents only approximate intra-tract composition and may attenuate heterogeneous unit-level shocks; Zillow coverage gaps require interpolation flagged in preprocessing logs.
+
+\textbf{Parallel trends.}
+Even with tract-linear trends residualized away on pre-ban months (\texttt{CallawaySantAnnaWithControlsAnalyzer}), curvature or macro shocks violating linearity threaten interpretation; pretrend regressions exported from \texttt{PretrendDiagnosticAnalyzer} quantify residual slope differences but cannot replace substantive economic modeling of neighborhood amenity shocks (see narrative in \texttt{docs/PRETREND\_VIOLATIONS\_AND\_FIXES.md}).
+
+\textbf{Spillovers.}
+Spatial spillovers (\emph{e.g.,} Airbnb demand hopping across boundaries) attenuate contrasts toward zero despite policy bite; exploratory synthetic-control prototypes (\texttt{docs/exploratory/SYNTHETIC\_PROTOTYPE\_NOTES.md}) may illuminate narrow comparisons but inherit different identification logic than broader staggered estimators.
+
+\textbf{Interpretation.}
+Double/debiased machine-learning estimators orthogonalize high-dimensional nuisance terms under distinct asymptotics (\citealp{chernozhukov2018double}) and belong in methodological appendices, not headline tables, unless staggered timelines are painstakingly reconstructed.

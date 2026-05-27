@@ -8,6 +8,7 @@ This module provides configuration management capabilities including:
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Literal
 
@@ -17,15 +18,40 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 logger = logging.getLogger(__name__)
 
 
+def _default_data_dir() -> Path:
+    """Root folder for local CSV / shapefiles (override with ``DATA_DIR``)."""
+    return Path(os.environ.get("DATA_DIR", "/project/data"))
+
+
 class DataConfig(BaseModel):
     """Configuration for data sources.
 
-    This class accepts arbitrary data path fields from the config file.
-    Users can add new data sources in the YAML without modifying this code.
+    Declares the paths exercised by tests and default pipeline tutorials. Additional
+    keys may be supplied via YAML thanks to ``extra="allow"``.
     """
 
     # Allow additional fields from YAML config
     model_config = ConfigDict(extra="allow")
+
+    rental_data_path: Path = Field(
+        default_factory=lambda: _default_data_dir()
+        / "Zip_zori_uc_sfrcondomfr_sm_month.csv",
+        description="Path to rental price data file",
+    )
+    zip_boundaries_path: Path | str = Field(
+        default="https://data.cityofchicago.org/resource/unjd-c2ca.json",
+        description="Path to ZIP code boundaries file or URL",
+    )
+    community_boundaries_path: Path | str = Field(
+        default="https://data.cityofchicago.org/resource/igwz-8jzy.json",
+        description="Path to community area boundaries file or URL",
+    )
+    tract_boundaries_path: Path = Field(
+        default_factory=lambda: _default_data_dir()
+        / "tl_2023_17_tract"
+        / "tl_2023_17_tract.shp",
+        description="Path to census tract boundaries shapefile",
+    )
 
     @field_validator("*", mode="before")
     @classmethod

@@ -18,7 +18,7 @@ project_dir := "$(current_abs_path)"
 # Optional data directory mount (if DATA_DIR is set)
 mount_data := $(if $(DATA_DIR),-v $(DATA_DIR):/project/data,)
 
-.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline-cs    
+.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline run-did-pipeline-covariates run-did-pipeline-cs run-did-pipeline-cs-local run-did-pipeline-cs-whitepaper run-did-matched-pipeline white-paper whitepaper-deck
 
 help: ## Show the help message
 	@echo "Available commands:"
@@ -33,10 +33,19 @@ help: ## Show the help message
 	@echo "  run-eda-pipeline         Run the housing EDA pipeline"
 	@echo "  run-clustering-pipeline  Prepare data for clustering"
 	@echo "  run-clustering-analysis  Run clustering data exploration (ARGS=\"--scatter-matrix\" to include scatter matrix)"
-	@echo "  run-did-pipeline-cs      Run DiD analysis with Callaway-Sant'Anna (2020) robust estimator"
+	@echo "  run-did-pipeline         Build DiD panel dataset for causal analysis"
+	@echo "  run-did-pipeline-covariates  Run DiD analysis with covariate controls (local data)"
+	@echo "  run-did-pipeline-cs         Run DiD with Callaway-Sant'Anna (2021) robust estimator"
+	@echo "  run-did-pipeline-cs-local   Same, with data copied to /tmp (avoids sync drive I/O)"
+	@echo "  run-did-pipeline-cs-whitepaper  CS pipeline → output/did-cs-whitepaper + whitepaper diagnostics"
+	@echo "  run-did-matched-pipeline  Run DiD analysis on trend-matched sample"
+	@echo "  white-paper              Build policy brief PDF (latexmk; host TeX required)"
+	@echo "  whitepaper-deck          Build Beamer deck (latexmk + output/did-cs-whitepaper assets)"
 	@echo ""
 	@echo "Optional environment variables (.env file):"
 	@echo "  DATA_DIR - Custom data directory path (defaults to ./data)"
+	@echo "  CENSUS_API_KEY - Census Bureau API key for ACS (see .env.example)"
+	@echo "  DID_TREATMENT_MODE - CS pipeline: threshold (default), binary, or both"
 	@echo ""
 
 build-only: ## Build Docker image only
@@ -68,5 +77,34 @@ run-clustering-pipeline: build-only ## Prepare data for clustering
 run-clustering-analysis: build-only ## Run clustering data exploration
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/clustering_analysis.py $(ARGS)
 
-run-did-pipeline-cs: build-only ## Run DiD analysis with Callaway-Sant'Anna (2020) robust estimator
+run-did-pipeline: build-only ## Build DiD panel dataset for causal analysis
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline.py
+
+run-did-pipeline-covariates: build-only ## Run DiD with covariate controls (local data)
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_with_covariates.py
+
+run-did-pipeline-cs: build-only ## Run DiD analysis with Callaway-Sant'Anna (2021) robust estimator
 	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna.py
+
+run-did-pipeline-cs-local: build-only ## Copy data to /tmp and run Callaway-Sant'Anna pipeline (avoids Errno 35 on Box/synced drives)
+	@mkdir -p /tmp/chicago_did_data && cp -r "$(current_abs_path)data/"* /tmp/chicago_did_data/ 2>/dev/null || true
+	@echo "Running Callaway-Sant'Anna pipeline with /tmp/chicago_did_data (avoids sync drive I/O issues)..."
+	docker compose run --rm -v "/tmp/chicago_did_data:/project/data" $(project_name) uv run python src/housing/scripts/did_pipeline_callaway_santanna.py
+
+run-did-pipeline-cs-whitepaper: ## Run CS pipeline → output/did-cs-whitepaper (host venv/DATA_DIR; no Docker unless you mirror this)
+	mkdir -p "$(current_abs_path)output/did-cs-whitepaper"
+	cd "$(current_abs_path)" && \
+	  DID_CS_OUTPUT_DIR="$(current_abs_path)output/did-cs-whitepaper" \
+	  DID_WHITEPAPER_MODE=1 \
+	  DATA_DIR="$(or $(DATA_DIR),$(current_abs_path)data)" \
+	  PYTHONPATH="$(current_abs_path)src" \
+	  uv run python -m housing.scripts.did_pipeline_callaway_santanna
+
+whitepaper-deck: ## Build Beamer slides (needs pipeline outputs under output/did-cs-whitepaper)
+	cd "$(current_abs_path)docs/white-paper/ppt" && latexmk -pdf -interaction=nonstopmode presentation.tex
+
+run-did-matched-pipeline: build-only ## Run DiD analysis on trend-matched sample
+	docker compose run --rm $(mount_data) $(project_name) uv run python src/housing/scripts/did_matched_pipeline.py
+
+white-paper: ## Build LaTeX policy brief (requires latexmk on host TeXLive/MacTeX)
+	cd docs/white-paper && latexmk -pdf -interaction=nonstopmode main.tex

@@ -1,0 +1,17 @@
+\section{Results}\label{sec:results}
+
+\paragraph{Evidence layers.}
+Administrative rollout and rent paths appear in temporal diagnostics emitted by \texttt{DIDTrendsVisualizer} (\texttt{did\_adoption\_curve.png}, \texttt{did\_parallel\_trends.png}, \texttt{did\_diagnostic\_analysis.png}).
+Parallel-trends regression summaries and imbalance tables appear as CSV extracts (\texttt{pretrend\_parallel\_trends\_regression\_summary.csv}, etc.).
+Matched tract geography plots (\texttt{did\_spatial\_sample.png}) juxtapose prohibition incidence with never-treated holdings.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.93\linewidth]{did_callaway_santanna_event_study_with_controls.png}
+    \caption{Dynamic Callaway--Sant'Anna ATT with ACS covariates and tract-linear trends preconditioned on pre-prohibition observations (pipeline default).}
+    \label{fig:cs-controls-main}
+\end{figure}
+
+\paragraph{Numerical snapshot (example run).}
+The baseline pooled CS ATT (\texttt{CallawaySantAnnaAnalyzer}) was near $\$\,3$ monthly rent index reductions with tight confidence intervals, while TWFE-derived event coefficients track closely (see outputs under \texttt{output/did-cs/did\_twfe\_cs\_comparison*}).
+Residualized pooled ATTs (\texttt{CallawaySantAnnaWithControlsAnalyzer}) quantify contrasts on preconditioned residuals; readers should cite event shapes (Figure~\ref{fig:cs-controls-main}) alongside raw TWFE overlays instead of extrapolating single residualized totals into observed rent deltas without translating scales.

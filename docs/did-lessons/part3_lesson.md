@@ -107,7 +107,7 @@ For never-treated tracts, this will be `NaN` (which is fine—they have no treat
 ## Building the TreatmentIndicatorProcessor
 
 Your component should:
-1. Get the tract-level rental panel from context (`context["tract_rental_panel"]`)
+1. Get the tract-level rental panel from context (`context["tract_panel_data"]`; legacy code may still use `tract_rental_panel`)
 2. Get the treatment dates from context (`context["tract_prohibition_dates"]`)
 3. Merge, create `treated` and `months_since_treatment`
 4. Return `{"did_panel": merged}`

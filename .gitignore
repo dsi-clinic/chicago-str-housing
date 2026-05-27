@@ -150,3 +150,46 @@ output/
 
 # data files
 data/
+
+# Literature PDFs stay local (size/copyright); commit references.bib and notes
+literature/**/*.pdf
+
+# LaTeX build artifacts (white paper)
+docs/white-paper/*.aux
+docs/white-paper/*.bbl
+docs/white-paper/*.bcf
+docs/white-paper/*.blg
+docs/white-paper/*.fdb_latexmk
+docs/white-paper/*.fls
+docs/white-paper/*.log
+docs/white-paper/*.out
+docs/white-paper/*.toc
+docs/white-paper/*.synctex.gz
+docs/white-paper/main.pdf
+
+
+# Beamer slides (ppt/)
+docs/white-paper/ppt/*.aux
+docs/white-paper/ppt/*.bcf
+docs/white-paper/ppt/*.fdb_latexmk
+docs/white-paper/ppt/*.fls
+docs/white-paper/ppt/*.log
+docs/white-paper/ppt/*.nav
+docs/white-paper/ppt/*.out
+docs/white-paper/ppt/*.snm
+docs/white-paper/ppt/*.synctex.gz
+docs/white-paper/ppt/*.toc
+docs/white-paper/ppt/presentation.pdf
+docs/white-paper/ppt/*.vrb
+
+# Claude / AI tooling (session state, brainstorm files, plugin cache)
+.claude/
+.superpowers/
+.playwright-mcp/
+
+# Agent instruction files (local context only, not for remote)
+AGENTS.md
+CLAUDE.md
+
+# QA screenshots
+qa_*.png

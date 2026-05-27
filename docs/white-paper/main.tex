@@ -1,0 +1,49 @@
+% Science-backed policy brief — Chicago STR prohibitions & rental outcomes
+\documentclass[11pt,letterpaper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{natbib}
+
+\geometry{margin=1in}
+\setstretch{1.15}
+\hypersetup{colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black}
+
+\graphicspath{{figures/}{../output/did-cs/}{../../output/did-cs/}}
+
+\title{\textbf{Short-Term Rental Prohibitions and Rental Prices:\\
+Evidence from Chicago Census Tracts}\\
+\vspace{0.5em}
+\large Draft policy brief (\today)}
+\author{DSI Clinic / City of Chicago housing project}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\input{sections/00_abstract.tex}
+\end{abstract}
+
+\textbf{Keywords:} short-term rentals; difference-in-differences; staggered adoption; rental housing; Chicago.
+
+\input{sections/01_intro.tex}
+\input{sections/02_background_policy.tex}
+\input{sections/03_data.tex}
+\input{sections/04_methods.tex}
+\input{sections/05_results.tex}
+\input{sections/06_limitations.tex}
+\input{sections/07_conclusion.tex}
+
+\bibliographystyle{plainnat}
+% Path relative to this directory when running bibtex from docs/white-paper/
+\bibliography{../../literature/references}
+
+\end{document}
