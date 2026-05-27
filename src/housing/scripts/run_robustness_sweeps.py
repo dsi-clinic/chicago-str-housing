@@ -18,8 +18,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from housing.scripts.did_pipeline_callaway_santanna import run_did_analysis_with_cs
-
 logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -75,11 +73,18 @@ def _att_row(
 def run_k_sweep(base_out: Path) -> pd.DataFrame:
     """Loop ``k_neighbors`` 1–5 with ``DID_MATCH_K_NEIGHBORS`` env override."""
     rows: list[dict[str, object]] = []
+    k_path = DOCS_ROBUSTNESS / "k_neighbors_sweep_summary.csv"
     for k in K_VALUES:
         out_dir = base_out / f"k{k}"
         os.environ["DID_MATCH_K_NEIGHBORS"] = str(k)
+        # Reset percentile to preferred default for k sweep
+        os.environ.pop("DID_THRESHOLD_PERCENTILE", None)
         logger.info("=== k_neighbors=%d → %s ===", k, out_dir)
         try:
+            from housing.scripts.did_pipeline_callaway_santanna import (
+                run_did_analysis_with_cs,
+            )
+
             _, ctx = run_did_analysis_with_cs(
                 treatment_mode="threshold",
                 output_dir=str(out_dir),
@@ -104,18 +109,26 @@ def run_k_sweep(base_out: Path) -> pd.DataFrame:
                     "error": str(exc),
                 }
             )
+        pd.DataFrame(rows).to_csv(k_path, index=False)
+        logger.info("Checkpoint %s (%d rows)", k_path, len(rows))
     return pd.DataFrame(rows)
 
 
 def run_percentile_sweep(base_out: Path) -> pd.DataFrame:
     """Loop threshold percentiles with ``DID_THRESHOLD_PERCENTILE`` env override."""
     rows: list[dict[str, object]] = []
+    p_path = DOCS_ROBUSTNESS / "threshold_percentile_sweep_summary.csv"
+    os.environ.pop("DID_MATCH_K_NEIGHBORS", None)
     for pct in PERCENTILES:
         tag = f"pct{int(pct * 100):02d}"
         out_dir = base_out / tag
         os.environ["DID_THRESHOLD_PERCENTILE"] = str(pct)
         logger.info("=== percentile=%.2f → %s ===", pct, out_dir)
         try:
+            from housing.scripts.did_pipeline_callaway_santanna import (
+                run_did_analysis_with_cs,
+            )
+
             _, ctx = run_did_analysis_with_cs(
                 treatment_mode="threshold",
                 output_dir=str(out_dir),
@@ -146,6 +159,8 @@ def run_percentile_sweep(base_out: Path) -> pd.DataFrame:
                     "error": str(exc),
                 }
             )
+        pd.DataFrame(rows).to_csv(p_path, index=False)
+        logger.info("Checkpoint %s (%d rows)", p_path, len(rows))
     return pd.DataFrame(rows)
 
 
@@ -162,8 +177,10 @@ def main() -> None:
     )
     args = parser.parse_args()
     run_k = args.all or args.k_only or (not args.k_only and not args.percentile_only)
-    run_pct = args.all or args.percentile_only or (
-        not args.k_only and not args.percentile_only
+    run_pct = (
+        args.all
+        or args.percentile_only
+        or (not args.k_only and not args.percentile_only)
     )
 
     DOCS_ROBUSTNESS.mkdir(parents=True, exist_ok=True)
@@ -171,15 +188,19 @@ def main() -> None:
 
     if run_k:
         k_df = run_k_sweep(base_out / "k-neighbors")
-        k_path = DOCS_ROBUSTNESS / "k_neighbors_sweep_summary.csv"
-        k_df.to_csv(k_path, index=False)
-        logger.info("Wrote %s", k_path)
+        logger.info("k sweep complete: %d rows", len(k_df))
 
     if run_pct:
         p_df = run_percentile_sweep(base_out / "threshold-percentile")
-        p_path = DOCS_ROBUSTNESS / "threshold_percentile_sweep_summary.csv"
-        p_df.to_csv(p_path, index=False)
-        logger.info("Wrote %s", p_path)
+        logger.info("percentile sweep complete: %d rows", len(p_df))
+
+    # Optional: plots if summaries exist
+    try:
+        from housing.scripts.plot_robustness_sweeps import main as plot_main
+
+        plot_main()
+    except FileNotFoundError:
+        logger.warning("Plot step skipped — summary CSVs missing")
 
 
 if __name__ == "__main__":
