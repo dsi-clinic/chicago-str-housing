@@ -1,0 +1,2 @@
+att,se,ci_low,ci_high,p_value,n_treated_original,n_spillover,n_pure_control,n_never_missing_geometry,comparison_group,min_cohort_size
+18.44217607425451,0.8061532725349754,16.86211566008596,20.022236488423065,0.0,273,128,22,0,nevertreated,5

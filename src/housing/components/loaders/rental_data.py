@@ -5,13 +5,12 @@ which provides zip code level rental price estimates.
 """
 
 import logging
-import os
-from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 from pipeline.base import DataLoader
+from pipeline.config import default_rental_data_path
 
 logger = logging.getLogger(__name__)
 
@@ -28,13 +27,9 @@ class RentalDataLoader(DataLoader):
         Args:
             file_path: Optional path to rental data file
         """
-        default_zori = (
-            Path(os.environ.get("DATA_DIR", "/project/data"))
-            / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
-        )
         super().__init__(
             "rental_data",
-            str(file_path) if file_path else str(default_zori),
+            file_path or str(default_rental_data_path()),
             "Load rental price data from ZORI dataset",
         )
 

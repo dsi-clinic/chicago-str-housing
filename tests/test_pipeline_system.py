@@ -4,7 +4,7 @@ This test file demonstrates the arrange-act-assert pattern for testing
 the pipeline components and integration.
 """
 
-import os
+from pathlib import Path
 from typing import Any
 
 import geopandas as gpd
@@ -19,6 +19,26 @@ from housing import (
 from pipeline import Pipeline
 from pipeline.base import PipelineComponent, PipelineResult
 from pipeline.config import ConfigManager, PipelineConfig
+
+MINIMAL_ZORI_CSV = """RegionName,202401
+60601,1500.0
+60602,1600.0
+"""
+
+
+@pytest.fixture(autouse=True)
+def _pipeline_test_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Writable DATA_DIR/OUTPUT_DIR so tests do not rely on /project mounts."""
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    (data_root / "Zip_zori_uc_sfrcondomfr_sm_month.csv").write_text(
+        MINIMAL_ZORI_CSV,
+        encoding="utf-8",
+    )
+    out_root = tmp_path / "output"
+    out_root.mkdir()
+    monkeypatch.setenv("DATA_DIR", str(data_root))
+    monkeypatch.setenv("OUTPUT_DIR", str(out_root))
 
 
 class TestPipelineComponents:
@@ -223,23 +243,31 @@ class TestConfigurationManagement:
         assert isinstance(config, PipelineConfig)
         assert config.data.rental_data_path is not None
 
-    def test_environment_variable_override(self) -> None:
-        """Test configuration override with environment variables."""
-        # Arrange
-        original_data_dir = os.environ.get("DATA_DIR")
+    def test_environment_variable_override(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """DATA_DIR changes where default rental_data_path resolves."""
+        first = tmp_path / "d1"
+        first.mkdir()
+        (first / "Zip_zori_uc_sfrcondomfr_sm_month.csv").write_text(
+            MINIMAL_ZORI_CSV,
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("DATA_DIR", str(first))
+        assert (
+            PipelineConfig().data.rental_data_path.parent.resolve() == first.resolve()
+        )
 
-        # Act
-        os.environ["DATA_DIR"] = "/project/data"  # Use existing path
-        config = PipelineConfig()
-
-        # Assert
-        assert str(config.data.rental_data_path).startswith("/project/data")
-
-        # Cleanup
-        if original_data_dir:
-            os.environ["DATA_DIR"] = original_data_dir
-        else:
-            del os.environ["DATA_DIR"]
+        second = tmp_path / "d2"
+        second.mkdir()
+        (second / "Zip_zori_uc_sfrcondomfr_sm_month.csv").write_text(
+            MINIMAL_ZORI_CSV,
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("DATA_DIR", str(second))
+        assert (
+            PipelineConfig().data.rental_data_path.parent.resolve() == second.resolve()
+        )
 
 
 class TestDataValidation:

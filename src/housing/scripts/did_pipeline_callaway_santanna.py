@@ -4,6 +4,10 @@ This pipeline runs both:
 1. Standard TWFE event study (for comparison)
 2. Callaway & Sant'Anna (2021) robust estimator
 
+Optional **tract-cluster block bootstrap** for baseline CS (resample tracts with
+replacement, re-estimate CS each draw): set ``--cs-bootstrap-reps N`` or environment
+variable ``CS_BOOTSTRAP_REPS``; use ``--cs-bootstrap-seed`` for reproducibility.
+
 The comparison reveals whether heterogeneous treatment effects bias TWFE estimates.
 
 **When to use Callaway-Sant'Anna:**
@@ -48,6 +52,13 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from housing.components.analyzers.callaway_santanna import CallawaySantAnnaAnalyzer
+from housing.components.analyzers.callaway_santanna_pretrend_test import (
+    log_and_export_pre_trend_joint_test,
+)
+from housing.components.analyzers.callaway_santanna_tract_bootstrap import (
+    parse_cs_bootstrap_cli,
+    write_cs_bootstrap_csv,
+)
 from housing.components.analyzers.callaway_santanna_with_controls import (
     CallawaySantAnnaWithControlsAnalyzer,
 )
@@ -93,6 +104,20 @@ from housing.components.visualizers.did_story_graphics import DIDStoryGraphicsVi
 from housing.components.visualizers.did_story_map import DiDStoryMapVisualizer
 from housing.components.visualizers.did_trends import DIDTrendsVisualizer
 from housing.components.visualizers.event_study import EventStudyVisualizer
+from housing.did_spec import (
+    DID_CS_ANTICIPATION,
+    DID_CS_COMPARISON_GROUP,
+    DID_CS_MIN_COHORT_SIZE,
+    DID_STR_PROHIBITION_POINTS_AGGREGATE_COLUMNS,
+    DID_STR_PROHIBITION_POINTS_ID_COLUMN,
+    DID_TREATMENT_THRESHOLD_PERCENTILE,
+    DID_TREND_MATCH_K_NEIGHBORS,
+    DID_TREND_MATCH_MIN_PRE_PERIODS,
+    DID_TWFE_POST_PERIODS,
+    DID_TWFE_PRE_PERIODS,
+    tract_shapefile_path,
+    zori_csv_path,
+)
 from pipeline import Pipeline
 
 load_dotenv()
@@ -105,8 +130,6 @@ BIAS_THRESHOLD = 10  # $ threshold for TWFE vs CS difference
 # Paths (defaults work in Docker; local runs resolve repo-relative output unless overridden)
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = Path(os.environ.get("DATA_DIR", "/project/data"))
-TRACT_SHP = DATA_ROOT / "tl_2023_17_tract" / "tl_2023_17_tract.shp"
-ZORI_CSV = DATA_ROOT / "Zip_zori_uc_sfrcondomfr_sm_month.csv"
 DID_WHITEPAPER_MODE = os.environ.get("DID_WHITEPAPER_MODE", "").lower() in (
     "1",
     "true",
@@ -156,14 +179,16 @@ def _output_dir_with_treatment_suffix(base: str, suffix: str) -> str:
 
 def _preflight_check() -> None:
     """Verify required data files exist and are readable."""
+    tract_shp = tract_shapefile_path()
+    zori_csv = zori_csv_path()
     missing = []
-    if not TRACT_SHP.exists():
-        missing.append(str(TRACT_SHP))
-    elif TRACT_SHP.stat().st_size == 0:
+    if not tract_shp.exists():
+        missing.append(str(tract_shp))
+    elif tract_shp.stat().st_size == 0:
         logger.warning("Tract shapefile is empty (0 bytes). %s", DID_PREFLIGHT_MSG)
-    if not ZORI_CSV.exists():
-        missing.append(str(ZORI_CSV))
-    elif ZORI_CSV.stat().st_size == 0:
+    if not zori_csv.exists():
+        missing.append(str(zori_csv))
+    elif zori_csv.stat().st_size == 0:
         logger.warning("ZORI CSV is empty (0 bytes). %s", DID_PREFLIGHT_MSG)
     if missing:
         raise FileNotFoundError(
@@ -173,7 +198,7 @@ def _preflight_check() -> None:
             + DID_PREFLIGHT_MSG
         )
     try:
-        with ZORI_CSV.open("rb") as f:
+        with zori_csv.open("rb") as f:
             f.read(1)
     except OSError as e:
         if e.errno == 35:  # noqa: PLR2004
@@ -211,6 +236,8 @@ def run_did_analysis_with_cs(
     *,
     treatment_mode: str | None = None,
     output_dir: str | None = None,
+    cs_bootstrap_reps: int | None = None,
+    cs_bootstrap_seed: int = 0,
 ) -> tuple:
     """Run DiD analysis with both TWFE and Callaway-Sant'Anna estimators.
 
@@ -221,6 +248,8 @@ def run_did_analysis_with_cs(
         output_dir: Artefact directory; defaults to ``DID_CS_OUTPUT_DIR``. For
             ``treatment_mode='both'``, the two runs use ``{base}-threshold`` and
             ``{base}-binary`` where ``base`` is ``output_dir`` or ``DID_CS_OUTPUT_DIR``.
+        cs_bootstrap_reps: Optional tract-cluster bootstrap replicates for matched CS.
+        cs_bootstrap_seed: RNG seed for bootstrap draws.
     """
     mode = _resolve_treatment_mode(treatment_mode)
     if mode == "both":
@@ -232,8 +261,18 @@ def run_did_analysis_with_cs(
             out_th,
             out_bi,
         )
-        run_did_analysis_with_cs(treatment_mode="threshold", output_dir=out_th)
-        return run_did_analysis_with_cs(treatment_mode="binary", output_dir=out_bi)
+        run_did_analysis_with_cs(
+            treatment_mode="threshold",
+            output_dir=out_th,
+            cs_bootstrap_reps=cs_bootstrap_reps,
+            cs_bootstrap_seed=cs_bootstrap_seed,
+        )
+        return run_did_analysis_with_cs(
+            treatment_mode="binary",
+            output_dir=out_bi,
+            cs_bootstrap_reps=cs_bootstrap_reps,
+            cs_bootstrap_seed=cs_bootstrap_seed,
+        )
 
     out_dir = output_dir or DID_CS_OUTPUT_DIR
 
@@ -251,10 +290,12 @@ def run_did_analysis_with_cs(
     # 1. Load Data
     logger.info("\n[1/5] Loading data...")
     pipeline.register_component(ZipBoundariesLoader())
-    pipeline.register_component(TractBoundariesLoader(file_path=str(TRACT_SHP)))
+    pipeline.register_component(
+        TractBoundariesLoader(file_path=str(tract_shapefile_path()))
+    )
     pipeline.register_component(CityBoundariesLoader())
     pipeline.register_component(STRProhibitionDataLoader(deduplicate_coords=True))
-    pipeline.register_component(TimeSeriesRentalLoader(file_path=str(ZORI_CSV)))
+    pipeline.register_component(TimeSeriesRentalLoader(file_path=str(zori_csv_path())))
 
     # 2. Process Data
     logger.info("\n[2/5] Processing panel data...")
@@ -264,11 +305,8 @@ def run_did_analysis_with_cs(
         PointsToTractProcessor(
             input_key="str_prohibition_data",
             output_key="str_tract_data",
-            id_column="application_id",
-            aggregate_columns={
-                "prohibition_date": "min",
-                "number_of_units": "sum",
-            },
+            id_column=DID_STR_PROHIBITION_POINTS_ID_COLUMN,
+            aggregate_columns=DID_STR_PROHIBITION_POINTS_AGGREGATE_COLUMNS,
             calculate_density=True,
             data_source_name="str_prohibition",
         )
@@ -281,7 +319,7 @@ def run_did_analysis_with_cs(
         pipeline.register_component(
             TreatmentThresholdProcessor(
                 output_dir=out_dir,
-                percentile=0.25,
+                percentile=DID_TREATMENT_THRESHOLD_PERCENTILE,
             )
         )
     else:
@@ -313,8 +351,8 @@ def run_did_analysis_with_cs(
     logger.info("\n[3/7] Trend matching for parallel trends...")
     pipeline.register_component(
         TrendMatchingProcessor(
-            k_neighbors=3,
-            min_pre_periods=6,
+            k_neighbors=DID_TREND_MATCH_K_NEIGHBORS,
+            min_pre_periods=DID_TREND_MATCH_MIN_PRE_PERIODS,
             matching_features=("pre_trend_slope", "avg_pre_rent"),
         )
     )
@@ -340,8 +378,8 @@ def run_did_analysis_with_cs(
     logger.info("\n[5/7] Estimating TWFE event study (matched sample)...")
     pipeline.register_component(
         EventStudyAnalyzer(
-            pre_periods=12,
-            post_periods=36,
+            pre_periods=DID_TWFE_PRE_PERIODS,
+            post_periods=DID_TWFE_POST_PERIODS,
             output_path=f"{out_dir}/event_study_coefficients.csv",
         )
     )
@@ -351,9 +389,11 @@ def run_did_analysis_with_cs(
     logger.info("\n[6/7] Estimating Callaway-Sant'Anna event study (robust)...")
     pipeline.register_component(
         CallawaySantAnnaAnalyzer(
-            comparison_group="nevertreated",
-            anticipation=0,
-            min_cohort_size=5,
+            comparison_group=DID_CS_COMPARISON_GROUP,
+            anticipation=DID_CS_ANTICIPATION,
+            min_cohort_size=DID_CS_MIN_COHORT_SIZE,
+            bootstrap_reps=cs_bootstrap_reps,
+            bootstrap_seed=cs_bootstrap_seed,
         )
     )
     pipeline.register_component(CallawaySantAnnaVisualizer(output_dir=out_dir))
@@ -541,6 +581,37 @@ def _print_summary(results: dict, *, output_dir: str) -> None:
         logger.info("  Number of treatment cohorts: %d", n_cohorts)
         logger.info("  Number of never-treated tracts: %d", n_never)
 
+    log_and_export_pre_trend_joint_test(
+        results,
+        output_dir,
+        summary_key="cs_pre_trend_joint_test",
+        periods_key="cs_pre_trend_joint_test_periods",
+        aggregate_basename="cs_pre_trend_joint_test_aggregate",
+        periods_basename="cs_pre_trend_joint_test_periods",
+        label="Callaway–Sant'Anna (baseline CS)",
+    )
+
+    boot_df = results.get("cs_event_study_tract_bootstrap")
+    boot_meta = results.get("cs_bootstrap_meta")
+    if (
+        isinstance(boot_df, pd.DataFrame)
+        and not boot_df.empty
+        and isinstance(boot_meta, dict)
+    ):
+        write_cs_bootstrap_csv(boot_df, boot_meta, output_dir)
+        logger.info("\nCallaway–Sant'Anna tract-cluster bootstrap (baseline CS):")
+        logger.info(
+            "  Overall ATT: point $%.2f (analytic SE $%.2f) | bootstrap SE $%.2f, "
+            "95%% CI [$%.2f, $%.2f] (%d valid draws, %d reps)",
+            float(boot_meta.get("overall_att_point", float("nan"))),
+            float(boot_meta.get("overall_se_analytic", float("nan"))),
+            float(boot_meta.get("overall_se_boot", float("nan"))),
+            float(boot_meta.get("overall_ci_low_boot", float("nan"))),
+            float(boot_meta.get("overall_ci_high_boot", float("nan"))),
+            int(boot_meta.get("overall_n_valid_draws", 0)),
+            int(boot_meta.get("n_reps", 0)),
+        )
+
     # Comparison with TWFE (use housing's event_study_coefficients format)
     cs_event = results.get("cs_event_study")
     twfe_event = _get_twfe_event_df(results)
@@ -582,6 +653,14 @@ def _print_summary(results: dict, *, output_dir: str) -> None:
         "  • did_spatial_sample*.png, pretrend_*.csv — geography and parallel-trends diagnostics"
     )
     logger.info("  • did_twfe_cs_comparison_table.csv - Detailed comparison")
+    logger.info(
+        "  • cs_pre_trend_joint_test_aggregate.csv - Pre-trend joint Wald (chi-squared)"
+    )
+    logger.info("  • cs_pre_trend_joint_test_periods.csv - Per rel_time contributions")
+    logger.info(
+        "  • cs_event_study_tract_bootstrap.csv - Tract-cluster bootstrap (when enabled)"
+    )
+    logger.info("  • cs_tract_bootstrap_meta.csv - Bootstrap metadata (when enabled)")
 
     logger.info("\n" + "=" * 80)
 
@@ -592,4 +671,5 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    run_did_analysis_with_cs()
+    _reps, _seed = parse_cs_bootstrap_cli()
+    run_did_analysis_with_cs(cs_bootstrap_reps=_reps, cs_bootstrap_seed=_seed)

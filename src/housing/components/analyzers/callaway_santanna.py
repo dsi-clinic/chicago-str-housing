@@ -43,6 +43,9 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from housing.components.analyzers.callaway_santanna_pretrend_test import (
+    compute_pre_trend_joint_test_from_cs_event_study,
+)
 from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
@@ -63,6 +66,9 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         anticipation: int = 0,
         min_cohort_size: int = 10,
         result_suffix: str = "",
+        *,
+        bootstrap_reps: int | None = None,
+        bootstrap_seed: int = 0,
     ) -> None:
         """Initialize the Callaway & Sant'Anna analyzer.
 
@@ -74,6 +80,9 @@ class CallawaySantAnnaAnalyzer(Analyzer):
                          If anticipation=1, we assume treatment effects may begin 1 period early.
             min_cohort_size: Minimum number of units in a cohort to estimate ATT.
             result_suffix: Optional suffix appended to all output context keys.
+            bootstrap_reps: If set and > 0, run tract-cluster block bootstrap for event-study
+                inference (expensive: re-estimates CS this many times).
+            bootstrap_seed: RNG seed for bootstrap draws.
         """
         super().__init__(
             "callaway_santanna_analysis",
@@ -83,6 +92,34 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         self.anticipation = anticipation
         self.min_cohort_size = min_cohort_size
         self.result_suffix = result_suffix
+        self.bootstrap_reps = bootstrap_reps
+        self.bootstrap_seed = bootstrap_seed
+
+    def estimate_core_from_panel(
+        self,
+        panel: pd.DataFrame,
+        *,
+        log_cohort_summary: bool = True,
+    ) -> dict[str, Any]:
+        """Run cohort ID, group-time ATTs, event-study aggregation, and overall ATT on one panel.
+
+        ``panel`` is copied; rows with missing ``rental_price`` are dropped. Used by
+        ``execute`` and tract-cluster bootstrap replicates.
+        """
+        work = panel.copy()
+        work = work.dropna(subset=["rental_price"]).reset_index(drop=True)
+
+        cohort_info = self._identify_cohorts(work, log_summary=log_cohort_summary)
+        group_time_atts = self._estimate_group_time_atts(work, cohort_info)
+        event_study_agg = self._aggregate_to_event_study(group_time_atts, work)
+        overall_att = self._compute_overall_att(group_time_atts)
+
+        return {
+            "cohort_info": cohort_info,
+            "group_time_atts": group_time_atts,
+            "event_study": event_study_agg,
+            "overall_att": overall_att,
+        }
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Estimate group-time ATTs and aggregate to event study."""
@@ -97,38 +134,34 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         panel = did_panel.copy()
         panel = panel.dropna(subset=["rental_price"]).reset_index(drop=True)
 
-        # Step 1: Identify treatment cohorts
-        cohort_info = self._identify_cohorts(panel)
+        core = self.estimate_core_from_panel(panel, log_cohort_summary=True)
+        cohort_info = core["cohort_info"]
+        group_time_atts = core["group_time_atts"]
+        event_study_agg = core["event_study"]
+        overall_att = core["overall_att"]
+
         logger.info(
             "Identified %d treatment cohorts and %d never-treated tracts",
             len(cohort_info["treated_cohorts"]),
             cohort_info["n_never_treated"],
         )
-
-        # Step 2: Estimate group-time ATTs
-        group_time_atts = self._estimate_group_time_atts(panel, cohort_info)
         logger.info("Estimated %d group-time ATTs", len(group_time_atts))
-
-        # Step 3: Aggregate to event study
-        event_study_agg = self._aggregate_to_event_study(group_time_atts, panel)
         logger.info(
             "Aggregated to event study with %d relative time periods",
             len(event_study_agg),
         )
-
-        # Step 4: Compute overall ATT (post-treatment average)
-        overall_att = self._compute_overall_att(group_time_atts)
         logger.info(
             "Overall ATT: %.2f (SE: %.2f)", overall_att["att"], overall_att["se"]
         )
 
-        # Step 5: Compute cohort-specific dynamic effects
         cohort_dynamics = self._compute_cohort_dynamics(group_time_atts)
+
+        pre_trend = compute_pre_trend_joint_test_from_cs_event_study(event_study_agg)
 
         def _key(base: str) -> str:
             return f"{base}{self.result_suffix}"
 
-        return {
+        out: dict[str, Any] = {
             _key("cs_group_time_atts"): group_time_atts,
             _key("cs_event_study"): event_study_agg,
             _key("cs_overall_att"): overall_att,
@@ -136,12 +169,41 @@ class CallawaySantAnnaAnalyzer(Analyzer):
             _key("cs_cohort_info"): cohort_info,
             _key("cs_comparison_group"): self.comparison_group,
         }
+        if not self.result_suffix:
+            out["cs_pre_trend_joint_test"] = pre_trend["summary"]
+            out["cs_pre_trend_joint_test_periods"] = pre_trend["periods"]
 
-    def _identify_cohorts(self, panel: pd.DataFrame) -> dict[str, Any]:
+        if self.bootstrap_reps is not None and self.bootstrap_reps > 0:
+            from housing.components.analyzers.callaway_santanna_tract_bootstrap import (
+                tract_bootstrap_event_study_and_overall,
+            )
+
+            logger.info(
+                "Running tract-cluster block bootstrap (%d replicates, seed=%d)...",
+                self.bootstrap_reps,
+                self.bootstrap_seed,
+            )
+
+            boot = tract_bootstrap_event_study_and_overall(
+                self,
+                panel,
+                event_study_agg,
+                overall_att,
+                n_reps=self.bootstrap_reps,
+                seed=self.bootstrap_seed,
+            )
+            out["cs_event_study_tract_bootstrap"] = boot["event_study_bootstrap"]
+            out["cs_bootstrap_meta"] = boot["meta"]
+
+        return out
+
+    def _identify_cohorts(
+        self, df: pd.DataFrame, *, log_summary: bool = True
+    ) -> dict[str, Any]:
         """Identify treatment cohorts and never-treated units."""
         # Get first treatment date for each tract
         tract_first_treatment = (
-            panel[panel["treated"] == 1]
+            df[df["treated"] == 1]
             .groupby("tract_geoid")["month"]
             .min()
             .reset_index()
@@ -150,7 +212,7 @@ class CallawaySantAnnaAnalyzer(Analyzer):
 
         # Identify never-treated tracts
         treated_tracts = tract_first_treatment["tract_geoid"].unique()
-        all_tracts = panel["tract_geoid"].unique()
+        all_tracts = df["tract_geoid"].unique()
         never_treated_tracts = set(all_tracts) - set(treated_tracts)
 
         # Get cohort sizes
@@ -161,9 +223,10 @@ class CallawaySantAnnaAnalyzer(Analyzer):
             tract_first_treatment["first_treatment_month"].isin(cohort_sizes.index)
         ]
 
-        logger.info("Cohort summary:")
-        for cohort_date, size in cohort_sizes.items():
-            logger.info("  Cohort %s: %d tracts", str(cohort_date)[:10], size)
+        if log_summary:
+            logger.info("Cohort summary:")
+            for cohort_date, size in cohort_sizes.items():
+                logger.info("  Cohort %s: %d tracts", str(cohort_date)[:10], size)
 
         return {
             "treated_cohorts": cohorts_df,
@@ -368,8 +431,11 @@ class CallawaySantAnnaAnalyzer(Analyzer):
         if group_time_atts.empty:
             return {"att": np.nan, "se": np.nan, "ci_low": np.nan, "ci_high": np.nan}
 
-        # Only post-treatment periods
-        post_treatment = group_time_atts[group_time_atts["rel_time"] >= 0].copy()
+        # Same window as event-study aggregation to keep the two consistent
+        post_treatment = group_time_atts[
+            (group_time_atts["rel_time"] >= 0)
+            & (group_time_atts["rel_time"] <= MAX_POST_TIME)
+        ].copy()
 
         if post_treatment.empty:
             return {"att": np.nan, "se": np.nan, "ci_low": np.nan, "ci_high": np.nan}

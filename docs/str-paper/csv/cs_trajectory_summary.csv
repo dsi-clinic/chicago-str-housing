@@ -1,0 +1,5 @@
+row_type,phase,rel_lo,rel_hi,att,se,ci_low,ci_high,n_periods,classification,classification_detail,linear_slope_e,linear_slope_p,quadratic_curvature,f_quad_vs_linear,p_quad_vs_linear,aic_linear,aic_log,aic_quadratic,late_minus_early,late_minus_early_se,late_minus_early_p
+phase,early,0.0,12.0,2.5401408690952,0.3207226057909061,1.9115245617450238,3.168757176445376,13.0,,,,,,,,,,,,,
+phase,mid,13.0,24.0,5.80673394809264,0.6050019602536648,4.620930105995457,6.992537790189823,12.0,,,,,,,,,,,,,
+phase,late,25.0,36.0,8.582662776646638,0.7893082520941551,7.035618602542094,10.129706950751181,12.0,,,,,,,,,,,,,
+summary,,,,,,,,,growing,linear_slope_positive; late_gt_early,0.2511122474895049,0.0,7.865569116970395e-05,0.0005981095807439873,0.9806316334620154,9.264175174472728,15.73383075306532,11.263524296242144,6.042521907551437,0.8519803440744623,1.318722908649761e-12

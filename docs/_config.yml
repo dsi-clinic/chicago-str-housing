@@ -1,0 +1,33 @@
+# GitHub Pages (Settings → Pages → Deploy from branch → main → /docs)
+# Live site: https://dsi-clinic.github.io/chicago-str-housing/
+title: "Chicago STR prohibitions & long-term rents"
+description: "Policy brief and technical paper — DSI Clinic / City of Chicago DTI"
+
+url: "https://dsi-clinic.github.io"
+baseurl: "/chicago-str-housing"
+
+theme: minima
+markdown: kramdown
+permalink: pretty
+
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+# jekyll-titles-from-headings (GitHub Pages default): strip the in-body
+# heading when it becomes page.title. Site layouts also avoid a second
+# template h1 on the home page (home) and on STR docs (page + hide_title).
+titles_from_headings:
+  strip_title: true
+
+header_pages:
+  - str-paper/STR_POLICY_BRIEF.md
+  - str-paper/STR_PROHIBITION_PAPER.md
+
+exclude:
+  - CLUSTERING_ANALYSIS.md
+  - CLUSTERING_PIPELINE.md
+  - HOUSING_GUIDE.md
+  - PIPELINE_GUIDE.md
+  - did-lessons
+  - str-paper/README.md

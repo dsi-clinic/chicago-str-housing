@@ -1,4 +1,4 @@
-# 2025-autumn-city-of-chicago-housing
+# chicago-str-housing
 
 ## Project Summary
 
@@ -348,6 +348,7 @@ ruff format
 
 ### DiD Analysis Documentation
 
+- **docs/str-paper/** — [README](docs/str-paper/README.md), [long-form paper](docs/str-paper/STR_PROHIBITION_PAPER.md), [policy brief](docs/str-paper/STR_POLICY_BRIEF.md); refresh archived figures + CSVs with `make sync-str-paper-figures`
 - **docs/DID_STUDENT_PLAN.md** - Implementation plan for staggered DiD analysis
 - **docs/DID_RESULTS_STORY.md** - Current results stack, treatment-definition sensitivity, matching robustness, and recommended frontend narrative
 - **docs/FRONTEND_MATCHING_ROBUSTNESS_COPY.md** - Frontend-ready copy blocks and captions for the matching robustness story

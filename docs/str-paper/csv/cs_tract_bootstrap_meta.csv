@@ -1,0 +1,2 @@
+n_reps,seed,elapsed_sec,sec_per_rep,overall_att_point,overall_se_analytic,overall_se_boot,overall_ci_low_boot,overall_ci_high_boot,overall_n_valid_draws
+1000,42,7568.428523077862,7.568428523077863,6.1283959585273955,0.3563882741060103,1.8930490777224807,2.737497418361873,10.19066482229742,1000

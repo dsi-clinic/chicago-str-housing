@@ -34,6 +34,7 @@ from housing.components.processors.treatment_threshold import (
 from housing.components.processors.zip_tract_crosswalk import ZipTractCrosswalkProcessor
 from housing.components.visualizers.did_trends import DIDTrendsVisualizer
 from housing.components.visualizers.treatment_map import TreatmentMapVisualizer
+from housing.did_spec import DID_TREATMENT_THRESHOLD_PERCENTILE
 from pipeline import Pipeline, PipelineResult
 
 load_dotenv()
@@ -90,7 +91,10 @@ def run_full_analysis() -> tuple[Pipeline, list[PipelineResult]]:
     )
     pipeline.register_component(TractProhibitionDatesProcessor(output_dir=str(out_dir)))
     pipeline.register_component(
-        TreatmentThresholdProcessor(output_dir=str(out_dir), percentile=0.25)
+        TreatmentThresholdProcessor(
+            output_dir=str(out_dir),
+            percentile=DID_TREATMENT_THRESHOLD_PERCENTILE,
+        )
     )
 
     pipeline.register_component(DIDDescriptiveAnalyzer())
