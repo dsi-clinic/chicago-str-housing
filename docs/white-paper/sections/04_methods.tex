@@ -3,14 +3,19 @@
 \paragraph{Staggered timing.}
 Treatments arrive at different calendar times; na\"ive TWFE can reweight cohorts implicitly in ways that distort economic interpretation \citep{goodman-bacon2021difference}.
 
+\paragraph{Estimator ladder.}
+\textbf{(1) Naive TWFE.} On the trend-matched panel we estimate a conventional two-way fixed effects event study (\texttt{EventStudyAnalyzer}) with $\pm12$ pre- and $+36$ post-month windows.
+\textbf{(2) Preferred full-panel CS.} Before matching, \texttt{CallawaySantAnnaAnalyzer} with \texttt{result\_suffix=\_full\_panel} pools all tracts with rent observations---this is the headline ATT for policy readers.
+\textbf{(3) Matched-sample CS.} The same estimator on the matched panel restricts controls to $k$-NN neighbors matched on slope and level.
+\textbf{(4) Residualized CS.} \texttt{CallawaySantAnnaWithControlsAnalyzer} removes tract-specific linear trends and ACS covariates fit on pre-treatment months only; magnitudes are \emph{not} directly comparable to raw rent ATTs.
+
 \paragraph{Group--time ATT and event studies.}
-Following \citet{callaway2021difference}, we summarize average treatment effects on the treated (ATT) at different horizons relative to first prohibition.
-Residualization optionally removes tract-specific linear trends and ACS covariates fit on \emph{pre-treatment} months only (\texttt{CallawaySantAnnaWithControlsAnalyzer}); see \texttt{docs/CS\_WITH\_CONTROLS.md}.
-Outcome regression and propensity-adjusted comparisons follow doubly robust ideas in \citet{santanna2020doubly}.
+Following \citet{callaway2021difference}, we summarize ATTs at different horizons relative to first prohibition, using never-treated units as the primary comparison group.
+Doubly robust residualization follows \citet{santanna2020doubly}.
+Optional tract-cluster block bootstrap and a joint Wald pre-trend test on baseline CS event-study coefficients (from the \texttt{controls} integration branch) supplement analytic standard errors when enabled via \texttt{CS\_BOOTSTRAP\_REPS}.
+
+\paragraph{Robustness grids.}
+We document sensitivity to $k \in \{1,\ldots,5\}$ and threshold percentiles $\{0.10, 0.15, 0.25, 0.33, 0.50\}$ in \texttt{docs/robustness/} (see \texttt{run\_robustness\_sweeps.py}).
 
 \paragraph{Pipeline evidence layers.}
-The script \texttt{housing.scripts.did\_pipeline\_callaway\_santanna} registers descriptive balance (\texttt{DIDDescriptiveAnalyzer}), temporal diagnostics (\texttt{DIDTrendsVisualizer}), geography (\texttt{DiDSampleMapVisualizer}), regression-based parallel-trends exports (\texttt{PretrendDiagnosticAnalyzer}), TWFE event studies, and CS estimators with figure writers—all targeting \texttt{output/did-cs}; see \texttt{docs/DID\_CS\_RUNBOOK.md}.
-
-\paragraph{Exploratory extensions (planned).}
-Synthetic control / synthetic DiD analogues may complement staggered ATT estimates \citep{arkhangelsky2021synthetic,abadie2010synthetic}; implementation is intentionally scoped secondary to validated CS estimates.
-
+The script \texttt{housing.scripts.did\_pipeline\_callaway\_santanna} registers descriptive balance, story tables, temporal and spatial diagnostics, TWFE, CS, and whitepaper extras when \texttt{DID\_WHITEPAPER\_MODE=1}; see \texttt{docs/DID\_CS\_RUNBOOK.md} and \texttt{docs/PREFERRED\_SPEC.md}.

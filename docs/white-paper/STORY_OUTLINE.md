@@ -4,15 +4,16 @@ Slides consume **`output/did-cs-whitepaper/`** (`DID_WHITEPAPER_MODE=1`; `make r
 
 | Block | Content | Key artefacts |
 | ----- | ------- | ------------- |
-| Introduction | Title, research question, staggered-DiD motivation | — |
-| § Data and design | Outcome / treatment / eventual sample size | — |
-| Geography | Matched panel map | `did_story_map.png` |
-| § From raw data … | **Steps 1–5 (policy walkthrough)** | `data_funnel.png`, `tables/tab_data_funnel.tex`, `tables/tab_cohort_descriptive.tex`, `did_descriptive_cohort_stats.csv` |
-| Adoption & trends | Adoption + parallel rents | `did_adoption_curve.png`, `did_parallel_trends.png` |
-| § Estimator | CS vs TWFE intuition | — |
-| § Results | Baseline CS, CS w/ controls, ATT table, cohort panels, explainer, TWFE vs CS | `did_callaway_santanna*.png`, cohort dynamics PNGs, comparison plot |
-| § SUTVA | Donut + dose + honest pretrends | `sutva_*`, `tables/tab_honest_pretrends.tex` |
+| Introduction | Title, research question, **naive → preferred ladder** | — |
+| § Data and design | Outcome / treatment / sample funnel | `data_funnel.png`, lineage CSVs |
+| § Naive benchmark | TWFE on matched panel (heterogeneity caveat) | `did_twfe_vs_cs_comparison.png` |
+| § Preferred headline | **Full-panel CS ATT** before matching | `did_callaway_santanna_event_study_full_panel.png`, `tables/tab_*.tex` |
+| § Robustness | Matched CS, k / percentile sweeps, threshold vs binary | `docs/robustness/*`, Love plot |
+| § Residualized CS | ACS + tract trends (non-comparable scale) | `did_callaway_santanna_event_study_with_controls.png` |
+| § SUTVA / pretrends | Donut, dose, Wald / honest pretrends | `sutva_*`, bootstrap CSVs when run |
 | § Takeaways | Summary + references | `literature/references.bib` |
+
+Lock defaults in [`docs/PREFERRED_SPEC.md`](../PREFERRED_SPEC.md); divergence vs Tim's Jekyll paper in [`PAPER_ALIGNMENT.md`](PAPER_ALIGNMENT.md).
 
 **New outputs (data-funnel story):**
 

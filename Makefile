@@ -22,7 +22,7 @@ mount_data := $(if $(DATA_DIR),-v $(DATA_DIR):/project/data,)
 CS_BOOTSTRAP_REPS ?= 399
 CS_BOOTSTRAP_SEED ?= 42
 
-.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline run-did-pipeline-covariates run-did-pipeline-cs run-did-pipeline-cs-local run-did-pipeline-cs-whitepaper run-did-pipeline-cs-bootstrap run-did-pipeline-cs-covariates run-did-pipeline-cs-covariates-bootstrap run-did-pipeline-cs-heterogeneity run-did-pipeline-cs-spillover run-did-pipeline-cs-trajectory run-did-matched-pipeline sync-str-paper-figures white-paper whitepaper-deck
+.PHONY: help build-only devcontainer run-interactive clean test run-generic-pipeline run-eda-pipeline run-clustering-pipeline run-clustering-analysis run-did-pipeline run-did-pipeline-covariates run-did-pipeline-cs run-did-pipeline-cs-local run-did-pipeline-cs-whitepaper run-did-pipeline-cs-bootstrap run-did-pipeline-cs-covariates run-did-pipeline-cs-covariates-bootstrap run-did-pipeline-cs-heterogeneity run-did-pipeline-cs-spillover run-did-pipeline-cs-trajectory run-did-matched-pipeline sync-str-paper-figures run-robustness-sweeps white-paper whitepaper-deck
 
 help: ## Show the help message
 	@echo "Available commands:"
@@ -176,3 +176,9 @@ run-did-matched-pipeline: build-only ## Run DiD analysis on trend-matched sample
 
 white-paper: ## Build LaTeX policy brief (requires latexmk on host TeXLive/MacTeX)
 	cd docs/white-paper && latexmk -pdf -interaction=nonstopmode main.tex
+
+run-robustness-sweeps: ## k-neighbors + threshold percentile sweeps → docs/robustness/*.csv
+	cd "$(current_abs_path)" && \
+	  DATA_DIR="$(or $(DATA_DIR),$(current_abs_path)data)" \
+	  PYTHONPATH="$(current_abs_path)src" \
+	  uv run python src/housing/scripts/run_robustness_sweeps.py --all

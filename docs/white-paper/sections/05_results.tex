@@ -1,17 +1,32 @@
 \section{Results}\label{sec:results}
 
-\paragraph{Evidence layers.}
-Administrative rollout and rent paths appear in temporal diagnostics emitted by \texttt{DIDTrendsVisualizer} (\texttt{did\_adoption\_curve.png}, \texttt{did\_parallel\_trends.png}, \texttt{did\_diagnostic\_analysis.png}).
-Parallel-trends regression summaries and imbalance tables appear as CSV extracts (\texttt{pretrend\_parallel\_trends\_regression\_summary.csv}, etc.).
-Matched tract geography plots (\texttt{did\_spatial\_sample.png}) juxtapose prohibition incidence with never-treated holdings.
+We report estimates in the order readers should interpret them: naive TWFE, preferred full-panel Callaway--Sant'Anna (CS), matched-sample CS, then residualized CS.
+All ATTs are differences in monthly rent index levels (\$/month) unless noted otherwise.
+
+\paragraph{Naive TWFE (matched panel).}
+The TWFE event study on the matched panel provides an intuitive first pass but remains vulnerable to staggered-treatment bias when effects differ across cohorts.
+Comparison plots (\texttt{did\_twfe\_vs\_cs\_comparison.png}) typically show post-period gaps between TWFE and CS coefficients.
+
+\paragraph{Preferred full-panel CS.}
+The headline estimand is the pooled CS ATT on the \textbf{unmatched} rent panel (\texttt{cs\_overall\_att\_full\_panel}), estimated before trend matching.
+Event-study dynamics for this sample appear in \texttt{did\_callaway\_santanna\_event\_study\_full\_panel.png}.
+This specification uses all tracts with ZORI coverage and never-treated comparison units.
+
+\paragraph{Matched-sample robustness.}
+Restricting to $k{=}3$ neighbors matched on pre-trend slope and average pre-treatment rent yields a smaller but more parallel-trends-comparable panel (\texttt{did\_story\_matching\_love.png}, \texttt{did\_matching\_diagnostics.csv}).
+The matched CS ATT (\texttt{cs\_overall\_att}) and event study (\texttt{did\_callaway\_santanna\_event\_study.png}) should be read as robustness to the full-panel headline, not as a substitute for it.
+
+\paragraph{Residualized CS (non-comparable scale).}
+Figure~\ref{fig:cs-controls-main} shows dynamic CS estimates after removing ACS covariates and tract-specific linear trends fit on pre-prohibition months.
+Pre-trends often look smoother than raw matched or full-panel event studies, but residualized pooled ATTs must not be quoted as observed rent changes without scale translation.
 
 \begin{figure}[t]
     \centering
     \includegraphics[width=0.93\linewidth]{did_callaway_santanna_event_study_with_controls.png}
-    \caption{Dynamic Callaway--Sant'Anna ATT with ACS covariates and tract-linear trends preconditioned on pre-prohibition observations (pipeline default).}
+    \caption{Dynamic Callaway--Sant'Anna ATT with ACS covariates and tract-linear trends (residualized robustness; not directly comparable in level to raw rent ATTs).}
     \label{fig:cs-controls-main}
 \end{figure}
 
-\paragraph{Numerical snapshot (example run).}
-The baseline pooled CS ATT (\texttt{CallawaySantAnnaAnalyzer}) was near $\$\,3$ monthly rent index reductions with tight confidence intervals, while TWFE-derived event coefficients track closely (see outputs under \texttt{output/did-cs/did\_twfe\_cs\_comparison*}).
-Residualized pooled ATTs (\texttt{CallawaySantAnnaWithControlsAnalyzer}) quantify contrasts on preconditioned residuals; readers should cite event shapes (Figure~\ref{fig:cs-controls-main}) alongside raw TWFE overlays instead of extrapolating single residualized totals into observed rent deltas without translating scales.
+\paragraph{Design-parameter sensitivity.}
+Appendix summaries in \texttt{docs/robustness/k\_neighbors\_sweep\_summary.csv} and \texttt{threshold\_percentile\_sweep\_summary.csv} trace headline CS ATTs as matching depth and treatment-intensity cutoffs vary.
+Treatment-definition sensitivity (\texttt{DID\_TREATMENT\_MODE=binary}) is reported in parallel output trees (\texttt{*-binary} vs \texttt{*-threshold}).

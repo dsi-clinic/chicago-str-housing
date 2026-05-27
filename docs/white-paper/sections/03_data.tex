@@ -1,16 +1,17 @@
 \section{Data}\label{sec:data}
 
 \paragraph{Treatment.}
-STR prohibition petitions and executions come from Chicago Data Portal disclosures with coordinates; \texttt{TractProhibitionDatesProcessor} maps each building footprint to Census tracts, producing tract-level onset months that feed \texttt{TreatmentIndicatorProcessor}.
-The analytic sample retains Cook County tract boundaries clipped to municipal borders when mapping.
+STR prohibition petitions and executions come from Chicago Data Portal disclosures with coordinates; \texttt{TractProhibitionDatesProcessor} maps each building footprint to Census tracts, producing tract-level onset months.
+Under the preferred \textbf{threshold} rule, a tract is treated in the first month its calendar-year restricted-unit share exceeds the year-specific 25th percentile of shares among tracts with ACS occupied-unit denominators (\texttt{TreatmentThresholdProcessor}; override via \texttt{DID\_THRESHOLD\_PERCENTILE}).
+A \textbf{binary} alternative (any prohibition month) is retained for sensitivity (\texttt{DID\_TREATMENT\_MODE}).
 
 \paragraph{Outcome.}
-Monthly rent levels originate from Zip-code Zillow Observed Rent observations (\texttt{Zip\_zori\_uc\_sfrcondomfr\_sm\_month.csv}) expanded to tract-months via the ZIP--tract crosswalk from \texttt{ZipTractCrosswalkProcessor} plus \texttt{TimeSeriesZipToTractProcessor}.
+Monthly rent levels originate from ZIP-code Zillow Observed Rent observations (\texttt{Zip\_zori\_uc\_sfrcondomfr\_sm\_month.csv}) expanded to tract-months via \texttt{ZipTractCrosswalkProcessor} and \texttt{TimeSeriesZipToTractProcessor} in a projected CRS.
 Because conversion relies on overlaps between ZIP polygons and tract polygons, heterogeneous housing supply within oversized ZIP footprints injects smoothing relative to hypothetical unit-level rents.
 
 \paragraph{Covariates.}
-American Community Survey tract covariates (median income/house value, renters' share, age, attainment, baseline rent summaries) arrive through \texttt{CensusDataLoader} and merge through \texttt{DIDCovariateProcessor}, aligning with ACS vintage documented in-code.
+American Community Survey tract covariates merge through \texttt{CensusDataLoader} and \texttt{DIDCovariateProcessor}, aligning with ACS vintage documented in-code.
 
 \paragraph{Matched sample.}
-\texttt{TrendMatchingProcessor} pairs treated tracts to nearest-sloped control neighbors in pre-ban rent dynamics (elastic net distance with $k$-nearest neighbors defaults catalogued in \texttt{docs/DID\_CS\_RUNBOOK.md}).
-Descriptive exports (\texttt{did\_descriptive\_*.csv}) and panel excerpts (\texttt{did\_panel\_data.csv}) document coverage for slides or appendices.
+After estimating a \textbf{full-panel} Callaway--Sant'Anna pass on all tracts with rent data, \texttt{TrendMatchingProcessor} pairs each ever-treated tract to $k{=}3$ never-treated neighbors on standardized \emph{pre-treatment rent slope and average pre-treatment rent level} (not slope alone).
+Descriptive exports (\texttt{did\_descriptive\_*.csv}) and the lineage funnel document how tracts drop across stages; see \texttt{docs/methodology-audit/}.

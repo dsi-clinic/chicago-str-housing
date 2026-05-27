@@ -55,6 +55,23 @@ DID_TREATMENT_THRESHOLD_PERCENTILE: Final = 0.25
 DID_TREND_MATCH_K_NEIGHBORS: Final = 3
 DID_TREND_MATCH_MIN_PRE_PERIODS: Final = 6
 
+
+def resolve_trend_match_k_neighbors() -> int:
+    """Return ``DID_MATCH_K_NEIGHBORS`` env override or :data:`DID_TREND_MATCH_K_NEIGHBORS`."""
+    raw = os.environ.get("DID_MATCH_K_NEIGHBORS")
+    if raw is not None and raw.strip():
+        return int(raw)
+    return DID_TREND_MATCH_K_NEIGHBORS
+
+
+def resolve_treatment_threshold_percentile() -> float:
+    """Return ``DID_THRESHOLD_PERCENTILE`` env override or default percentile."""
+    raw = os.environ.get("DID_THRESHOLD_PERCENTILE")
+    if raw is not None and raw.strip():
+        return float(raw)
+    return DID_TREATMENT_THRESHOLD_PERCENTILE
+
+
 # --- Callaway–Sant'Anna: baseline stack (main CS, heterogeneity, spillover) ---
 
 DID_CS_COMPARISON_GROUP: Final = "nevertreated"

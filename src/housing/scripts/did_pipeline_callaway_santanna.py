@@ -110,11 +110,11 @@ from housing.did_spec import (
     DID_CS_MIN_COHORT_SIZE,
     DID_STR_PROHIBITION_POINTS_AGGREGATE_COLUMNS,
     DID_STR_PROHIBITION_POINTS_ID_COLUMN,
-    DID_TREATMENT_THRESHOLD_PERCENTILE,
-    DID_TREND_MATCH_K_NEIGHBORS,
     DID_TREND_MATCH_MIN_PRE_PERIODS,
     DID_TWFE_POST_PERIODS,
     DID_TWFE_PRE_PERIODS,
+    resolve_treatment_threshold_percentile,
+    resolve_trend_match_k_neighbors,
     tract_shapefile_path,
     zori_csv_path,
 )
@@ -319,7 +319,7 @@ def run_did_analysis_with_cs(
         pipeline.register_component(
             TreatmentThresholdProcessor(
                 output_dir=out_dir,
-                percentile=DID_TREATMENT_THRESHOLD_PERCENTILE,
+                percentile=resolve_treatment_threshold_percentile(),
             )
         )
     else:
@@ -351,7 +351,7 @@ def run_did_analysis_with_cs(
     logger.info("\n[3/7] Trend matching for parallel trends...")
     pipeline.register_component(
         TrendMatchingProcessor(
-            k_neighbors=DID_TREND_MATCH_K_NEIGHBORS,
+            k_neighbors=resolve_trend_match_k_neighbors(),
             min_pre_periods=DID_TREND_MATCH_MIN_PRE_PERIODS,
             matching_features=("pre_trend_slope", "avg_pre_rent"),
         )
