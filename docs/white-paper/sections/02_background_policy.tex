@@ -1,8 +1,45 @@
-\section{Policy background}\label{sec:policy}
+\section{Policy Background}\label{sec:policy}
 
-The Shared Housing Ordinance requires registration and can ultimately prohibit entire buildings from operating as short-term rentals when the city records a qualifying STR ban.
-Because enforcement depends on casework, inspection, and signed dates, prohibitions roll out slowly and unevenly across neighborhoods; some tracts never record a ban while others align with clusters of apartment towers or single-room-occupancy conversions.
+\subsection{Chicago's Shared Housing Ordinance}
 
-For policy partners, the salient questions are whether prohibitions change neighborhood rent pressure and how quickly any effects appear.
-Descriptive maps (\texttt{did\_spatial\_sample*.png}) illustrate where prohibitions concentrate relative to the trend-matched census tracts feeding the causal sample, while adoption curves (\texttt{did\_adoption\_curve.png}) measure administrative exposure over time.
-Those visuals precede formal identification because they articulate who is exposed and when bans accelerate.
+Chicago adopted the Shared Housing Ordinance in 2016 under Municipal Code Chapter 4-6-300, creating a regulatory framework for short-term rental activity within the city. The ordinance established two parallel tracks: a registration and licensing system for short-term rental operators and hosts, and a prohibited buildings registry that allows residential buildings to permanently opt out of STR activity. It is the second track --- the prohibited buildings list --- that drives the identification strategy in this paper.
+
+Under the prohibited buildings registry, a residential building is added to the list when its governing condominium declaration, rental agreement, or homeowners' association rules prohibit short-term rental activity, and the city verifies the restriction. Once listed, the building is barred from hosting any short-term rental regardless of whether the host holds a platform registration. The prohibition is permanent: buildings are not removed from the list once added. The registry is maintained by the city's Department of Business Affairs and Consumer Protection (BACP) and is publicly accessible through the Chicago Data Portal under the title ``House Share Prohibited Buildings.''
+
+The mechanism is building-level and cumulative. Individual buildings within a census tract enter the prohibited list at different times as their governing associations choose to enforce or adopt STR bans. A tract's effective regulatory environment therefore evolves gradually: it may have a single prohibited building in 2015 and dozens by 2020. Whether and when a tract's prohibition intensity crosses a meaningful threshold depends on both the density of STR-prohibiting buildings and the overall housing stock in the tract.
+
+\subsection{Staggered Rollout and Geographic Concentration}
+
+The staggered nature of the prohibited buildings rollout is central to our identification strategy. The earliest prohibitions appear in mid-2015, concentrated in high-density neighborhoods with established short-term rental markets: the Near North Side, Lincoln Park, Lakeview, and the Loop. These neighborhoods contain many condominium towers and rental buildings with active homeowners' associations that were among the first to adopt STR-prohibiting bylaws. Adoption then spread progressively across community areas as awareness of the prohibition mechanism grew among building managers, real estate attorneys, and landlords.
+
+By early 2024, the prohibited buildings registry covers addresses across Cook County, including tracts far from the original high-demand core. This geographic spread --- from the lakefront to the South and West Sides --- creates cross-sectional variation in prohibition intensity that complements the temporal variation in adoption timing. Some tracts become heavily restricted (many buildings listed by 2018); others remain unrestricted throughout the sample period. This two-dimensional variation is what the CS estimator exploits: comparing tracts that adopted prohibitions at different times, against tracts that never adopted any.
+
+Figure~\ref{fig:map-status} displays the spatial distribution of ever-treated and never-treated tracts in the matched sample, illustrating the geographic concentration of early adopters on the North Side and the spread of later adopters across the rest of the city.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.88\linewidth]{../../output/did-cs-whitepaper-2feat-threshold/did_spatial_sample.png}
+  \caption{Geographic distribution of ever-treated tracts and timing of first prohibition in the two-feature matched sample (intensity threshold $p=0.25$, $k=3$).}
+  \figurenotes{Top panel: binary ever-treated status among matched-sample tracts (blue = at least one month above the intensity threshold). Bottom panel: calendar year of first crossing for treated tracts only; gray tracts are never-treated controls in the matched panel. Maps use 2023 census tract boundaries clipped to the city of Chicago; counts refer to tracts in the rent panel after matching, not all Cook County tracts.}
+  \label{fig:map-status}
+\end{figure}
+
+\subsection{Treatment Definition and Intensity}
+
+Because a single prohibited building in a large census tract represents a negligible change in the STR market, we define a tract's effective treatment date as the first month its cumulative prohibition intensity crosses a meaningful threshold. Our preferred \textbf{intensity-threshold} rule classifies a tract as treated in the first month its ratio of prohibited units to total ACS-occupied housing units exceeds the 25th percentile of that ratio among all tracts with at least one prohibition in the same calendar year.
+
+This threshold rule has two advantages over a simple binary indicator (``any prohibition ever''). First, it focuses on tracts where prohibition activity is substantive relative to the local housing stock, filtering out cases where a single listed building in a 1,000-unit tract has no plausible market effect. Second, varying the threshold from the 10th to the 50th percentile enables a dose-response analysis: stricter thresholds identify tracts with more intensive prohibition activity, allowing us to test whether higher prohibition intensity produces stronger rent effects.
+
+The selection of the 25th percentile as the preferred threshold is a prespecified decision, recorded in the project's preferred specification document, made before running the final whitepaper estimates. It represents a middle-ground intensity definition: a tract must be more restricted than the bottom quartile of all actively-restricting tracts in its year. Section~\ref{sec:results-robustness} and Appendix~\ref{app:robustness-percentile} report results across the full threshold grid.
+
+\subsection{Prohibition Mechanism and Housing Market Channels}
+
+The predicted direction of the rent effect from STR prohibitions is theoretically ambiguous, and clarifying the competing channels motivates the empirical analysis.
+
+The canonical \textbf{supply-side} argument holds that Airbnb and similar platforms reduce the long-term rental supply by converting residential units to short-term use. If prohibitions return units to the conventional rental market, supply increases, vacancy rises, and rents fall. Under this channel, prohibitions would reduce long-term rents --- the opposite of what we find.
+
+An alternative \textbf{demand-signaling} channel operates through tenant preferences and search behavior. Prohibition signals to prospective long-term tenants that a building (and, by geographic proximity, the surrounding neighborhood) is protected from STR disruption: no rotating guests, no noisy short-term occupants, no hotel-style traffic in the lobby. Tenants who value residential stability may be willing to pay a premium to live in prohibited buildings or adjacent areas. If prohibitions attract long-term tenants at higher willingness-to-pay, rents in prohibited tracts rise --- consistent with our positive estimates.
+
+A third \textbf{gentrification acceleration} channel is also possible: prohibitions signal residential investment by affluent owner-occupants and large condo associations, which may itself attract higher-income long-term renters and accelerate neighborhood upgrading independent of the direct supply or demand effects.
+
+Our empirical results (positive ATTs with effects strongest in high-Airbnb-density tracts) are most consistent with the demand-signaling channel dominating the supply-side channel in this setting. We discuss the mechanism evidence in Section~\ref{sec:conclusion}.

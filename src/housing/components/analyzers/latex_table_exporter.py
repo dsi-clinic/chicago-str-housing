@@ -8,6 +8,7 @@ from typing import Any
 
 import pandas as pd
 
+from housing.components.analyzers.cohort_att_latex import build_cohort_att_table_lines
 from pipeline.base import Analyzer
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,11 @@ class LaTeXTableExporter(Analyzer):
         sutva_donut = self.output_dir / "sutva_donut_summary.csv"
         if sutva_donut.exists():
             ddf = pd.read_csv(sutva_donut)
+            label_map = {
+                "full_sample": "Full matched control pool",
+                "never_adjacent_treated_neighbour": "Adjacent never-treated controls",
+                "never_isolated_neighbours": "Isolated never-treated controls",
+            }
             lines = [
                 "% Auto-generated",
                 "\\begin{tabular}{lrr}",
@@ -124,7 +130,8 @@ class LaTeXTableExporter(Analyzer):
                 "\\midrule",
             ]
             for _, rr in ddf.iterrows():
-                lbl = str(rr.get("subgroup", "")).replace("_", "\\_")
+                raw = str(rr.get("subgroup", ""))
+                lbl = label_map.get(raw, raw.replace("_", " "))
                 lines.append(
                     lbl
                     + f" & {_cell_att_se(_num(rr.get('att')), _num(rr.get('se')))} \\\\"
@@ -311,6 +318,19 @@ class LaTeXTableExporter(Analyzer):
                 p_coh = tdir / "tab_cohort_descriptive.tex"
                 p_coh.write_text("\n".join(c_lines) + "\n", encoding="utf-8")
                 written.append(str(p_coh))
+
+        att_summary_path = self.output_dir / "did_cs_att_summary.csv"
+        pretrend_sig_path = self.output_dir / "did_cs_pretrend_significance.csv"
+        if att_summary_path.exists():
+            att_df = pd.read_csv(att_summary_path)
+            pretrend_df = (
+                pd.read_csv(pretrend_sig_path) if pretrend_sig_path.exists() else None
+            )
+            cohort_lines = build_cohort_att_table_lines(att_df, pretrend_df)
+            if cohort_lines:
+                p_catt = tdir / "tab_cohort_att.tex"
+                p_catt.write_text("\n".join(cohort_lines) + "\n", encoding="utf-8")
+                written.append(str(p_catt))
 
         logger.info("LaTeX tables: %s", written)
         return {"latex_whitepaper_tables": written}

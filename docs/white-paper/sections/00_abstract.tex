@@ -1,8 +1,13 @@
-% Refresh dollar magnitudes whenever you rerun ``python -m housing.scripts.did_pipeline_callaway_santanna``.
+% Refresh after each whitepaper pipeline run.
 \textbf{Abstract.}
-The City of Chicago enforces Shared Housing Ordinance registrations that forbid eligible buildings from renting units on short-term rental platforms once prohibitions finalize.
-Combining prohibition records spatially aggregated to census tracts with tract--month rental indices (Zillow Observed Rent interpolated from ZIP-month data), we estimate staggered difference-in-differences effects where treatments adopt at different calendar months.
+Chicago's Shared Housing Ordinance allows residential buildings to permanently opt out of short-term rental activity through a publicly disclosed prohibited buildings registry, with adoption staggered across census tracts from 2015 to 2024.
+We estimate the causal effect of crossing a meaningful prohibition intensity threshold on long-term rental prices using the Callaway--Sant'Anna staggered difference-in-differences estimator applied to approximately 110,000 tract-month observations constructed from six public data sources.
 
-We report Callaway and Sant'Anna (\citeyear{callaway2021difference}) group--time average treatment effects on the treated (ATT) rather than relying solely on two-way fixed effects, which can reweight cohorts in misleading ways when effects are heterogeneous \citep{goodman-bacon2021difference}.
-Dual specifications appear: a baseline ATT on observed rent levels, and a covariate- and tract-trend-adjusted specification fit on pre-prohibition months only (\texttt{CallawaySantAnnaWithControlsAnalyzer}; see \texttt{docs/CS\_WITH\_CONTROLS.md}).
-In a recent local run, baseline pooled ATT was about \$-2.95 per month on the tract--month rental index (SE \$0.63), while the pooled ATT after residualizing on ACS covariates and tract-linear trends approached \$-85 monthly on the \emph{preprocessed} outcome—not directly comparable dollar-for-dollar because the outcome replaces raw rent with fitted residuals (\texttt{docs/CS\_WITH\_CONTROLS.md}); readers should privilege event-study dynamics and diagnostics committed under \texttt{output/did-cs/}.
+The pre-treatment event study reveals a V-shaped departure from parallel trends between treated and never-treated tracts (maximum divergence $\approx -\$16$/month at $t = -8$; joint Wald $p < 0.001$), consistent with prohibitions being adopted disproportionately in already-appreciating neighborhoods.
+We document this selection pattern as a policy-relevant finding in its own right and address the parallel trends violation through pre-treatment trajectory matching and Rambachan--Roth smoothness-bound sensitivity analysis.
+
+Our baseline two-feature matched Callaway--Sant'Anna ATT is $+\$4.60$/month (SE 0.39), comparable in specification to the published clinic pipeline; the stricter five-feature matched estimate is $+\$5.46$/month and the full-panel estimate is $+\$20.65$/month.
+Under the HonestDiD smoothness bound $M = 2.71$ derived from the observed pre-period dynamics, estimated effects remain consistent with positive rent impacts throughout the post-treatment window.
+Results are stable across matching depth ($k \in \{1,\ldots,5\}$) and intensity threshold ($p \in \{0.10,\ldots,0.50\}$) robustness grids.
+A spatial spillover diagnostic finds that using only isolated never-treated tracts as controls raises the estimated ATT to $+\$26$/month, consistent with positive spillovers that attenuate the headline estimate downward.
+These results are more consistent with a demand-signaling channel --- prohibition attracting rent-premium-paying long-term tenants --- than with a supply-release channel, and suggest that building-level prohibition mechanisms may not deliver the affordability benefits anticipated by policymakers in high-demand neighborhoods.

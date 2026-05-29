@@ -60,9 +60,10 @@ from housing.did_spec import (
     DID_STR_PROHIBITION_POINTS_AGGREGATE_COLUMNS,
     DID_STR_PROHIBITION_POINTS_ID_COLUMN,
     DID_TREATMENT_THRESHOLD_PERCENTILE,
-    DID_TREND_MATCH_K_NEIGHBORS,
     DID_TREND_MATCH_MIN_PRE_PERIODS,
     did_cs_output_dir,
+    resolve_trend_match_features,
+    resolve_trend_match_k_neighbors,
     tract_shapefile_path,
     zori_csv_path,
 )
@@ -143,8 +144,9 @@ def run_cs_spillover_pipeline() -> tuple[Pipeline, dict]:
     )
     pipeline.register_component(
         TrendMatchingProcessor(
-            k_neighbors=DID_TREND_MATCH_K_NEIGHBORS,
+            k_neighbors=resolve_trend_match_k_neighbors(),
             min_pre_periods=DID_TREND_MATCH_MIN_PRE_PERIODS,
+            matching_features=resolve_trend_match_features(),
         )
     )
 

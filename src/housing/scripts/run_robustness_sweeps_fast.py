@@ -30,7 +30,9 @@ from housing.did_spec import (
     DID_CS_ANTICIPATION,
     DID_CS_COMPARISON_GROUP,
     DID_CS_MIN_COHORT_SIZE,
+    DID_TREND_MATCH_FEATURES_2,
     DID_TREND_MATCH_MIN_PRE_PERIODS,
+    resolve_trend_match_features,
 )
 from housing.scripts import plot_robustness_sweeps
 
@@ -40,6 +42,16 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DOCS_ROBUSTNESS = REPO_ROOT / "docs" / "robustness"
 K_VALUES = (1, 2, 3, 4, 5)
 PERCENTILES = (0.10, 0.15, 0.25, 0.33, 0.50)
+
+
+def _sweep_output_paths() -> tuple[Path, Path]:
+    """Return k-neighbors and percentile CSV paths (suffix for matching spec)."""
+    features = resolve_trend_match_features()
+    suffix = "2feat" if len(features) == len(DID_TREND_MATCH_FEATURES_2) else "5feat"
+    return (
+        DOCS_ROBUSTNESS / f"k_neighbors_sweep_summary_{suffix}.csv",
+        DOCS_ROBUSTNESS / f"threshold_percentile_sweep_summary_{suffix}.csv",
+    )
 
 
 def _load_panel(path: Path) -> pd.DataFrame:
@@ -102,7 +114,7 @@ def _estimate_row(
     matcher = TrendMatchingProcessor(
         k_neighbors=k_neighbors,
         min_pre_periods=DID_TREND_MATCH_MIN_PRE_PERIODS,
-        matching_features=("pre_trend_slope", "avg_pre_rent"),
+        matching_features=resolve_trend_match_features(),
     )
     match_out = matcher.execute({"did_panel": panel})
     matched = match_out["did_panel"]
@@ -170,6 +182,7 @@ def _estimate_row(
 
 def run_k_sweep(panel: pd.DataFrame, census_df: pd.DataFrame) -> pd.DataFrame:
     """k-neighbors sweep on fixed threshold panel."""
+    k_csv, _ = _sweep_output_paths()
     cs_full = CallawaySantAnnaAnalyzer(
         comparison_group=DID_CS_COMPARISON_GROUP,
         anticipation=DID_CS_ANTICIPATION,
@@ -201,9 +214,7 @@ def run_k_sweep(panel: pd.DataFrame, census_df: pd.DataFrame) -> pd.DataFrame:
                     "error": str(exc),
                 }
             )
-        pd.DataFrame(rows).to_csv(
-            DOCS_ROBUSTNESS / "k_neighbors_sweep_summary.csv", index=False
-        )
+        pd.DataFrame(rows).to_csv(k_csv, index=False)
     return pd.DataFrame(rows)
 
 
@@ -211,6 +222,7 @@ def run_percentile_sweep(
     base_panel: pd.DataFrame, census_df: pd.DataFrame
 ) -> pd.DataFrame:
     """Threshold percentile sweep."""
+    _, pct_csv = _sweep_output_paths()
     rows: list[dict[str, Any]] = []
     for pct in PERCENTILES:
         logger.info("Fast percentile sweep: %.2f", pct)
@@ -235,9 +247,7 @@ def run_percentile_sweep(
                     "error": str(exc),
                 }
             )
-        pd.DataFrame(rows).to_csv(
-            DOCS_ROBUSTNESS / "threshold_percentile_sweep_summary.csv", index=False
-        )
+        pd.DataFrame(rows).to_csv(pct_csv, index=False)
     return pd.DataFrame(rows)
 
 

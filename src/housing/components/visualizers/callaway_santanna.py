@@ -19,6 +19,87 @@ logger = logging.getLogger(__name__)
 # Asymmetric display window: 12 months pre, 36 months post
 PLOT_PRE_MONTHS = 12
 PLOT_POST_MONTHS = 36
+COHORT_PANELS_PER_PAGE = 6
+COHORT_PANEL_TITLE_FONTSIZE = 12
+COHORT_PANEL_AXIS_FONTSIZE = 11
+
+
+def plot_paginated_cohort_panels(
+    plot_df: pd.DataFrame,
+    output_dir: Path,
+    basename: str,
+    *,
+    suptitle: str,
+    highlight_substr: str = "2019-10",
+    panels_per_page: int = COHORT_PANELS_PER_PAGE,
+    logger: logging.Logger | None = None,
+) -> list[str]:
+    """Save cohort dynamics as one PNG per page (avoids overflow in print layouts)."""
+    cohorts = sorted(plot_df["cohort"].unique())
+    if not cohorts:
+        return []
+
+    paths: list[str] = []
+    n_pages = (len(cohorts) + panels_per_page - 1) // panels_per_page
+    n_cols = 2
+
+    for page in range(n_pages):
+        page_cohorts = cohorts[page * panels_per_page : (page + 1) * panels_per_page]
+        n_panels = len(page_cohorts)
+        n_rows = (n_panels + n_cols - 1) // n_cols
+        fig, axes = plt.subplots(
+            n_rows,
+            n_cols,
+            figsize=(12, 4.2 * n_rows),
+            squeeze=False,
+        )
+        axes_flat = axes.flatten()
+
+        for idx, cohort in enumerate(page_cohorts):
+            ax = axes_flat[idx]
+            cohort_data = plot_df[plot_df["cohort"] == cohort].sort_values("rel_time")
+            ax.plot(
+                cohort_data["rel_time"],
+                cohort_data["att"],
+                color="darkgreen",
+                marker="o",
+                markersize=4,
+                linewidth=1.4,
+            )
+            ax.fill_between(
+                cohort_data["rel_time"],
+                cohort_data["ci_low"],
+                cohort_data["ci_high"],
+                alpha=0.3,
+                color="darkgreen",
+            )
+            ax.axhline(0, color="red", linestyle="--", linewidth=1, alpha=0.8)
+            ax.axvline(0, color="red", linestyle=":", linewidth=1, alpha=0.6)
+            ax.set_xlabel("Months since treatment", fontsize=COHORT_PANEL_AXIS_FONTSIZE)
+            ax.set_ylabel("ATT ($/mo.)", fontsize=COHORT_PANEL_AXIS_FONTSIZE)
+            title = str(cohort)[:10]
+            if highlight_substr and highlight_substr in title:
+                title = f"{title} (highlight)"
+                for spine in ax.spines.values():
+                    spine.set_edgecolor("#800000")
+                    spine.set_linewidth(2)
+            ax.set_title(title, fontsize=COHORT_PANEL_TITLE_FONTSIZE)
+            ax.tick_params(labelsize=COHORT_PANEL_AXIS_FONTSIZE - 1)
+            ax.grid(True, alpha=0.3)
+
+        for idx in range(n_panels, len(axes_flat)):
+            axes_flat[idx].axis("off")
+
+        page_note = f" (page {page + 1}/{n_pages})" if n_pages > 1 else ""
+        fig.suptitle(suptitle + page_note, fontsize=14, y=0.995)
+        plt.tight_layout(rect=[0, 0, 1, 0.97])
+
+        suffix = f"_p{page + 1}" if n_pages > 1 else ""
+        out_path = output_dir / f"{basename}{suffix}.png"
+        setup_figure_and_save(fig, out_path, title=None, logger=logger)
+        paths.append(str(out_path))
+
+    return paths
 
 
 def _get_twfe_results_df(context: dict[str, Any]) -> pd.DataFrame | None:
@@ -397,70 +478,28 @@ class CallawaySantAnnaVisualizer(Visualizer):
         if plot_df.empty:
             return None
 
-        cohorts = sorted(plot_df["cohort"].unique())
-        n_cohorts = len(cohorts)
-
-        if n_cohorts == 0:
-            return None
-
-        # Create subplots (max 4 per row)
-        n_cols = min(2, n_cohorts)
-        n_rows = (n_cohorts + n_cols - 1) // n_cols
-
-        fig, axes = plt.subplots(
-            n_rows, n_cols, figsize=(8 * n_cols, 5 * n_rows), squeeze=False
-        )
-        axes = axes.flatten()
-
-        for idx, cohort in enumerate(cohorts):
-            ax = axes[idx]
-            cohort_data = plot_df[plot_df["cohort"] == cohort].sort_values("rel_time")
-
-            # Plot
-            ax.plot(
-                cohort_data["rel_time"],
-                cohort_data["att"],
-                color="darkgreen",
-                marker="o",
-                markersize=3,
-                linewidth=1.2,
-            )
-            ax.fill_between(
-                cohort_data["rel_time"],
-                cohort_data["ci_low"],
-                cohort_data["ci_high"],
-                alpha=0.3,
-                color="darkgreen",
-            )
-
-            # Reference lines
-            ax.axhline(0, color="red", linestyle="--", linewidth=1, alpha=0.8)
-            ax.axvline(0, color="red", linestyle=":", linewidth=1, alpha=0.6)
-
-            ax.set_xlabel("Months since treatment", fontsize=10)
-            ax.set_ylabel("ATT ($)", fontsize=10)
-            ax.set_title(f"Cohort: {str(cohort)[:7]}", fontsize=11)
-            ax.grid(True, alpha=0.3)
-
-        # Hide extra subplots
-        for idx in range(n_cohorts, len(axes)):
-            axes[idx].axis("off")
-
         scale_note = (
             " (residualized: ACS + tract trends)"
             if self.context_suffix == "_with_controls"
             else ""
         )
-        fig.suptitle(
-            "Cohort-Specific Dynamic Treatment Effects" + scale_note + "\n"
-            "Each panel shows effects for one treatment cohort",
-            fontsize=14,
+        basename = f"did_cohort_dynamics{self.output_suffix}"
+        paths = plot_paginated_cohort_panels(
+            plot_df,
+            Path(self.output_dir),
+            basename,
+            suptitle="Cohort-specific dynamic treatment effects" + scale_note,
+            logger=logger,
         )
-        plt.tight_layout()
+        if not paths:
+            return None
 
-        filename = f"did_cohort_dynamics{self.output_suffix}.png"
-        out_path = Path(self.output_dir) / filename
-        setup_figure_and_save(fig, out_path, "Cohort Dynamics", logger=logger)
+        # Back-compat: first page also written without _p1 suffix when paginated
+        out_path = Path(paths[0])
+        if len(paths) > 1:
+            legacy = Path(self.output_dir) / f"{basename}.png"
+            legacy.write_bytes(out_path.read_bytes())
+            out_path = legacy
 
         logger.info("Saved cohort dynamics plot to %s", out_path)
         return str(out_path)

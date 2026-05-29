@@ -123,6 +123,10 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
         sig_counts = self._compute_pretrend_significance(context)
         sig_counts_path = self._write_sig_counts_table(sig_counts)
 
+        cohort_dyn_path = self._write_cohort_dynamics_table(
+            context.get("cs_cohort_dynamics")
+        )
+
         return {
             # Existing overall ATT for the full sample is left untouched
             # in context as `cs_overall_att`.
@@ -141,6 +145,9 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
             "cs_pretrend_sig_counts": sig_counts,
             "cs_pretrend_sig_counts_path": str(sig_counts_path)
             if sig_counts_path is not None
+            else None,
+            "cs_cohort_dynamics_path": str(cohort_dyn_path)
+            if cohort_dyn_path is not None
             else None,
         }
 
@@ -639,6 +646,24 @@ class CallawaySantAnnaSummaryAnalyzer(Analyzer):
             title="Callaway & Sant\u2019Anna (2021): Dynamic and Cumulative ATT",
             title_y=0.99,
             logger=logger,
+        )
+        return output_path
+
+    def _write_cohort_dynamics_table(
+        self, cohort_dynamics: pd.DataFrame | None
+    ) -> Path | None:
+        """Write per-cohort event-study coefficients to CSV."""
+        if cohort_dynamics is None or not isinstance(cohort_dynamics, pd.DataFrame):
+            return None
+        if cohort_dynamics.empty:
+            return None
+
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = self.output_dir / "did_cs_cohort_dynamics.csv"
+        cohort_dynamics.to_csv(output_path, index=False)
+        logger.info(
+            "Callaway-Sant'Anna cohort dynamics written to: %s",
+            output_path,
         )
         return output_path
 

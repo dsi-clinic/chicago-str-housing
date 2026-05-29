@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 
 # Constants
 MAX_PRE_TIME = 12  # Maximum pre-treatment periods
+DETREND_ORDER_QUADRATIC = 2
 MAX_POST_TIME = 36  # Maximum post-treatment periods
 
 
@@ -63,6 +64,7 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
         include_tract_trends: bool = True,
         covariates: list[str] | None = None,
         estimation_method: str = "dr",
+        detrend_order: int = 1,
     ) -> None:
         """Initialize the enhanced CS analyzer.
 
@@ -74,6 +76,10 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             include_tract_trends: Whether to include tract-specific linear time trends
             covariates: List of covariate names to include (None = use defaults)
             estimation_method: "dr" (doubly robust, default), "ipw", or "or" (outcome regression)
+            detrend_order: Polynomial order for tract-specific time trends (1 = linear,
+                2 = quadratic).  Quadratic adds a t² interaction term per tract to better
+                fit non-linear pre-treatment trajectories.  Only used when
+                include_tract_trends=True.
         """
         super().__init__(
             "callaway_santanna_with_controls",
@@ -83,6 +89,8 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             raise ValueError(
                 f"estimation_method must be 'dr', 'ipw', or 'or', got '{estimation_method}'"
             )
+        if detrend_order not in (1, 2):
+            raise ValueError(f"detrend_order must be 1 or 2, got '{detrend_order}'")
         self.comparison_group = comparison_group
         self.anticipation = anticipation
         self.min_cohort_size = min_cohort_size
@@ -90,6 +98,7 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
         self.include_tract_trends = include_tract_trends
         self.covariates = covariates
         self.estimation_method = estimation_method
+        self.detrend_order = detrend_order
         self._propensity_diagnostics: list[dict] = []
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
@@ -142,21 +151,29 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
 
         pre_trend = compute_pre_trend_joint_test_from_cs_event_study(event_study_agg)
 
-        # Write to distinct keys so basic CS results are not overwritten
+        suffix = (
+            self.name.replace("callaway_santanna_with_controls", "").lstrip("_") or ""
+        )
+        key = lambda base: f"{base}{('_' + suffix) if suffix else ''}"  # noqa: E731
+
+        # Write to distinct keys so basic CS results are not overwritten.
+        # When a second instance is registered (e.g. quadratic detrend), its component
+        # name is changed after construction so `suffix` routes to unique context keys.
         return {
-            "cs_group_time_atts_with_controls": group_time_atts,
-            "cs_event_study_with_controls": event_study_agg,
-            "cs_overall_att_with_controls": overall_att,
-            "cs_cohort_dynamics_with_controls": cohort_dynamics,
-            "cs_cohort_info_with_controls": cohort_info,
+            key("cs_group_time_atts_with_controls"): group_time_atts,
+            key("cs_event_study_with_controls"): event_study_agg,
+            key("cs_overall_att_with_controls"): overall_att,
+            key("cs_cohort_dynamics_with_controls"): cohort_dynamics,
+            key("cs_cohort_info_with_controls"): cohort_info,
             "cs_comparison_group": self.comparison_group,
             "cs_with_controls": True,
             "cs_include_covariates": self.include_covariates,
             "cs_include_tract_trends": self.include_tract_trends,
             "cs_estimation_method": self.estimation_method,
-            "cs_propensity_diagnostics": self._propensity_diagnostics,
-            "cs_pre_trend_joint_test_with_controls": pre_trend["summary"],
-            "cs_pre_trend_joint_test_periods_with_controls": pre_trend["periods"],
+            "cs_detrend_order": self.detrend_order,
+            key("cs_propensity_diagnostics"): self._propensity_diagnostics,
+            key("cs_pre_trend_joint_test_with_controls"): pre_trend["summary"],
+            key("cs_pre_trend_joint_test_periods_with_controls"): pre_trend["periods"],
         }
 
     def _residualize_outcome(
@@ -207,7 +224,12 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
                 X_components.append(covariate_data)
 
         if self.include_tract_trends:
-            logger.info("  Adding tract-specific linear time trends")
+            order_label = (
+                "quadratic"
+                if self.detrend_order == DETREND_ORDER_QUADRATIC
+                else "linear"
+            )
+            logger.info("  Adding tract-specific %s time trends", order_label)
             df["time_index"] = (
                 (df["month"] - df["month"].min()).dt.days / 30.44
             ).astype(int)
@@ -218,6 +240,14 @@ class CallawaySantAnnaWithControlsAnalyzer(Analyzer):
             tract_trends = tract_dummies.multiply(df["time_index"], axis=0)
             tract_trends.columns = [col + "_trend" for col in tract_trends.columns]
             X_components.append(tract_trends)
+
+            if self.detrend_order >= DETREND_ORDER_QUADRATIC:
+                # Add t² interaction per tract: captures nonlinear (V-shaped) trajectories
+                tract_trends_sq = tract_trends.multiply(df["time_index"], axis=0)
+                tract_trends_sq.columns = [
+                    col.replace("_trend", "_trend_sq") for col in tract_trends.columns
+                ]
+                X_components.append(tract_trends_sq)
 
         if not X_components:
             logger.warning("No controls to residualize on")

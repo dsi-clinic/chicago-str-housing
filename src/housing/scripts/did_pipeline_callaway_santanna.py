@@ -55,6 +55,9 @@ from housing.components.analyzers.callaway_santanna import CallawaySantAnnaAnaly
 from housing.components.analyzers.callaway_santanna_pretrend_test import (
     log_and_export_pre_trend_joint_test,
 )
+from housing.components.analyzers.callaway_santanna_summary import (
+    CallawaySantAnnaSummaryAnalyzer,
+)
 from housing.components.analyzers.callaway_santanna_tract_bootstrap import (
     parse_cs_bootstrap_cli,
     write_cs_bootstrap_csv,
@@ -114,6 +117,8 @@ from housing.did_spec import (
     DID_TWFE_POST_PERIODS,
     DID_TWFE_PRE_PERIODS,
     resolve_treatment_threshold_percentile,
+    resolve_trend_match_caliper,
+    resolve_trend_match_features,
     resolve_trend_match_k_neighbors,
     tract_shapefile_path,
     zori_csv_path,
@@ -280,6 +285,7 @@ def run_did_analysis_with_cs(
     logger.info("DiD Analysis Pipeline: TWFE vs. Callaway-Sant'Anna (2021)")
     logger.info("Treatment mode: %s", mode)
     logger.info("Output directory: %s", out_dir)
+    logger.info("Matching features: %s", ", ".join(resolve_trend_match_features()))
     logger.info("=" * 80)
     _preflight_check()
 
@@ -353,7 +359,8 @@ def run_did_analysis_with_cs(
         TrendMatchingProcessor(
             k_neighbors=resolve_trend_match_k_neighbors(),
             min_pre_periods=DID_TREND_MATCH_MIN_PRE_PERIODS,
-            matching_features=("pre_trend_slope", "avg_pre_rent"),
+            caliper=resolve_trend_match_caliper(),
+            matching_features=resolve_trend_match_features(),
         )
     )
 
@@ -400,6 +407,7 @@ def run_did_analysis_with_cs(
     pipeline.register_component(
         CallawaySantAnnaComparisonVisualizer(output_dir=out_dir)
     )
+    pipeline.register_component(CallawaySantAnnaSummaryAnalyzer(output_dir=out_dir))
 
     # 7. Callaway-Sant'Anna with controls (covariates + tract trends)
     logger.info("\n[7/7] Estimating Callaway-Sant'Anna with controls...")
@@ -438,6 +446,30 @@ def run_did_analysis_with_cs(
         )
         pipeline.register_component(DataFunnelVisualizer(output_dir=out_dir))
         pipeline.register_component(LaTeXTableExporter(output_dir=out_dir))
+
+        # Appendix: quadratic (nonlinear) detrending sensitivity spec.
+        # Demonstrates that the negative linear-detrend ATT is a functional-form
+        # artifact: quadratic trends better fit the V-shaped pre-period, moving the
+        # residualized ATT toward zero or positive.
+        cs_controls_quadratic = CallawaySantAnnaWithControlsAnalyzer(
+            comparison_group="nevertreated",
+            anticipation=0,
+            min_cohort_size=5,
+            include_covariates=True,
+            include_tract_trends=True,
+            estimation_method="dr",
+            detrend_order=2,
+        )
+        cs_controls_quadratic.name = "callaway_santanna_with_controls_quadratic"
+        pipeline.register_component(cs_controls_quadratic)
+        cs_viz_quadratic = CallawaySantAnnaVisualizer(
+            output_dir=out_dir,
+            context_suffix="_with_controls_quadratic",
+            output_suffix="_quadratic_detrend",
+        )
+        cs_viz_quadratic.name = "callaway_santanna_visualizer_with_controls_quadratic"
+        pipeline.register_component(cs_viz_quadratic)
+
         wp_order_suffix.extend(
             [
                 "honest_pretrends_analysis",
@@ -445,6 +477,8 @@ def run_did_analysis_with_cs(
                 "cohort_dynamics_explainer",
                 "data_funnel_visualization",
                 "latex_whitepaper_tables",
+                "callaway_santanna_with_controls_quadratic",
+                "callaway_santanna_visualizer_with_controls_quadratic",
             ]
         )
 
@@ -477,8 +511,9 @@ def run_did_analysis_with_cs(
         "did_sample_map_visualization",
         *(["did_story_map_visualization"] if DID_WHITEPAPER_MODE else []),
         "event_study_analysis",
-        "event_study_visualizer",
+        "event_study_visualization",
         "callaway_santanna_analysis",
+        "callaway_santanna_att_summary",
         "callaway_santanna_visualizer",
         "cs_comparison_visualizer",
         "callaway_santanna_with_controls",
@@ -558,7 +593,28 @@ def _print_summary(results: dict, *, output_dir: str) -> None:
         if results.get("cs_include_covariates"):
             logger.info("  Covariates: included")
         if results.get("cs_include_tract_trends"):
-            logger.info("  Tract trends: included")
+            logger.info(
+                "  Tract trends: included (order=%d)",
+                results.get("cs_detrend_order", 1),
+            )
+
+    # Overall ATT from CS with quadratic detrending (appendix sensitivity, whitepaper only)
+    cs_overall_quad = results.get("cs_overall_att_with_controls_quadratic", {})
+    if cs_overall_quad:
+        att_q = cs_overall_quad.get("att", float("nan"))
+        se_q = cs_overall_quad.get("se", float("nan"))
+        ci_low_q = cs_overall_quad.get("ci_low", float("nan"))
+        ci_high_q = cs_overall_quad.get("ci_high", float("nan"))
+        logger.info("\nCallaway-Sant'Anna Overall ATT (quadratic detrend — appendix):")
+        logger.info("  Point Estimate: $%.2f", att_q)
+        logger.info("  Standard Error: $%.2f", se_q)
+        logger.info("  95%% CI: [$%.2f, $%.2f]", ci_low_q, ci_high_q)
+        logger.info(
+            "  (Compare to linear detrend: $%.2f — sign shift indicates linear over-correction)",
+            cs_overall_ctrl.get("att", float("nan"))
+            if cs_overall_ctrl
+            else float("nan"),
+        )
 
     # Trend matching info
     matching_info = results.get("matching_info")

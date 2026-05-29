@@ -63,6 +63,18 @@ only aligned on a trend statistic while leaving large price-level differences in
 place. Matching on slope and pre-level is still simple, but it is much easier to
 explain and defend.
 
+## Five-feature extension (2026-05)
+
+The default matcher now also uses lagged rent levels at 1, 6, and 12 months before
+the **panel-wide first treatment month** (`rent_lag_1`, `rent_lag_6`, `rent_lag_12`)
+so k-NN can align on trajectory shape, not only slope and mean level.
+
+**Caveat:** lags use a global calendar anchor for all tracts (including late adopters),
+not each tract's own prohibition month. Report as a limitation when discussing staggered
+timing.
+
+See [`docs/PREFERRED_SPEC.md`](../PREFERRED_SPEC.md) for locked defaults.
+
 ## What this does *not* solve
 
 Several econometric limitations remain:

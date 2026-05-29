@@ -54,6 +54,22 @@ DID_TREATMENT_THRESHOLD_PERCENTILE: Final = 0.25
 
 DID_TREND_MATCH_K_NEIGHBORS: Final = 3
 DID_TREND_MATCH_MIN_PRE_PERIODS: Final = 6
+DID_TREND_MATCH_CALIPER: Final[float | None] = None
+
+# Two-feature (slope + level): reproduces published DSI clinic baseline matching.
+DID_TREND_MATCH_FEATURES_2: Final[tuple[str, ...]] = (
+    "pre_trend_slope",
+    "avg_pre_rent",
+)
+
+# Five-feature (slope + level + lagged levels): stricter trajectory matching.
+DID_TREND_MATCH_FEATURES_5: Final[tuple[str, ...]] = (
+    "pre_trend_slope",
+    "avg_pre_rent",
+    "rent_lag_1",
+    "rent_lag_6",
+    "rent_lag_12",
+)
 
 
 def resolve_trend_match_k_neighbors() -> int:
@@ -62,6 +78,37 @@ def resolve_trend_match_k_neighbors() -> int:
     if raw is not None and raw.strip():
         return int(raw)
     return DID_TREND_MATCH_K_NEIGHBORS
+
+
+def resolve_trend_match_features() -> tuple[str, ...]:
+    """Return matching feature tuple from ``DID_MATCH_FEATURES`` env override.
+
+    Accepted values:
+    - ``slope_level``, ``2``, ``2feat``: slope + average pre-rent (boss baseline)
+    - ``slope_level_lags``, ``5``, ``5feat`` (default): adds three lagged rent levels
+    """
+    raw = os.environ.get("DID_MATCH_FEATURES", "slope_level_lags").strip().lower()
+    if raw in {"slope_level", "2", "2feat", "two", "boss"}:
+        return DID_TREND_MATCH_FEATURES_2
+    if raw in {"slope_level_lags", "5", "5feat", "five", "strict"}:
+        return DID_TREND_MATCH_FEATURES_5
+    msg = (
+        "DID_MATCH_FEATURES must be 'slope_level' (2-feature) or "
+        f"'slope_level_lags' (5-feature); got {raw!r}"
+    )
+    raise ValueError(msg)
+
+
+def resolve_trend_match_caliper() -> float | None:
+    """Return ``DID_MATCH_CALIPER`` env override or :data:`DID_TREND_MATCH_CALIPER`.
+
+    Set ``DID_MATCH_CALIPER=2.0`` (for example) to reject matches with standardised
+    Euclidean distance > 2.0.  Unset or empty keeps the default of no caliper.
+    """
+    raw = os.environ.get("DID_MATCH_CALIPER")
+    if raw is not None and raw.strip():
+        return float(raw)
+    return DID_TREND_MATCH_CALIPER
 
 
 def resolve_treatment_threshold_percentile() -> float:

@@ -67,10 +67,11 @@ def _plot_overlay_event_study(
         hi = w["ci_high"] if "ci_high" in w.columns else w["att"] + 1.96 * w["se"]
         ax.fill_between(w["rel_time"], lo, hi, alpha=0.15, color=color)
 
-    ax.set_xlabel("Months since STR prohibition (threshold crossing)", fontsize=11)
-    ax.set_ylabel(ylabel, fontsize=11)
-    ax.set_title(title, fontsize=12, pad=12)
-    ax.legend(loc="best", fontsize=9)
+    ax.set_xlabel("Months since STR prohibition (threshold crossing)", fontsize=13)
+    ax.set_ylabel(ylabel, fontsize=13)
+    ax.set_title(title, fontsize=14, pad=12)
+    ax.legend(loc="best", fontsize=11)
+    ax.tick_params(labelsize=11)
     ax.grid(True, alpha=0.3)
     ax.set_xlim(-PLOT_PRE_MONTHS - 0.5, PLOT_POST_MONTHS + 0.5)
 
@@ -203,7 +204,7 @@ class CallawaySantAnnaHeterogeneityVisualizer(Visualizer):
             logger.warning("No event-study data for %s; skip plot.", filename)
             return None
 
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(11, 6.5))
         series: list[tuple[str, pd.DataFrame, str]] = [
             (
                 label_a,

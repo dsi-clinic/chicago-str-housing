@@ -34,15 +34,24 @@ class TrendMatchingProcessor(DataProcessor):
         k_neighbors: int = 3,
         min_pre_periods: int = 6,
         caliper: float | None = None,
-        matching_features: tuple[str, ...] = ("pre_trend_slope", "avg_pre_rent"),
+        matching_features: tuple[str, ...] = (
+            "pre_trend_slope",
+            "avg_pre_rent",
+            "rent_lag_1",
+            "rent_lag_6",
+            "rent_lag_12",
+        ),
     ) -> None:
         """Initialize the trend matching processor.
 
         Args:
             k_neighbors: Number of control matches per treated tract
             min_pre_periods: Minimum pre-treatment months required
-            caliper: Maximum allowed difference in trend slopes (None = no limit)
-            matching_features: Standardized pre-treatment columns used for k-NN matching
+            caliper: Maximum allowed Euclidean distance in standardized feature space
+                (None = no limit)
+            matching_features: Standardized pre-treatment columns used for k-NN matching.
+                Default includes slope, mean, and three lagged rent levels to capture
+                trajectory shape (not just overall direction).
         """
         super().__init__(
             "trend_matching",
@@ -111,10 +120,32 @@ class TrendMatchingProcessor(DataProcessor):
             "matching_diagnostics": matching_diagnostics,
         }
 
+    @staticmethod
+    def _rent_at_month(
+        pre_data_indexed: pd.Series, target_dt: pd.Timestamp, fallback: float
+    ) -> float:
+        """Look up rent at a target calendar month (year+month match), or return fallback."""
+        mask = (pre_data_indexed.index.year == target_dt.year) & (
+            pre_data_indexed.index.month == target_dt.month
+        )
+        matches = pre_data_indexed[mask]
+        return float(matches.iloc[0]) if not matches.empty else fallback
+
     def _calculate_pre_trends(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Calculate pre-treatment rent trends for each tract."""
+        """Calculate pre-treatment rent trends and lagged levels for each tract.
+
+        Lag reference point is the panel-wide first treatment month so all tracts are
+        measured at the same calendar anchor — avoids data leakage for never-treated units.
+        """
         # Identify first treatment date in sample
         first_treatment = df.loc[df["treated"] == 1, "month"].min()
+
+        # Pre-compute lag reference months once
+        lag_months = {
+            "rent_lag_1": first_treatment - pd.DateOffset(months=1),
+            "rent_lag_6": first_treatment - pd.DateOffset(months=6),
+            "rent_lag_12": first_treatment - pd.DateOffset(months=12),
+        }
 
         # Get all unique tracts
         all_tracts = df["tract_geoid"].unique()
@@ -142,8 +173,14 @@ class TrendMatchingProcessor(DataProcessor):
                     months_numeric, pre_data["rental_price"]
                 )
 
-                # Also calculate average pre-treatment rent
                 avg_pre_rent = pre_data["rental_price"].mean()
+
+                # Lagged rent levels indexed by month for fast lookup
+                rent_series = pre_data.set_index("month")["rental_price"]
+                lag_values = {
+                    name: self._rent_at_month(rent_series, dt, avg_pre_rent)
+                    for name, dt in lag_months.items()
+                }
 
                 pre_trends.append(
                     {
@@ -153,6 +190,7 @@ class TrendMatchingProcessor(DataProcessor):
                         "pre_trend_r_squared": r_value**2,
                         "pre_trend_p_value": p_value,
                         "avg_pre_rent": avg_pre_rent,
+                        **lag_values,
                         "n_pre_periods": len(pre_data),
                         "ever_treated": tract_data["ever_treated"].iloc[0]
                         if "ever_treated" in tract_data.columns

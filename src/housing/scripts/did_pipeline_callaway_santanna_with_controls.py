@@ -256,7 +256,7 @@ def run_did_analysis_with_cs_and_covariate_controls(
             "did_panel_with_covariates",
             "did_descriptive_analysis",
             "event_study_analysis",
-            "event_study_visualizer",
+            "event_study_visualization",
             "callaway_santanna_analysis",
             "callaway_santanna_visualizer",
             "cs_comparison_visualizer",

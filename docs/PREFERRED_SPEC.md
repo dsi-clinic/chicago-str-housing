@@ -7,7 +7,7 @@ Single reference for the **headline** staggered-DiD design. Robustness sweeps an
 | Layer | Spec | Notes |
 |-------|------|-------|
 | **Primary** | Full-panel **Callaway–Sant'Anna** (`nevertreated`, `min_cohort_size=5`) | Run **before** trend matching; keys `cs_overall_att_full_panel` |
-| **Matched robustness** | Same CS on **trend-matched** panel | k-NN on standardized pre-trend slope **+** average pre-treatment rent |
+| **Matched robustness** | Same CS on **trend-matched** panel | k-NN on standardized slope, avg pre-rent, and lagged levels at t−1/−6/−12 (global calendar anchor) |
 | **TWFE contrast** | Matched-sample event study | Report early as **naive** benchmark only |
 | **Residualized** | CS w/ ACS + tract linear trends | Robustness; **do not** compare ATT levels to raw rent CS |
 
@@ -25,7 +25,8 @@ Single reference for the **headline** staggered-DiD design. Robustness sweeps an
 |---------|-------|
 | `k_neighbors` | `3` (`DID_TREND_MATCH_K_NEIGHBORS`; override `DID_MATCH_K_NEIGHBORS`) |
 | `min_pre_periods` | `6` |
-| Features | `pre_trend_slope`, `avg_pre_rent` (standardized) |
+| Features | `pre_trend_slope`, `avg_pre_rent`, `rent_lag_1`, `rent_lag_6`, `rent_lag_12` (standardized) |
+| Caliper | `None` (optional `DID_MATCH_CALIPER` in standardized feature space) |
 
 ## Callaway–Sant'Anna (matched branch)
 
