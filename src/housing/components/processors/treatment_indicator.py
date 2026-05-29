@@ -1,13 +1,14 @@
-"""Treatment indicator processor for difference-in-differences analysis.
+"""Treatment indicator processor for DiD analysis.
 
-This module creates treatment indicators and relative time variables for
-tract-level rental panel data, enabling difference-in-differences (DiD)
-analysis of short-term rental (STR) prohibition effects on rental prices.
+This module adds treatment indicators to the tract-level rental panel,
+creating a DiD-ready dataset with treatment timing information.
 """
 
 import logging
 from pathlib import Path
 from typing import Any
+
+import pandas as pd
 
 from pipeline.base import DataProcessor
 
@@ -15,100 +16,183 @@ logger = logging.getLogger(__name__)
 
 
 class TreatmentIndicatorProcessor(DataProcessor):
-    """Create treatment indicators for difference-in-differences analysis.
+    """Add treatment indicators to tract-level rental panel.
 
-    This processor merges tract-level rental panel data with treatment dates
-    (STR prohibition dates) and creates:
-    1. Binary treatment indicator (`treated`): 0 before treatment, 1 after
-    2. Relative time variable (`months_since_treatment`): months before/after
-       treatment date
+    This processor:
+    1. Merges the tract-level rental panel with tract prohibition dates
+    2. Creates binary treatment indicator (0 before treatment, 1 after)
+    3. Creates relative time variable (months since treatment) for event study
+    4. Returns DiD-ready panel data
 
-    Args:
-    - output_dir: Optional output directory for visualizations
-
-    Returns:
-    - `did_panel`: DataFrame with added `treated` and `months_since_treatment`
-      columns, ready for DiD analysis.
-    - `did_panel_csv`: Path to did_panel DataFrame saved as csv
+    For never-treated tracts:
+    - treated = 0 for all periods
+    - months_since_treatment = NaN (no treatment event)
     """
 
-    def __init__(self, output_dir: str | None = None) -> None:
-        """Initialize the treatment indicator processor."""
-        super().__init__(
-            "treatment_indicator",
-            "Create treatment indicators for difference-in-differences analysis",
-        )
-        self.output_dir = output_dir or "/project/output"
-
-    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Create treatment indicators and relative time variables.
-
-        Merges the tract rental panel with treatment dates and creates:
-        - `treated`: Binary indicator (0 = untreated, 1 = treated)
-        - `months_since_treatment`: Relative time in months from treatment date
+    def __init__(self, output_path: str | None = None) -> None:
+        """Initialize the treatment indicator processor.
 
         Args:
-            context: Pipeline context dictionary
+            output_path: Optional path to save DiD panel CSV
+        """
+        super().__init__(
+            "treatment_indicator",
+            "Add treatment indicators to tract-level rental panel for DiD analysis",
+        )
+        self.required_data = ["tract_panel_data", "tract_prohibition_dates"]
+        self.output_path = output_path or "/project/output/did_panel_data.csv"
+
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Add treatment indicators to the rental panel.
+
+        Required context keys:
+            - tract_panel_data: DataFrame with (tract_geoid, month, rental_price)
+            - tract_prohibition_dates: DataFrame with (tract_geoid, first_prohibition_date, building_count)
+
+        For backward compatibility, ``tract_rental_panel`` is used if ``tract_panel_data`` is absent.
 
         Returns:
-            Dictionary with output key containing the DiD panel DataFrame with
-            treatment indicators added.
-
-        Raises:
-            KeyError: If required data keys are missing from context.
-            ValueError: If input data does not have expected columns.
+            Dictionary with 'did_panel' containing a DataFrame with columns:
+            - tract_geoid: Census tract GEOID
+            - month: datetime of the observation
+            - rental_price: rental price for that tract-month
+            - treated: 0 if pre-treatment or never-treated, 1 if post-treatment
+            - months_since_treatment: relative time (negative before, 0 at, positive after treatment)
+            - first_prohibition_date: treatment date (NaT for never-treated)
         """
-        # Get data from context
-        treatments = context["tract_prohibition_dates"]
-        panel_data = context["tract_panel_data"]
+        panel_src = context.get("tract_panel_data")
+        if panel_src is None:
+            panel_src = context.get("tract_rental_panel")
+        if panel_src is None:
+            msg = "Expected 'tract_panel_data' (or legacy 'tract_rental_panel') in context."
+            raise KeyError(msg)
+        panel = panel_src.copy()
+        treatment_dates = context["tract_prohibition_dates"]
 
-        # Merge panel data with treatment dates
-        merged = panel_data.merge(treatments, on="tract_geoid", how="left")
+        logger.info("Adding treatment indicators to tract-level rental panel...")
+        logger.info("  Input panel observations: %d", len(panel))
+        logger.info("  Tracts in panel: %d", panel["tract_geoid"].nunique())
+        logger.info("  Treated tracts available: %d", len(treatment_dates))
 
-        # Create indicator variable
-        merged["treated"] = (
-            merged["month"].dt.to_period("M")
-            >= merged["first_prohibition_date"].dt.to_period("M")
-        ).astype(int)
-
-        treatment_counts = merged.groupby("treated")["tract_geoid"].nunique()
-        logger.info(
-            "Unique tracts by treatment status - Untreated (0): %d, Treated (1): %d",
-            treatment_counts.get(0, 0),
-            treatment_counts.get(1, 0),
+        # Step 1: Merge panel with treatment dates
+        # Use left join to keep all tract-months, including never-treated tracts
+        merged = panel.merge(
+            treatment_dates[["tract_geoid", "first_prohibition_date"]],
+            on="tract_geoid",
+            how="left",
         )
 
-        # Create relative time variable
-        # Never treated tracts will have NaN values (this is expected)
+        # Ensure dates are datetime
+        merged["month"] = pd.to_datetime(merged["month"])
+        merged["first_prohibition_date"] = pd.to_datetime(
+            merged["first_prohibition_date"]
+        )
+
+        # Step 2: Create treatment indicator
+        # treated = 1 if month >= first_prohibition_date, else 0
+        # For never-treated tracts (NaT date), comparison returns False → 0
+        merged["treated"] = (
+            merged["month"] >= merged["first_prohibition_date"]
+        ).astype(int)
+
+        # Step 3: Create relative time (months since treatment)
+        # This is used for event study analysis
+        # For never-treated tracts, this will be NaN
         merged["months_since_treatment"] = (
             merged["month"].dt.year - merged["first_prohibition_date"].dt.year
         ) * 12 + (merged["month"].dt.month - merged["first_prohibition_date"].dt.month)
 
-        # Data Validation Checks
+        # Sort by tract and month
+        merged = merged.sort_values(["tract_geoid", "month"]).reset_index(drop=True)
 
-        # Check never-treated tracts have treated=0 always
-        never_treated = merged[merged["first_prohibition_date"].isna()]
-        never_treated_check = (never_treated["treated"] == 0).all()
+        # Log summary statistics
+        n_tracts = merged["tract_geoid"].nunique()
+        n_treated_tracts = merged[merged["first_prohibition_date"].notna()][
+            "tract_geoid"
+        ].nunique()
+        n_never_treated = n_tracts - n_treated_tracts
+        n_treated_obs = merged["treated"].sum()
+        n_control_obs = len(merged) - n_treated_obs
+
+        logger.info("DiD panel created successfully:")
+        logger.info("  Total tracts: %d", n_tracts)
+        logger.info("  Treated tracts: %d", n_treated_tracts)
+        logger.info("  Never-treated tracts (pure control): %d", n_never_treated)
+        logger.info("  Treated observations: %d", n_treated_obs)
+        logger.info("  Control observations: %d", n_control_obs)
         logger.info(
-            "validation: never-treated tracts have treated=0: %s", never_treated_check
+            "  Months since treatment range: %d to %d",
+            int(merged["months_since_treatment"].min()),
+            int(merged["months_since_treatment"].max()),
         )
 
-        # Check treated tracts switch at the right time
-        passed_check = 1
-        treated_tracts = merged[merged["first_prohibition_date"].notna()]
-        for tract_id, group in treated_tracts.groupby("tract_geoid"):
-            first_treated_month = group.loc[group["treated"] == 1, "month"].min()
-            prohibition_date = group["first_prohibition_date"].iloc[0]
-            if (first_treated_month.month != prohibition_date.month) or (
-                first_treated_month.year != prohibition_date.year
-            ):
-                logger.warning("Treatment date mismatch for %s", tract_id)
-                passed_check = 0
-        if passed_check == 1:
-            logger.info("Treatment dates aligned for all tracts.")
+        # Validate treatment indicator logic
+        self._validate_treatment_indicator(merged)
 
-        # Create csv file output
-        output_path = Path(self.output_dir) / "did_panel_data.csv"
-        merged.to_csv(output_path)
+        # Save to CSV
+        output_file = Path(self.output_path)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        merged.to_csv(output_file, index=False)
+        logger.info("  Saved DiD panel to: %s", output_file)
 
-        return {"did_panel": merged, "did_panel_csv": str(output_path)}
+        return {
+            "did_panel": merged,
+            "did_panel_unmatched": merged.copy(),
+        }
+
+    def _validate_treatment_indicator(self, df: pd.DataFrame) -> None:
+        """Validate that treatment indicators are correctly assigned.
+
+        Args:
+            df: DiD panel DataFrame
+
+        Raises:
+            ValueError: If validation fails
+        """
+        # Check 1: Never-treated tracts should have treated=0 always
+        never_treated = df[df["first_prohibition_date"].isna()]
+        if len(never_treated) > 0:
+            if not (never_treated["treated"] == 0).all():
+                raise ValueError(
+                    "Never-treated tracts should have treated=0 for all periods"
+                )
+            logger.info("  Validation passed: Never-treated tracts have treated=0")
+
+        # Check 2: Treated tracts should switch from 0 to 1 at the right time
+        treated_tracts = df[df["first_prohibition_date"].notna()]
+        if len(treated_tracts) > 0:
+            # Sample a few tracts for detailed validation
+            sample_tracts = treated_tracts["tract_geoid"].drop_duplicates().head(5)
+
+            for tract_id in sample_tracts:
+                tract_data = df[df["tract_geoid"] == tract_id].copy()
+                prohibition_date = tract_data["first_prohibition_date"].iloc[0]
+
+                # Check that treated=0 before treatment and treated=1 after
+                pre_treatment = tract_data[tract_data["month"] < prohibition_date]
+                post_treatment = tract_data[tract_data["month"] >= prohibition_date]
+
+                if len(pre_treatment) > 0:
+                    if not (pre_treatment["treated"] == 0).all():
+                        raise ValueError(
+                            f"Tract {tract_id}: should have treated=0 before {prohibition_date}"
+                        )
+
+                if len(post_treatment) > 0:
+                    if not (post_treatment["treated"] == 1).all():
+                        raise ValueError(
+                            f"Tract {tract_id}: should have treated=1 after {prohibition_date}"
+                        )
+
+            logger.info("  Validation passed: Treatment switches at correct time")
+
+        # Check 3: months_since_treatment should be 0 at treatment month
+        at_treatment = df[df["months_since_treatment"] == 0]
+        if len(at_treatment) > 0:
+            if not (at_treatment["treated"] == 1).all():
+                raise ValueError(
+                    "Observations at treatment month should have treated=1"
+                )
+            logger.info(
+                "  Validation passed: months_since_treatment=0 aligned with treatment"
+            )

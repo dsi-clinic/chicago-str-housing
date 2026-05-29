@@ -1,0 +1,58 @@
+\section{Data and Panel Construction}\label{sec:data}
+
+\subsection{Data Sources}
+
+The analysis draws on six publicly available data sources, each providing a distinct dimension of the housing and regulatory environment at the census tract level.
+
+\textbf{Zillow Observed Rent Index (ZORI).} Our outcome measure is the ZORI, a monthly smoothed rental price index published by Zillow at the ZIP code level. ZORI captures the typical observed market rent across the active rental stock --- single-family homes, condominiums, and multifamily buildings --- using a repeat-rent methodology that controls for compositional changes in listed units. The series is seasonally adjusted by Zillow; we do not apply additional deseasonalization in the main analysis, as our seasonality diagnostic confirms that adding calendar-month fixed effects leaves estimates essentially unchanged (Appendix~\ref{app:seasonality}). The panel covers January 2015 through early 2025, providing a pre-treatment window long enough to assess parallel trends for all treatment cohorts.
+
+\textbf{House Share Prohibited Buildings List.} Building-level records of addresses banned from short-term rental activity under Chicago's Shared Housing Ordinance are available through the Chicago Data Portal. Each record contains the building address, geographic coordinates, number of residential units, and the date on which the prohibition became effective. We accessed this file via the Data Portal API and validated coordinates against the city's administrative boundary. The dataset records permanent prohibitions; once a building is added, it does not return to active STR status.
+
+\textbf{American Community Survey (ACS).} We merge tract-level demographic and socioeconomic variables from the U.S. Census Bureau's five-year ACS estimates: median household income, share of occupied housing units that are renter-occupied, median age, and total occupied units. The occupied-unit count serves as the denominator in our treatment intensity measure (Section~\ref{sec:data-treatment}). ACS covariates enter the residualized CS branch as controls; they are not used in the preferred full-panel or matched CS specifications.
+
+\textbf{TIGER/Line Shapefiles.} Census tract boundary files for the state of Illinois (2023 vintage) provide the spatial reference for all geographic operations. We use the tract polygons to assign prohibition building coordinates to tracts (point-in-polygon join) and to compute the area-weighted ZIP-to-tract rent crosswalk.
+
+\textbf{Chicago Data Portal Boundaries.} ZIP code and community area boundary files are fetched via API and cached locally. These provide the geographic bridge between Zillow's ZIP-level rent data and our tract-level analysis.
+
+\textbf{Inside Airbnb.} Listing-level data from Inside Airbnb --- including coordinates, listing type, and price --- provides a measure of pre-treatment Airbnb market density at the tract level, computed as active listings per square kilometer. This variable enters the heterogeneity analysis (Section~\ref{sec:results-heterogeneity}) as a proxy for how intensively STR platforms were operating in a tract before prohibition adoption.
+
+\subsection{Spatial Crosswalk and Panel Construction}\label{sec:data-construction}
+
+The central data engineering challenge is that the six sources do not share a common geographic unit. Zillow publishes rents at the ZIP code level; prohibition records are point-level building coordinates; Census demographics are tract-level. Constructing the analysis panel requires two spatial operations.
+
+\textbf{ZIP-to-tract rent interpolation.} Each census tract's monthly rent is computed as an area-weighted average of the ZORI values of all ZIP codes whose boundaries overlap it. A tract spanning two ZIP codes receives a weighted average proportional to the share of its area falling in each ZIP. Tracts with no overlapping ZIP code coverage are excluded. This interpolation introduces measurement error proportional to the within-ZIP rent dispersion: tracts in large ZIP codes may have imprecise rent signals. We acknowledge this limitation and note that it attenuates our estimates toward zero.
+
+\textbf{Point-in-polygon building assignment.} Each prohibition building coordinate is assigned to the census tract whose boundary contains it via spatial join. Tract-level counts of prohibited buildings, total prohibited units, and cumulative prohibition dates are then aggregated from the building-level records. The first month in which a tract records any prohibition activity and the cumulative share of prohibited units in the tract's ACS housing stock are the key treatment-side variables.
+
+The resulting panel covers 842 census tracts across Cook County with at least one ZORI observation, spanning January 2015 through early 2025 and yielding approximately 110,000 tract-month observations. The panel is unbalanced: some tracts appear in fewer months due to gaps in ZIP code rent coverage.
+
+\subsection{Treatment Definition}\label{sec:data-treatment}
+
+We define treatment using an intensity-threshold rule that converts continuous prohibition activity into a binary first-treatment date. For each calendar year, we compute each tract's \emph{prohibition intensity} as the ratio of cumulative prohibited units to ACS-measured occupied housing units. A tract becomes treated in the first month its intensity in a given year exceeds the $p$-th percentile of intensity values among all tracts with at least one prohibition recorded in that year. Treatment is absorbing: once a tract crosses the threshold, it remains treated in all subsequent periods.
+
+The baseline specification uses $p = 0.25$: a tract must be more intensively restricted than the bottom quartile of all actively prohibiting tracts in the same year. This rule filters out tracts where a single prohibited building in a large multi-unit complex produces a negligible restriction share, focusing the treated sample on tracts with meaningful prohibition activity relative to their housing stock. We retain a \textbf{binary} alternative --- treating a tract in the first month \emph{any} prohibition appears, regardless of intensity --- as a secondary treatment-timing sensitivity (Appendix~\ref{app:preferred-spec}). Robustness to the intensity threshold over $p \in \{0.10, 0.15, 0.25, 0.33, 0.50\}$ is documented in Appendix~\ref{app:robustness-percentile}.
+
+Under the preferred $p = 0.25$ rule, 274 of the 842 rent-panel tracts are ever-treated. The earliest treatment cohort adopts in October 2015; most adoptions cluster in 2016--2021. The remaining 568 tracts are never-treated and constitute the potential comparison pool before matching.
+
+\subsection{Descriptive Statistics}
+
+Table~\ref{tab:balance} reports pre-treatment rent means for the treated and never-treated groups in the matched sample. Even before matching, treated tracts have substantially higher average rents than never-treated tracts: \$1,634 per month versus \$1,432 per month, a gap of roughly \$203. This gap is not incidental --- it reflects the geographic concentration of prohibitions in higher-rent, higher-demand neighborhoods (primarily the North Side lakefront and central neighborhoods). The pre-treatment rent gap motivates the parallel trends concern at the center of our identification strategy: treated and never-treated tracts were on different rent levels and, as the event study reveals, different rent trajectories.
+
+\begin{table}[t]
+  \centering
+  \caption{Sample construction funnel from tract boundaries to matched DiD panel (intensity threshold $p=0.25$, $k=3$).}
+  \label{tab:balance}
+  \small
+  \input{../../output/did-cs-whitepaper-threshold/tables/tab_data_funnel.tex}
+\end{table}
+
+Table~\ref{tab:balance} documents the sample shrinkage from raw geographic coverage to the final matched estimand: the 1,332 census tract boundaries in Cook County narrow to 842 tracts with rent panel coverage, then to 274 ever-treated and 568 never-treated tracts in the pre-match DiD panel, and finally to 450 tracts (274 treated, 176 controls) in the matched panel.
+
+Figure~\ref{fig:adoption} shows the cumulative adoption curve: the share of ever-treated tracts that have crossed the treatment threshold by each calendar month. Adoption accelerates in 2016--2017 and again in 2020--2021, with a long tail of late adopters through 2023. This staggered pattern --- no single treatment date, no geographic shock --- is what motivates the CS estimator rather than a standard before/after comparison.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.93\linewidth]{did_adoption_curve.png}
+  \caption{Cumulative STR prohibition adoption among ever-treated tracts (intensity threshold $p=0.25$).}
+  \label{fig:adoption}
+\end{figure}

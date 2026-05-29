@@ -1,4 +1,4 @@
-# 2025-autumn-city-of-chicago-housing
+# chicago-str-housing
 
 ## Project Summary
 
@@ -51,7 +51,14 @@ By merging datasets and performing k-means clustering, the analysis revealed sig
 
 **Key Question:** What is the causal effect of STR prohibition adoption on rental prices in Chicago census tracts?
 
-Building on the descriptive and clustering analyses, this phase implements a **staggered Difference-in-Differences (DiD) analysis** to estimate the causal impact of STR prohibitions on rental prices. Since different tracts adopted prohibitions at different times (2015-2024), we can use later-treated tracts as controls for earlier-treated ones, leveraging the variation in treatment timing to identify causal effects. The analysis uses panel data methods with two-way fixed effects (tract and time) to control for time-invariant tract characteristics and city-wide trends, and includes event study analysis to test the parallel trends assumption and examine how treatment effects evolve over time.
+Building on the descriptive and clustering analyses, this phase implements a **staggered Difference-in-Differences (DiD) analysis** to estimate the causal impact of STR prohibitions on rental prices. The current design centers on **Callaway-Sant'Anna** group-time ATT estimators for staggered adoption, with a **full-panel CS estimate as the primary result**, followed by treatment-definition sensitivity, matched-sample robustness, and a residualized CS specification with ACS covariates plus tract-specific linear trends.
+
+Current interpretation:
+
+- The **full-panel CS estimator** is the headline rent-level estimate.
+- **Matching** is a robustness restriction, not the main identification strategy.
+- The **residualized CS** specification is informative about differential observables and linear trend structure, but its ATT magnitude should not be read as directly comparable to the raw rent-level ATT.
+- Event-study pre-periods remain imperfect even after residualization, so the project treats parallel trends as a sensitivity question rather than a simple visual pass/fail check.
 
 **Key outputs** and methodology are described in the [DiD Analysis Documentation](#did-analysis-documentation) section.
 
@@ -341,4 +348,8 @@ ruff format
 
 ### DiD Analysis Documentation
 
+- **docs/str-paper/** — [README](docs/str-paper/README.md), [long-form paper](docs/str-paper/STR_PROHIBITION_PAPER.md), [policy brief](docs/str-paper/STR_POLICY_BRIEF.md); refresh archived figures + CSVs with `make sync-str-paper-figures`
 - **docs/DID_STUDENT_PLAN.md** - Implementation plan for staggered DiD analysis
+- **docs/DID_RESULTS_STORY.md** - Current results stack, treatment-definition sensitivity, matching robustness, and recommended frontend narrative
+- **docs/FRONTEND_MATCHING_ROBUSTNESS_COPY.md** - Frontend-ready copy blocks and captions for the matching robustness story
+- **docs/methodology-audit/README.md** - Current methodological audit notes for crosswalk construction and matching design

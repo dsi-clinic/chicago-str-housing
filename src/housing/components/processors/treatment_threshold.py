@@ -160,4 +160,8 @@ class TreatmentThresholdProcessor(DataProcessor):
         merged.to_csv(output_path, index=False)
         logger.info("Saved DiD panel data to: %s", output_path)
 
-        return {"did_panel": merged, "did_panel_csv": str(output_path)}
+        return {
+            "did_panel": merged,
+            "did_panel_unmatched": merged.copy(),
+            "did_panel_csv": str(output_path),
+        }

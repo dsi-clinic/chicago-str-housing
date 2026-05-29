@@ -1,0 +1,289 @@
+% Online replication materials (Markdown runbooks) remain in the repository;
+% this appendix is the publish-facing summary referenced from the main text.
+
+\section{Preferred specification and treatment intensity}\label{app:preferred-spec}
+
+\subsection{Headline estimand}
+
+The preferred design estimates a full-panel Callaway--Sant'Anna ATT on monthly tract rents \emph{before} any trend matching, using never-treated tracts as the primary comparison group, a minimum cohort size of five tracts, and no anticipation window.
+Matched-sample CS, two-way fixed effects event studies, and residualized CS specifications are reported as robustness layers only.
+
+\subsection{Intensity-based treatment indicator (threshold rule)}\label{app:treatment-intensity}
+
+Administrative prohibition records identify buildings that ban short-term rentals, but tracts differ in how intensively restrictions bind relative to housing stock.
+Our \textbf{preferred treatment indicator} is \emph{intensity-threshold} adoption:
+
+\begin{itemize}
+  \item For each calendar year, compute each tract's share of restricted units relative to ACS occupied housing units.
+  \item Compare that share to the year-specific $p$-th percentile of shares among tracts with at least one recorded prohibition in that year.
+  \item A tract \textbf{becomes treated} in the first month its share \textbf{exceeds} the threshold; it remains treated thereafter under the staggered-adoption panel.
+\end{itemize}
+
+The default intensity cutoff is $p=0.25$: a tract must be more restricted than the bottom quartile of active prohibition tracts in that year.
+Lower percentiles (e.g.\ $p=0.10$) classify more tracts as treated earlier; higher percentiles (e.g.\ $p=0.50$) require stronger within-tract restriction intensity before treatment begins.
+
+This rule is distinct from a \textbf{binary} alternative that treats a tract in the first month \emph{any} qualifying prohibition appears, regardless of intensity relative to stock.
+The binary definition classifies more tracts as treated earlier and tends to yield larger matched-sample raw ATTs when run on the same pipeline; we retain it as a secondary sensitivity on treatment \emph{timing} rather than as the headline intensity estimand.
+All robustness grids in this appendix use the threshold rule unless noted otherwise.
+
+\subsection{Matching and covariates}\label{app:matching-details}
+
+We report two matched-sample designs:
+\begin{itemize}
+  \item \textbf{Two-feature baseline} (slope + average pre-rent): reproduces the published DSI clinic matched specification and is the main comparability layer (Section~\ref{sec:results-main-2feat}).
+  \item \textbf{Five-feature strict matching} (adds lagged rent levels at 1, 6, and 12 months): improves balance on short-run trajectory shape and is our preferred robustness layer (Section~\ref{sec:results-5feat}).
+\end{itemize}
+After the full-panel CS pass, each ever-treated tract is matched to $k=3$ never-treated neighbors on standardized pre-treatment features.
+American Community Survey tract covariates enter only the residualized CS branch.
+
+---
+
+\section{Matching design and balance}\label{app:matching}
+
+Five-feature matching improves balance relative to slope-only or slope-plus-level rules by aligning short-run rent \emph{shape} (lagged levels at $t=-1$, $-6$, $-12$ relative to the global first treatment month) in addition to slope and mean.
+Table~\ref{tab:annex-matching-comparison} summarizes how pooled ATTs shift across the two matching rules at $k=3$, $p=0.25$.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Two-feature vs.\ five-feature matching: pooled ATTs.}
+  \label{tab:annex-matching-comparison}
+  \input{tables/tab_matching_att_comparison.tex}
+\end{table}
+
+On the five-feature whitepaper run ($k=3$, $p=0.25$), standardized mean differences on the pre-treatment slope fall from about 1.36 (pre-match) to about 0.75 (post-match); lagged-rent features show similar post-match SMDs near 0.56--0.58.
+Matching remains nearest-neighbour with replacement; maximum control reuse reaches 31 under preferred settings.
+
+\subsection{Boss-specification reconciliation}\label{app:boss-reconciliation}
+
+Re-running the two-feature matched specification on the current threshold panel yields a matched ATT of \$4.60/month and an event-study shape comparable to the clinic figure (smoother pre-period than five-feature matching). The clinic's published matched ATT of about \$6/month used the same slope+level matching rule but on a binary first-prohibition treatment definition and an earlier data vintage; our binary sensitivity run (Section~\ref{sec:results-binary}) moves closer to that magnitude. We treat the two-feature threshold result as the internal baseline and the clinic binary result as the external benchmark.
+
+\subsection{Matching choice and residualized specifications}\label{app:matching-residualized}
+
+Appendix Table~\ref{tab:annex-matching-residualized} compares residualized pooled ATTs under two-feature and five-feature matching at $k=3$.
+Residualization uses equation~\eqref{eq:residualization} in the main text; magnitudes remain on a preconditioned scale and must not be compared dollar-for-dollar to raw rent CS.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Matching $\times$ residualization interaction ($k=3$, $p=0.25$).}
+  \label{tab:annex-matching-residualized}
+  \input{tables/tab_matching_robustness_comparison.tex}
+\end{table}
+
+Stricter five-feature matching can change residualized ATTs because the matched panel and pre-period fit windows differ; both specifications typically remain negative on the preconditioned scale when linear detrending extrapolates the late pre-period recovery slope.
+
+\subsection{Five-feature robustness sweeps}\label{app:matching-robustness}
+
+Section~\ref{sec:results-robustness} summarizes $k$-neighbors and threshold-intensity grids under five-feature matching (Appendices~\ref{app:robustness-k}--\ref{app:robustness-percentile}).
+The same grids under two-feature matching are archived in the repository robustness folder with a \texttt{2feat} suffix; five-feature counterparts use a \texttt{5feat} suffix.
+Matched ATTs are generally larger under two-feature matching at the same $(k,p)$ because slope-only matching admits controls with different short-run curvature.
+
+We pre-specified two design-parameter grids requested for policy review:
+\begin{enumerate}
+  \item \textbf{$k$-neighbors sensitivity} (Appendix~\ref{app:robustness-k}): vary matched controls per treated tract from $k=1$ to $k=5$ holding the threshold rule at $p=0.25$.
+  \item \textbf{Threshold-intensity sensitivity} (Appendix~\ref{app:robustness-percentile}): vary $p\in\{0.10,0.15,0.25,0.33,0.50\}$ holding $k=3$.
+\end{enumerate}
+
+Each grid point re-estimates full-panel CS, matched CS, and residualized CS on a fresh pipeline run (Docker replication, May 2026).
+Full-panel ATTs are reported in \$/month on the rent index; residualized ATTs use a preconditioned outcome scale and must not be compared dollar-for-dollar to raw rent CS (Appendix~\ref{app:residualized}).
+
+---
+
+\section{$k$-neighbors robustness}\label{app:robustness-k}
+
+Table~\ref{tab:annex-k-sweep} and Figure~\ref{fig:annex-k-att} summarize the sweep.
+The full-panel CS ATT is invariant to $k$ by construction (matching occurs after the full-panel pass).
+Matched CS ATTs rise with $k$ as the control pool widens and control reuse increases; direction stays positive throughout.
+
+\begin{table}[htbp]
+  \centering
+  \caption{$k$-neighbors sweep (threshold $p=0.25$, five-feature matching). Preferred: $k=3$.}
+  \label{tab:annex-k-sweep}
+  \small
+  \begin{tabular}{crrrrrr}
+    \toprule
+    $k$ & Controls & Max reuse & Full-panel ATT & Matched ATT & Residualized ATT \\
+    \midrule
+    1 & 83  & 24 & 20.65 &  3.68 & $-$58.0 \\
+    2 & 136 & 31 & 20.65 &  4.40 & $-$83.9 \\
+    \textbf{3} & \textbf{176} & \textbf{31} & \textbf{20.65} & \textbf{ 5.46} & \textbf{$-$87.8} \\
+    4 & 213 & 41 & 20.65 &  6.88 & $-$91.6 \\
+    5 & 248 & 41 & 20.65 &  7.88 & $-$90.6 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\linewidth]{k_neighbors_att_by_spec.png}
+  \caption{Pooled ATT by $k$ for full-panel CS, matched CS, and residualized CS.}
+  \label{fig:annex-k-att}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\linewidth]{k_neighbors_sample_diagnostics.png}
+  \caption{Matched control counts and maximum control reuse across $k$.}
+  \label{fig:annex-k-diagnostics}
+\end{figure}
+
+\textbf{Decision.} We retain $k=3$ as the preferred match depth: it limits maximum control reuse (31) relative to $k\geq 4$ while preserving a sufficiently large control pool (176 tracts).
+
+---
+
+\section{Threshold-intensity robustness}\label{app:robustness-percentile}
+
+Table~\ref{tab:annex-pct-sweep} and Figure~\ref{fig:annex-pct-att} vary the intensity percentile $p$ that defines when a tract crosses into treatment.
+Lower $p$ expands the treated set (329 ever-treated tracts at $p=0.10$ vs.\ 183 at $p=0.50$) and raises matched CS ATTs; full-panel CS remains near \$20/month across the grid.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Threshold-intensity sweep ($k=3$, five-feature matching). Preferred: $p=0.25$.}
+  \label{tab:annex-pct-sweep}
+  \small
+  \begin{tabular}{crrrrrr}
+    \toprule
+    Percentile $p$ & Ever-treated & Controls & Full-panel ATT & Matched ATT & Residualized ATT \\
+    \midrule
+    0.10 & 329 & 175 & 20.87 &  9.97 & $-$66.1 \\
+    0.15 & 311 & 172 & 20.18 &  8.53 & $-$76.4 \\
+    \textbf{0.25} & \textbf{274} & \textbf{176} & \textbf{20.65} & \textbf{ 5.46} & \textbf{$-$87.8} \\
+    0.33 & 245 & 159 & 21.16 &  4.19 & $-$77.2 \\
+    0.50 & 183 & 148 & 19.83 &  3.81 & $-$88.0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\linewidth]{threshold_percentile_att_by_spec.png}
+  \caption{Pooled ATT by treatment-intensity percentile.}
+  \label{fig:annex-pct-att}
+\end{figure}
+
+\textbf{Interpretation.} Matched ATTs are sensitive to how stringently ``treatment'' is defined: looser intensity cutoffs (lower $p$) associate with larger positive matched estimates, while stricter cutoffs shrink the treated set toward high-intensity tracts and reduce matched ATTs.
+This pattern is consistent with heterogeneous exposure rather than proof of a stable causal magnitude; it motivates reporting the $p=0.25$ rule as a middle-ground intensity definition rather than as a uniquely identified effect size.
+
+\textbf{Decision.} The preferred intensity cutoff remains $p=0.25$.
+
+---
+
+\section{Robustness overview}\label{app:robustness-overview}
+
+\section{Cohort-specific results}\label{app:cohort-att}
+
+Matched-sample Callaway--Sant'Anna group--time effects decompose by first-treatment cohort (adoption month).
+Table~\ref{tab:annex-cohort-att} reports pooled post-period ATTs per cohort under the \textbf{intensity-threshold} rule (Appendix~\ref{app:treatment-intensity}); Table~\ref{tab:annex-cohort-att-binary} repeats the exercise under a \textbf{binary} first-prohibition definition.
+
+\textbf{Pre-violations} counts significant pre-period coefficients among relative times $t\in\{-12,\ldots,-2\}$ (11 periods; $t=-1$ is the reference).
+\textbf{Clean} cohorts have at most two such violations.
+Early 2016 adoption months have small matched samples and wide confidence bands in the cohort event-study figures (Figures~\ref{fig:cohort-dynamics-p1}--\ref{fig:cohort-dynamics-p2}); they contribute noise to the aggregate V-shape but should not anchor policy conclusions.
+
+The \textbf{2019-10} cohort (highlighted) tends to show flatter pre-treatment dynamics and a positive post-period path in the matched event-study panels; treat any cohort-specific magnitude as illustrative rather than as a standalone causal headline.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Cohort pooled post-period ATTs (intensity threshold, $p=0.25$, matched $k=3$).}
+  \label{tab:annex-cohort-att}
+  \small
+  \input{../../output/did-cs-whitepaper-threshold/tables/tab_cohort_att.tex}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Cohort pooled post-period ATTs (binary treatment; matched $k=3$).}
+  \label{tab:annex-cohort-att-binary}
+  \small
+  \input{../../output/did-cs-whitepaper-binary/tables/tab_cohort_att.tex}
+\end{table}
+
+\subsection{Calendar-month fixed effects (diagnostic)}\label{app:seasonality}
+
+To probe whether $\sim$12-month oscillation in cohort panels reflects seasonal rent cycles, we re-estimate matched CS after subtracting panel-wide month-of-year means from rents (common calendar-month FE).
+Table~\ref{tab:annex-seasonality} and Figures~\ref{fig:annex-seasonality-p1}--\ref{fig:annex-seasonality-p2} summarize the comparison.
+In the May 2026 diagnostic run, calendar-month demeaning leaves the pooled matched ATT unchanged (about \$5.5/month) and does not reduce 2019-10 pre-trend violations (2 of 11 pre-periods significant under both specs).
+We therefore \textbf{do not} adopt month-of-year adjustment in the headline rent-level specification.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Raw vs calendar-month demeaned matched CS (diagnostic).}
+  \label{tab:annex-seasonality}
+  \small
+  \input{../../docs/robustness/tables/seasonality_comparison.tex}
+\end{table}
+
+\IfFileExists{../../docs/robustness/figures/did_cohort_dynamics_seasonality_compare_p1.png}{%
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.92\linewidth]{did_cohort_dynamics_seasonality_compare_p1.png}
+  \caption{Cohort dynamics: raw rents vs.\ month-of-year demeaned (matched CS), cohorts 1--6.}
+  \figurenotes{Gray line: raw ZORI levels; red line: rents after subtracting panel-wide calendar-month means (common month FE). If seasonality drove pre-trends, demeaned paths should flatten before month 0; pooled ATT in Table~\ref{tab:annex-seasonality} is essentially unchanged.}
+  \label{fig:annex-seasonality-p1}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.92\linewidth]{did_cohort_dynamics_seasonality_compare_p2.png}
+  \caption{Cohort dynamics: raw vs.\ demeaned (continued), cohorts 7--11.}
+  \figurenotes{Same diagnostic as Figure~\ref{fig:annex-seasonality-p1}; 2019-10 cohort highlighted in the seasonality run when present on this page.}
+  \label{fig:annex-seasonality-p2}
+\end{figure}
+}{%
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.88\linewidth]{did_cohort_dynamics_seasonality_compare.png}
+  \caption{Cohort dynamics: raw rents vs.\ month-of-year demeaned (matched CS).}
+  \figurenotes{Re-run \texttt{run\_seasonality\_diagnostic.py} to emit paginated appendix figures (\texttt{*\_p1.png}, \texttt{*\_p2.png}). Gray = raw ZORI; red = month-demeaned rents.}
+  \label{fig:annex-seasonality}
+\end{figure}
+}%
+
+---
+
+\section{Parallel trends and residualized specifications}\label{app:parallel-trends}
+
+\subsection{V-shaped pre-treatment dynamics}
+
+Full-panel CS event-study coefficients relative to $t=-1$ exhibit a V-shaped pre-ban path: about $-$8/month at $t=-12$, a minimum near $-$16/month at $t=-8$, and recovery toward zero at $t=-1$.
+A joint Wald test on pre-period group--time ATTs rejects a flat pre-trend null ($p<0.001$).
+Treated tracts had higher pre-ban rent levels and faster growth than never-treated tracts---consistent with gentrification pressure in neighborhoods where prohibitions cluster.
+
+\subsection{Why raw and residualized pooled ATTs diverge}
+
+Positive full-panel and matched raw ATTs may partly reflect continuation of pre-ban reconvergence rather than a prohibition-caused rent increase.
+Residualized CS with tract-linear trends fit on pre-ban months can \emph{over-extrapolate} the late recovery phase of the V-shape, producing large negative pooled ATTs on a preconditioned scale (about $-$88/month linear; even more extreme under quadratic detrend in Figure~\ref{fig:annex-quadratic}).
+
+Neither sign should headline a rent-level policy conclusion without acknowledging the pre-trend violation.
+
+\subsection{Pretrend heuristic (not HonestDiD)}
+
+Table~\ref{tab:annex-honest-pretrends} summarizes a lightweight diagnostic exported alongside the whitepaper run.
+It flags the magnitude of pre-period TWFE coefficients and their second differences; it does \textbf{not} implement the full sensitivity analysis of \citet{rbs2023}.
+Use it only as a companion to the CS joint Wald test and the event-study figure.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Pretrend heuristic summary (not Rambachan--Roth HonestDiD).}
+  \label{tab:annex-honest-pretrends}
+  \input{../../output/did-cs-whitepaper-threshold/tables/tab_honest_pretrends.tex}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\linewidth]{did_callaway_santanna_event_study_quadratic_detrend.png}
+  \caption{Residualized CS event study with quadratic tract-specific detrending (sensitivity).}
+  \label{fig:annex-quadratic}
+\end{figure}
+
+\subsection{Residualized CS semantics}\label{app:residualized}
+
+The residualized branch removes ACS covariates and tract-specific time trends estimated on pre-treatment months, then applies standard Callaway--Sant'Anna on the preconditioned outcome.
+Pooled residualized ATTs are \textbf{not} interpretable as changes in observed monthly rent in \$/month comparable to raw CS.
+They are reported only to document sensitivity to detrending functional form.
+
+---
+
+\section{Replication notes}\label{app:replication}
+
+Results in this brief were generated with the project's staggered-DiD replication pipeline (Callaway--Sant'Anna, May 2026 whitepaper run).
+Diagnostic tables exported alongside figures include pre-trend Wald tests, matching balance, sample lineage, and pretrend regression summaries.
+Detailed command-line runbooks and version-pinned defaults are maintained in the project repository for clinic partners and are not reproduced here.

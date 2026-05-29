@@ -1,0 +1,90 @@
+\section{Empirical Strategy}\label{sec:methods}
+
+\subsection{The Problem with Two-Way Fixed Effects}
+
+The standard approach to estimating treatment effects in staggered adoption settings is a two-way fixed effects (TWFE) regression of the form
+
+\[
+Y_{it} = \alpha_i + \lambda_t + \beta D_{it} + \varepsilon_{it},
+\]
+
+where $\alpha_i$ and $\lambda_t$ are unit and time fixed effects, $D_{it}$ is the treatment indicator, and $\beta$ is interpreted as the average treatment effect. In settings with a single treatment date and homogeneous effects, this estimator is unbiased. Under staggered adoption with treatment effect heterogeneity, however, TWFE can produce severely misleading estimates.
+
+\citet{goodman-bacon2021difference} shows that the TWFE coefficient decomposes into a weighted average of all pairwise two-by-two comparisons between groups treated at different times. Crucially, some of these comparisons use already-treated units as controls for later-treated units, assigning implicit weights that can be negative when treatment effects vary across cohorts or over time. In our setting --- where early-adopting tracts concentrated in high-demand neighborhoods may respond differently to prohibitions than late-adopting tracts spreading cityward --- this contamination risk is substantial. \citet{de-chaisemartin2020two} derive analogous concerns, showing that any estimator relying on a two-way fixed effects structure can produce estimates of the wrong sign when effects are heterogeneous.
+
+We implement TWFE alongside our preferred estimator for diagnostic comparison but do not use it as a primary causal claim. The contrast between TWFE and the Callaway--Sant'Anna estimates in our results illustrates empirically how large the heterogeneity bias can be in this setting (Section~\ref{sec:results-main-2feat}).
+
+\subsection{Callaway--Sant'Anna Group-Time ATT}
+
+Our preferred estimator is the Callaway--Sant'Anna (CS) group-time average treatment effect on the treated \citep{callaway2021difference}. The estimator proceeds by defining treatment cohorts --- groups of units sharing a common first-treatment period --- and estimating cohort-specific, period-specific ATTs.
+
+Formally, let $G_i$ denote the first calendar period in which unit $i$ is treated ($G_i = \infty$ for never-treated units), and let $C$ denote a comparison group of units not yet treated by period $t$. For cohort $g$ and period $t$, the group-time ATT is
+
+\[
+\mathrm{ATT}(g, t) = \mathbb{E}\bigl[Y_t(g) - Y_t(0) \mid G_i = g\bigr],
+\]
+
+which is identified under the parallel trends assumption as
+
+\[
+\mathrm{ATT}(g, t) = \mathbb{E}\bigl[Y_t - Y_{g-1} \mid G_i = g\bigr] - \mathbb{E}\bigl[Y_t - Y_{g-1} \mid i \in C\bigr].
+\]
+
+Each cohort-time cell compares the change in rents from the period before treatment ($g-1$) to period $t$ for treated tracts, against the same change for comparison units. Because already-treated units are never used as controls, the estimator avoids the negative-weighting problem of TWFE.
+
+\paragraph{Comparison group.} We use never-treated tracts (those with $G_i = \infty$) as the primary comparison group. This is a stricter and more transparent choice than using not-yet-treated units as controls, which introduces additional assumptions about the timing of treatment effects for later-adopting cohorts. Sensitivity to this choice is discussed in Appendix~\ref{app:robustness-overview}.
+
+\paragraph{Aggregation.} We aggregate group-time ATTs to the event-time dimension by computing
+\[
+\overline{\mathrm{ATT}}(\ell) = \sum_{g} w_g \cdot \mathrm{ATT}(g, g + \ell),
+\]
+where $\ell$ denotes the number of periods since first treatment, and weights $w_g$ are proportional to cohort size. This produces event-study plots tracing the dynamic treatment path and a pooled post-period ATT that averages across all positive event times. The doubly-robust (DR) variant of the estimator, following \citet{santanna2020doubly}, also incorporates observed covariates in the outcome model to improve efficiency.
+
+\subsection{Parallel Trends Assumption and Pre-Trend Evidence}\label{sec:methods-parallel-trends}
+
+The CS estimator requires the conditional parallel trends assumption:
+
+\[
+\mathbb{E}\bigl[Y_t(0) - Y_{g-1}(0) \mid G_i = g\bigr] = \mathbb{E}\bigl[Y_t(0) - Y_{g-1}(0) \mid i \in C\bigr] \quad \text{for all } t < g.
+\]
+
+In words: absent the prohibition, treated tracts would have followed the same rent trend as never-treated tracts in every pre-treatment period.
+
+This assumption is violated in our setting. The full-panel CS event study (Section~\ref{sec:results-pretrend}) reveals a V-shaped pre-treatment divergence: the group-time ATT at $t = -8$ is approximately $-$\$16/month, dipping significantly below zero before recovering toward zero at $t = -1$. A joint Wald test on all pre-period group-time ATTs rejects the null of flat pre-trends at $p < 0.001$. This pattern is economically coherent --- STR prohibitions were adopted disproportionately in tracts that were already on faster rent-growth trajectories --- but it means the standard parallel trends assumption does not hold.
+
+We address this in two ways. First, we document the violation explicitly and interpret raw ATTs as an upper bound on the plausible effect size, noting that the positive post-period estimates may partly reflect continuation of the pre-ban divergence rather than a prohibition-caused rent change. Second, we apply the sensitivity framework of \citet{rbs2023} to bound the degree of violation. The HonestDiD smoothness constraint $M$ captures the maximum allowable month-to-month change in the counterfactual trend relative to the observed pre-period. Using the largest observed pre-period change ($M = 2.71$ \$/month per period, derived from the second differences of the pre-period TWFE coefficients), the identified set for the average ATT remains consistent with positive effects throughout the post-period window. This does not restore point identification but provides a credible lower bound: effects are positive even under the most pessimistic violation permitted by $M = 2.71$.
+
+Pre-trend tests themselves are underpowered in this design. \citet{roth2022pretest} documents that standard parallel-trends pre-tests have low power against economically relevant violations, and that passing a pre-test provides little assurance of identification. The TWFE parallel-trends regression on our matched panel fails to reject at $p \approx 0.34$ despite economically large pre-period gaps ($\$7$--$\$16$/month). This result should not be read as evidence that parallel trends holds; it reflects the low power of the test relative to the observed violation magnitude.
+
+\subsection{Pre-Treatment Trend Matching}\label{sec:methods-matching}
+
+To strengthen the parallel trends assumption by comparing more similar units, we apply $k$-nearest-neighbor matching on pre-treatment rent trajectories. The \textbf{baseline} specification matches on two standardized features used in the published DSI clinic paper:
+\begin{enumerate}
+  \item \textbf{Pre-treatment rent slope} (\texttt{pre\_trend\_slope})
+  \item \textbf{Average pre-treatment rent} (\texttt{avg\_pre\_rent})
+\end{enumerate}
+Our \textbf{strict robustness} specification adds three lagged rent levels (\texttt{rent\_lag\_1}, \texttt{rent\_lag\_6}, \texttt{rent\_lag\_12}) relative to the panel-wide first treatment month to capture short-run trajectory shape.
+
+All features are standardized before computing Euclidean distances. The baseline two-feature rule reproduces the clinic's headline matched ATT; the five-feature rule is more conservative and reveals V-shaped pre-period composition that slope-only matching can miss (Section~\ref{sec:results-5feat}).
+
+The matched panel under five-feature matching retains 274 treated tracts and 176 never-treated controls (450 total tracts, out of 842 rent-panel tracts). Post-match standardized mean differences improve on slope (from 1.36 to 0.75) though material imbalance remains. The preferred matching depth is $k = 3$ (Appendix~\ref{app:robustness-k}).
+
+\subsection{Estimator Ladder}
+
+We organize our results around a deliberate sequence of increasingly restrictive specifications:
+
+\begin{enumerate}
+  \item \textbf{Full-panel CS (primary diagnostic).} Callaway--Sant'Anna on all rent-panel tracts with never-treated controls. This is the first result readers should inspect (the event study reveals the V-shape).
+
+  \item \textbf{Two-feature matched CS (baseline headline).} CS on the matched panel using slope + level matching --- comparable to the published clinic specification (Section~\ref{sec:results-main-2feat}).
+
+  \item \textbf{Five-feature matched CS (strict robustness).} Same estimator on a stricter matched panel using lagged rent levels (Section~\ref{sec:results-5feat}).
+
+  \item \textbf{Naive TWFE (benchmark).} Conventional two-way fixed effects on the matched panel for comparison.
+
+  \item \textbf{Residualized CS (appendix sensitivity).} Doubly-robust CS on rents residualized per equation~\eqref{eq:residualization}; magnitudes are not comparable to raw rent ATTs (Appendix~\ref{app:residualized}).
+\end{enumerate}
+
+\subsection{Inference}
+
+Standard errors are computed analytically by the \texttt{csdid} implementation following \citet{callaway2021difference}. Cluster-robust inference clusters at the census tract level to account for within-tract serial correlation in monthly rent observations. All event-study figures display 95\% pointwise confidence intervals; pre-period joint tests use the Wald statistic against the null that all pre-period group-time ATTs equal zero simultaneously.

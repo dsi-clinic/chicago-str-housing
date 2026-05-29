@@ -1,0 +1,363 @@
+% Beamer narrative — STR prohibitions and tract rents (Callaway & Sant'Anna spine)
+\documentclass[11pt,aspectratio=169]{beamer}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{tikz}
+
+\usetheme{UChicago}
+
+% Pipeline outputs resolved from docs/white-paper/ppt -> repo root ../../../
+\newcommand{\WpOut}{../../../output/did-cs-whitepaper}
+\graphicspath{{../../../output/did-cs-whitepaper/}{../../../output/did-cs/}}
+
+% Image with graceful placeholder if the figure has not been built yet.
+\newcommand{\WPFig}[2]{%
+  \IfFileExists{\WpOut/#1}{%
+    \includegraphics[#2]{#1}%
+  }{%
+    \fbox{\parbox{0.9\linewidth}{\centering\scriptsize Missing file: \detokenize{#1}\\[0.35em]Run \texttt{make run-did-pipeline-cs-whitepaper}}}%
+  }%
+}
+
+% Snippet \input with placeholder.
+\newcommand{\WPInput}[1]{%
+  \IfFileExists{\WpOut/#1}{\input{\WpOut/#1}}%
+  {{\scriptsize\textit{Missing snippet: \texttt{\detokenize{#1}}}.}}%
+}
+
+\title[STR prohibitions and rents]{Short-Term Rental Prohibitions and Census-Tract Rents}
+\subtitle{A staggered difference-in-differences design with cohort-aware estimation}
+\author[DSI Housing]{Data Science Institute Housing Clinic \and City of Chicago DTI}
+\date{\today}
+
+\begin{document}
+
+% --------------------------------------------------------------------
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{What we ask, and why it is hard}
+\begin{itemize}
+  \item \textbf{Question.} Do census-tract STR prohibitions adopted under Chicago's Shared Housing Ordinance change \emph{rental prices} for long-term tenants?
+  \item \textbf{Why hard:} treatment is \emph{staggered} -- different tracts adopt in different months -- and effects plausibly vary by cohort and time-since-adoption.
+  \item \textbf{Implication for design:} pooled two-way fixed effects (TWFE) implicitly compares newly-treated tracts to \emph{already-treated} ones, generating negative weights and biased ATT under heterogeneity (Goodman-Bacon, 2021).
+  \item \textbf{Our spine:} the Callaway--Sant'Anna (CS) group-time ATT estimator with \emph{never-treated} controls; pretrend matched sample; ACS + tract linear trend residualization for robustness.
+\end{itemize}
+\end{frame}
+
+% --------------------------------------------------------------------
+\section{Data and design}
+
+\begin{frame}{Data}
+\begin{itemize}
+  \item \textbf{Outcome:} ZORI smoothed monthly rent index, ZIP-level, crosswalked to census tract using HUD area shares -- a tract-month panel of rents in dollars.
+  \item \textbf{Treatment:} first month a tract has \emph{any} parcel covered by an STR prohibition (Chicago Data Portal: prohibited buildings).
+  \item \textbf{Sample:} restricted to tracts whose pre-treatment rent slope can be matched to never-treated comparators (k-NN on slope, $k=3$, $\geq 6$ pre-periods).
+  \item \textbf{Result (after Steps 2--5):} matched panel $=$ 373 treated tracts + 114 never-treated; CS keeps 12 prohibition-\emph{cohort months} each with $\geq 5$ tracts (covers 320 of the 373 treated tracts --- very small rollout months are pooled out of aggregated curves).
+\end{itemize}
+\vfill
+{\footnotesize\textit{Estimands operate on the rent index in \$/month; magnitudes are differences in rent levels, not in growth rates.}}
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{Geography of treatment (matched DiD panel)}
+\vspace{-0.3em}
+\centering
+\WPFig{did_story_map.png}{height=0.83\textheight,keepaspectratio}
+\end{frame}
+
+% --------------------------------------------------------------------
+\section{From raw data to matched sample}
+
+\begin{frame}{Step 1 --- Build one tract--month panel (before matching)}
+\vspace{-0.2em}
+\textbf{Audience hook: ``What data did we actually start from?''}
+\begin{enumerate}\setlength\itemsep{0.45em}
+  \item \textbf{Outcome:} smoothed rents (ZORI) measured at ZIP, allocated to census tracts via HUD ZIP--tract weights.
+  \item \textbf{Treatment timing:} first calendar month each tract intersects prohibited-building STR registrations (Chicago Data Portal).
+  \item \textbf{Panel bookkeeping:} one row per tract per month --- e.g.\ 842 Chicago tracts in the raw file; aligned to 128 months (2015-01 through 2025-08).
+\end{enumerate}
+\vfill
+{\footnotesize Still no causal estimator --- uniform panel structure is prerequisite for every subsequent plot.}
+\end{frame}
+
+\begin{frame}{Step 2 --- Why shrink controls? (\emph{pre-treatment matching})}
+\begin{itemize}\setlength\itemsep{0.4em}
+  \item Compared neighbourhoods differ in baseline prices and rent growth; we nonetheless need untreated tracts whose \emph{pre-prohibition rent path} resembles treated tracts' paths as closely as feasible.
+  \item \textbf{Procedure:} for each treated tract, retain up to three never-treated tracts with closest standardized pre-period rent slope and average pre-period rent ($k{=}3$ nearest neighbours); require $\geq 6$ pre months.
+  \item \textbf{Treated preservation:} \emph{all} prohibition tracts survive this filter; removals apply only to never-treated tracts that never serve as usable counterfactual matches.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Step 3 --- Tract funnel (counts)}
+\vspace{-0.45em}
+\centering
+\WPFig{data_funnel.png}{height=0.45\textheight,keepaspectratio}\\[-0.1em]
+{\scriptsize\setlength{\tabcolsep}{3pt}%
+\renewcommand{\arraystretch}{0.92}%
+\setlength{\fboxsep}{0pt}%
+\resizebox{\linewidth}{!}{\begin{minipage}{\linewidth}%
+\WPInput{tables/tab_data_funnel.tex}\end{minipage}}%
+}
+\vskip0.35em
+\footnotesize
+\begin{itemize}\setlength\itemsep{0.12em}
+  \item Stage B drops many raw never-treated tracts (\emph{never} dropping treated census tracts outright).
+  \item Stage C lists CS-visible adoption months --- cohort waves with sufficient mass ($n\geq 5$ tracts).
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Step 4 --- Descriptive snapshots by prohibition cohort}
+\vspace{-0.35em}
+\centering
+{\scriptsize\setlength{\tabcolsep}{2.5pt}\renewcommand{\arraystretch}{0.95}%
+\resizebox{\linewidth}{!}{\begin{minipage}{\linewidth}\WPInput{tables/tab_cohort_descriptive.tex}\end{minipage}}}%
+\vskip0.4em
+\footnotesize
+\begin{itemize}\setlength\itemsep{0.15em}
+\item ``Cohort'' $=$ calendar month each tract appears in the prohibition layer for the first time (group-time CS inputs).
+\item Early prohibition waves correlate with higher baseline rents on average; income / education columns require a live Census pull (\texttt{CENSUS\_API\_KEY})---rent still sorts cohorts when those fields are blank.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Step 5 --- Slopes aligned, levels still tilted (\emph{residualization})}
+\begin{columns}[T,totalwidth=\linewidth]
+\column{0.53\linewidth}\footnotesize
+\begin{itemize}\setlength\itemsep{0.25em}
+  \item Matching enforces similarity in \textit{rates of change}; it does \textbf{not} eliminate level wedges (cheap vs.\ expensive neighbourhoods remain cheap vs.\ expensive).
+  \item \textbf{Residualized specification:} fit on \emph{pre-treatment months only},
+        \[ \widehat Y_{it} \;=\; \hat\alpha + \hat\gamma' X_i^{\text{\tiny ACS}}
+              + (\text{tract-specific linear } t) ,\qquad
+           \widetilde Y_{it} \;=\; Y_{it} - \widehat Y_{it} + \overline Y. \]
+  \item Re-run pooled CS on $\widetilde Y$ (\texttt{drc}) --- magnitudes relocate because subtracting ACS + slopes changes the indexing of dollars.
+\end{itemize}
+\column{0.46\linewidth}\centering
+\scriptsize Pre-window mean rents (months $<$ first prohibition)\\[0.3em]
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Group} & Mean & Std & Tracts\\
+\midrule
+Ever treated & \$1{,}379.67 & 313.86 & 373 \\
+Never treated & \$1{,}165.59 & 252.18 & 114 \\
+\midrule
+\multicolumn{4}{l}{\textit{t}-gap $\approx\$214$,\ $p{<}10^{-11}$ (\texttt{did\_descriptive\_pre\_balance})}\\
+\bottomrule
+\end{tabular}
+
+\vskip0.55em\raggedright
+\textbf{Interpretation for policy slides:} even ``matched'' contrasts mix different rent levels --- hence transparent raw vs.\ residualized CS ladders.
+\end{columns}
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{Adoption dynamics and parallel rents}
+\begin{columns}[T,onlytextwidth]
+\column{0.49\linewidth}
+\centering
+\WPFig{did_adoption_curve.png}{width=\linewidth}
+\column{0.49\linewidth}
+\centering
+\WPFig{did_parallel_trends.png}{width=\linewidth}
+\end{columns}
+\vskip0.4em
+{\footnotesize Rent paths visually parallel pre-prohibition; the level gap motivates residualization.}
+\end{frame}
+
+% --------------------------------------------------------------------
+\section{Estimator}
+
+\begin{frame}{Why Callaway--Sant'Anna (and not pooled TWFE)}
+\begin{itemize}
+  \item For each cohort $g$ and calendar period $t$, the CS estimator forms
+        $\widehat{\mathrm{ATT}}(g,t)
+         \;=\; \mathbb{E}[Y_t-Y_{g-1}\mid G_g=1]\;-\;\mathbb{E}[Y_t-Y_{g-1}\mid C=1],$
+        comparing only to \emph{never-treated} (or not-yet-treated) units.
+  \item Aggregation to event-study time $e$: $\widehat{\mathrm{ATT}}(e)=\sum_{g}\omega_{g,e}\,\widehat{\mathrm{ATT}}(g,g+e)$ with positive, transparent weights.
+  \item \textbf{What this buys us:} no contamination from already-treated controls, no negative weights, and an interpretable per-cohort dynamic effect.
+  \item \textbf{Doubly robust analogue (\texttt{drc}):} residualize $Y$ on pre-period ACS covariates and tract-specific linear trends, then re-run CS. Aligns with Sant'Anna and Zhao (2020).
+\end{itemize}
+\end{frame}
+
+% --------------------------------------------------------------------
+\section{Results}
+
+\begin{frame}{Baseline CS event study (no covariate adjustment)}
+\centering
+\WPFig{did_callaway_santanna_event_study.png}{width=0.85\linewidth}\\[0.2em]
+{\footnotesize Pooled CS ATT estimates on the raw rent index. Pre-period coefficients fluctuate around zero; the post-trajectory drifts mildly negative.}
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{CS event study with ACS + tract-linear-trend controls}
+\centering
+\WPFig{did_callaway_santanna_event_study_with_controls.png}{width=0.85\linewidth}\\[0.2em]
+{\footnotesize Same estimator on \emph{residualized} rent: ACS composition + tract-specific linear trends are netted out before re-running CS. Magnitudes change because the scale changes.}
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{Pooled ATTs: baseline vs.\ residualized CS}
+\vfill
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Estimator} & \textbf{ATT (\$/mo.)} & \textbf{SE} & \textbf{95\% CI} \\
+\midrule
+Callaway--Sant'Anna (matched sample)        & $-2.95$  & 0.63 & $[-4.19,\ -1.71]$ \\
+CS w/ ACS + tract linear trends (\texttt{drc}) & $-85.32$ & 0.53 & $[-86.37,\ -84.27]$ \\
+\bottomrule
+\end{tabular}
+\vskip0.7em
+\begin{itemize}\footnotesize
+  \item Both ATTs are statistically distinguishable from zero; the residualized estimate is interpretable on the residualized scale.
+  \item The gap reflects the level wedge documented earlier: residualization sweeps out tract-specific drift that the unconditional CS leaves in.
+\end{itemize}
+\vfill
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{Cohort heterogeneity (baseline CS)}
+\centering
+\WPFig{did_cohort_dynamics.png}{height=0.82\textheight,keepaspectratio}
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{Cohort heterogeneity (CS with controls)}
+\centering
+\WPFig{did_cohort_dynamics_with_controls.png}{height=0.82\textheight,keepaspectratio}
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{Why residualization moves the headline}
+\centering
+\WPFig{cohort_dynamics_explainer.png}{height=0.78\textheight,keepaspectratio}
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{TWFE vs.\ CS: is the bias guarantee binding here?}
+\begin{columns}[T,onlytextwidth]
+\column{0.6\linewidth}
+\centering
+\WPFig{did_twfe_vs_cs_comparison.png}{width=\linewidth}
+\column{0.4\linewidth}
+\scriptsize
+\textbf{Why?}
+\begin{itemize}\setlength{\itemsep}{0.25em}
+\item TWFE uses \emph{already-treated} units as controls for newly-treated ones (``forbidden comparisons'') $\Rightarrow$ negative weights, biased ATT under heterogeneity.
+\item CS only compares to \emph{never-treated} controls -- no negative weights by construction.
+\end{itemize}
+\textbf{Takeaway}
+\begin{itemize}\setlength{\itemsep}{0.25em}
+\item Trajectories look parallel; mean TWFE$-$CS gap is \$2.83.
+\item TWFE bias is \emph{not} the binding constraint in this Chicago sample, but we still report CS because its guarantee is unconditional.
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% --------------------------------------------------------------------
+\section{Robustness: SUTVA / spillovers}
+
+\begin{frame}{Are controls contaminated by neighbour treatment?}
+\begin{itemize}
+  \item SUTVA failure $\Rightarrow$ never-treated tracts that border prohibition tracts may absorb spillover demand and bias the comparison.
+  \item \textbf{Two probes:}
+        \begin{enumerate}
+            \item \emph{Donut:} restrict the never-treated pool to tracts with \emph{no} ever-treated neighbour, then to those with at least one.
+            \item \emph{Dose:} sort never-treated tracts into quartiles of mid-sample share-of-neighbours-treated; re-estimate pooled CS in each.
+        \end{enumerate}
+\end{itemize}
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{Donut comparison: testing for spillover into controls}
+\centering
+\WPFig{sutva_donut.png}{height=0.42\textheight,keepaspectratio}\\[0.2em]
+\begin{columns}[T,onlytextwidth]
+\column{0.48\linewidth}
+\scriptsize
+\textbf{Idea}
+\begin{itemize}\setlength{\itemsep}{0.15em}
+\item Neighbours = tracts that share a border (\texttt{geom.touches}, queen contiguity).
+\item Split never-treated controls into \emph{isolated} (no treated neighbour) vs \emph{adjacent} ($\geq 1$ treated neighbour).
+\item Spillover hypothesis: adjacent controls absorb demand $\Rightarrow$ ATT pulled toward zero.
+\end{itemize}
+\column{0.48\linewidth}
+\scriptsize
+\textbf{What we are seeing}
+\begin{itemize}\setlength{\itemsep}{0.15em}
+\item Full $-\$2.95$; Adjacent $-\$8.18$ ($n{=}100$); Isolated $+\$34.40$ ($n{=}14$).
+\item Clean SUTVA failure $\Rightarrow$ isolated should be \emph{more} negative; we see the opposite.
+\item 14 isolated tracts are peripheral neighbourhoods $\Rightarrow$ selection, not spillover, drives the gap.
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{Neighbour-treatment dose}
+\begin{columns}[T,onlytextwidth]
+\column{0.5\linewidth}
+\centering
+\WPFig{sutva_dose_response.png}{width=\linewidth}
+\column{0.5\linewidth}
+\scriptsize
+\textbf{Construction.} Sort never-treated controls by mid-sample share of treated neighbours; re-run pooled CS in each quartile.
+\begin{itemize}\setlength{\itemsep}{0.2em}
+\item Q1 (share $0.13$, $n{=}31$): $+\$16.83$.
+\item Q2 (share $0.44$, $n{=}32$): $-\$7.71$.
+\item Q3 (share $0.66$, $n{=}26$): $-\$15.77$.
+\item Q4 (share $0.92$, $n{=}25$): $-\$8.05$.
+\end{itemize}
+\textbf{Why we are seeing this}
+\begin{itemize}\setlength{\itemsep}{0.25em}
+\item Q1 mirrors the donut ``isolated'' subset: low-exposure controls sit in spatially distinct neighbourhoods.
+\item Q2--Q4 settle into a stable negative band $\Rightarrow$ no monotone dose gradient; pattern reads as neighbourhood selection rather than dose-dependent spillover.
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{Pretrend sensitivity (heuristic)}
+\vfill
+\centering
+{\footnotesize\WPInput{tables/tab_honest_pretrends.tex}}
+\vskip0.5em
+\begin{itemize}\footnotesize
+  \item Reports the maximum pre-period TWFE coefficient and the coarsest discrete second-difference (a smoothness budget) over pre-coefs.
+  \item \emph{Spirit only}: a calibrated bound under the Rambachan--Roth (2023) framework would replace these heuristics in a fully ``honest'' sensitivity exercise.
+\end{itemize}
+\vfill
+\end{frame}
+
+% --------------------------------------------------------------------
+\section{Takeaways}
+
+\begin{frame}{What we conclude}
+\begin{itemize}
+  \item \textbf{Tract-level STR prohibitions} are associated with a small \emph{negative} change in tract rents on the unadjusted CS scale and a larger negative effect once tract-specific drift and ACS composition are netted out.
+  \item \textbf{Design implication:} reporting both the ``raw'' CS and the residualized CS is honest: residualization changes the meaning of the ATT (it is now on the residual scale), not just its magnitude.
+  \item \textbf{Robustness:} cohort heterogeneity is real; spatial probes do not flag obvious SUTVA failure; pretrend coefficients are small in magnitude.
+  \item \textbf{Limits:} tract rents are interpolated from ZIP-level ZORI; ``treatment'' is binary even though prohibition density varies; no calibrated R\&R bound is reported here.
+\end{itemize}
+\end{frame}
+
+% --------------------------------------------------------------------
+\begin{frame}{Methods references}
+\begin{itemize}\footnotesize
+  \item Callaway, B.\ and Sant'Anna, P.\ (2021). \emph{Difference-in-differences with multiple time periods}. Journal of Econometrics 225(2), 200--230.
+  \item Goodman-Bacon, A.\ (2021). \emph{Difference-in-differences with variation in treatment timing}. JoE 225(2), 254--277.
+  \item Sant'Anna, P.\ and Zhao, J.\ (2020). \emph{Doubly robust difference-in-differences estimators}.
+  \item Rambachan, A.\ and Roth, J.\ (2023). \emph{A more credible approach to parallel trends}. RESTUD 90(5), 2551--2598.
+  \item Pipeline source: \texttt{src/housing/scripts/did\_pipeline\_callaway\_santanna.py}; documentation in \texttt{docs/CS\_WITH\_CONTROLS.md}.
+\end{itemize}
+\end{frame}
+
+\end{document}

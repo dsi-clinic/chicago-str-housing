@@ -1,0 +1,6 @@
+sweep,parameter,value,output_dir,n_matched_treated_tracts,n_matched_control_tracts,max_control_reuse,cs_full_panel_att,cs_full_panel_se,cs_matched_att,cs_matched_se,cs_with_controls_att,cs_with_controls_se,n_ever_treated_tracts
+threshold_percentile,percentile,0.10,/project/output/did-cs-robustness/threshold-percentile/pct10,329,175,39,20.869327672309996,0.35792277470863126,9.965610506492663,0.39696906006622124,-66.10386293471429,0.5757390365261096,329
+threshold_percentile,percentile,0.15,/project/output/did-cs-robustness/threshold-percentile/pct15,311,172,36,20.17900124693029,0.3554996784412164,8.528223304104777,0.39511280175327246,-76.3647971044075,0.5830545752481547,311
+threshold_percentile,percentile,0.25,/project/output/did-cs-robustness/threshold-percentile/pct25,274,176,31,20.64857151121078,0.35437740204256707,5.456416006902977,0.3895606130856879,-87.79736113434961,0.5577825464378953,274
+threshold_percentile,percentile,0.33,/project/output/did-cs-robustness/threshold-percentile/pct33,245,159,31,21.16190358880102,0.3789768797020341,4.194216403180818,0.4127735812101066,-77.16805449370666,0.6495794067620502,245
+threshold_percentile,percentile,0.50,/project/output/did-cs-robustness/threshold-percentile/pct50,183,148,31,19.831427403649954,0.4348253165101166,3.810871780879909,0.46456848705911047,-87.97053038076494,0.6649293360178664,183

@@ -1,0 +1,13 @@
+% Refresh after each whitepaper pipeline run.
+\textbf{Abstract.}
+Chicago's Shared Housing Ordinance allows residential buildings to permanently opt out of short-term rental activity through a publicly disclosed prohibited buildings registry, with adoption staggered across census tracts from 2015 to 2024.
+We estimate the causal effect of crossing a meaningful prohibition intensity threshold on long-term rental prices using the Callaway--Sant'Anna staggered difference-in-differences estimator applied to approximately 110,000 tract-month observations constructed from six public data sources.
+
+The pre-treatment event study reveals a V-shaped departure from parallel trends between treated and never-treated tracts (maximum divergence $\approx -\$16$/month at $t = -8$; joint Wald $p < 0.001$), consistent with prohibitions being adopted disproportionately in already-appreciating neighborhoods.
+We document this selection pattern as a policy-relevant finding in its own right and address the parallel trends violation through pre-treatment trajectory matching and Rambachan--Roth smoothness-bound sensitivity analysis.
+
+Our baseline two-feature matched Callaway--Sant'Anna ATT is $+\$4.60$/month (SE 0.39), comparable in specification to the published clinic pipeline; the stricter five-feature matched estimate is $+\$5.46$/month and the full-panel estimate is $+\$20.65$/month.
+Under the HonestDiD smoothness bound $M = 2.71$ derived from the observed pre-period dynamics, estimated effects remain consistent with positive rent impacts throughout the post-treatment window.
+Results are stable across matching depth ($k \in \{1,\ldots,5\}$) and intensity threshold ($p \in \{0.10,\ldots,0.50\}$) robustness grids.
+A spatial spillover diagnostic finds that using only isolated never-treated tracts as controls raises the estimated ATT to $+\$26$/month, consistent with positive spillovers that attenuate the headline estimate downward.
+These results are more consistent with a demand-signaling channel --- prohibition attracting rent-premium-paying long-term tenants --- than with a supply-release channel, and suggest that building-level prohibition mechanisms may not deliver the affordability benefits anticipated by policymakers in high-demand neighborhoods.

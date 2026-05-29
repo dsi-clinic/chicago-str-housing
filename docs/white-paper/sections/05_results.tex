@@ -1,0 +1,212 @@
+\section{Results}\label{sec:results}
+
+\subsection{Pre-Treatment Dynamics: The V-Shape}\label{sec:results-pretrend}
+
+Figure~\ref{fig:cs-full-panel} is the first result readers should inspect. The full-panel Callaway--Sant'Anna event study --- using all rent-panel tracts and never-treated units as the comparison group --- reveals a pronounced V-shaped departure from parallel trends in the pre-treatment period. Group-time ATTs fall steadily from approximately $-\$8$/month at $t = -12$ to a minimum near $-\$16$/month at $t = -8$, then recover monotonically back toward zero at $t = -1$. A joint Wald test on all pre-period group-time ATTs rejects the flat pre-trend null at $p < 0.001$; all 11 pre-period coefficients are individually statistically significant.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.93\linewidth]{../../output/did-cs-whitepaper-2feat-threshold/did_callaway_santanna_event_study_full_panel.png}
+    \caption{Full-panel Callaway--Sant'Anna event study (preferred sample before matching). Pre-period coefficients depart systematically from zero in a V-shaped pattern; post-period dynamics must be interpreted in light of this violation.}
+    \label{fig:cs-full-panel}
+\end{figure}
+
+The V-shaped pre-period has a clear economic interpretation. STR prohibition activity was concentrated in tracts experiencing faster pre-ban rent growth. The dip at $t = -8$ followed by recovery toward zero at $t = -1$ is consistent with a temporary divergence: treated tracts were on a steeper appreciation trajectory than never-treated tracts. This selection into treatment is economically coherent but means the standard parallel trends assumption does not hold.
+
+Critically, the TWFE parallel trends regression on the matched panel fails to reject at $p \approx 0.34$, despite economically large pre-period gaps. This discrepancy illustrates the low power of standard pre-trend tests documented by \citet{roth2022pretest}. We therefore treat parallel trends as a core identification challenge and report HonestDiD bounds rather than claiming the assumption is satisfied (Appendix~\ref{app:parallel-trends}).
+
+\subsection{Main Result: Two-Feature Matching Baseline}\label{sec:results-main-2feat}
+
+Our \textbf{baseline matched specification} follows the published DSI clinic design: each ever-treated tract is matched to $k=3$ never-treated tracts on two standardized pre-treatment features --- rent slope and average pre-rent --- before applying Callaway--Sant'Anna on the matched panel. This two-feature rule reproduces the clinic's headline event-study shape and point estimates on the same data (Appendix~\ref{app:boss-reconciliation}).
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.93\linewidth]{../../output/did-cs-whitepaper-2feat-threshold/did_callaway_santanna_event_study.png}
+    \caption{Callaway--Sant'Anna event study on the trend-matched panel under two-feature matching ($k=3$, intensity threshold $p=0.25$). This is the baseline specification aligned with the published clinic paper.}
+    \label{fig:cs-matched-2feat}
+\end{figure}
+
+Table~\ref{tab:main-att-2feat} summarizes pooled ATTs on the rent index (\$/month) for the baseline ladder.
+
+\begin{table}[t]
+    \centering
+    \caption{Pooled Callaway--Sant'Anna ATTs under two-feature matching (intensity threshold $p=0.25$, $k=3$). Residualized row is not comparable in level to raw rent rows; see Appendix~\ref{app:residualized}.}
+    \label{tab:main-att-2feat}
+    \input{../../output/did-cs-whitepaper-2feat-threshold/tables/tab_main_att.tex}
+\end{table}
+
+Under two-feature matching, the matched-sample CS ATT is \$4.60/month (Table~\ref{tab:main-att-2feat}). The full-panel CS ATT is \$20.65/month and is identical by construction across matching specifications; given the V-shaped pre-period, it likely mixes any genuine prohibition effect with continuation of pre-ban divergence. The matched-sample estimate restricts to tracts with comparable pre-treatment slope and level. Relative to the published clinic matched ATT (about \$6/month on an earlier binary-treatment specification), our threshold-panel estimate is in the same positive range but somewhat smaller, consistent with the intensity rule delaying treatment timing for some tracts.
+
+\subsection{Five-Feature Matching: Stricter Trajectory Control}\label{sec:results-5feat}
+
+Two-feature matching aligns treated and control tracts on direction and average level but can miss differences in \emph{trajectory shape}. We therefore report a stricter five-feature specification that adds lagged rent levels at 1, 6, and 12 months before the panel-wide first treatment month (Section~\ref{sec:methods-matching}). This specification is our preferred \textbf{robustness layer} for balance on short-run curvature, not a replacement for the baseline clinic comparability result.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.93\linewidth]{../../output/did-cs-whitepaper-threshold/did_callaway_santanna_event_study.png}
+    \caption{Callaway--Sant'Anna event study under five-feature matching ($k=3$, $p=0.25$). Pre-period dynamics are closer to zero than under slope-only matching but remain imperfect.}
+    \label{fig:cs-matched-5feat}
+\end{figure}
+
+Table~\ref{tab:matching-att-comparison} compares pooled ATTs across the two matching rules. Full-panel ATTs are identical by construction; matched and residualized ATTs shift when lagged levels enter the match.
+
+\begin{table}[t]
+    \centering
+    \caption{Matching-specification comparison: two-feature (baseline) vs.\ five-feature (strict).}
+    \label{tab:matching-att-comparison}
+    \input{tables/tab_matching_att_comparison.tex}
+\end{table}
+
+Table~\ref{tab:matching-att-comparison} compares pooled ATTs across the two matching rules. Full-panel ATTs are identical by construction; on the current threshold panel the five-feature matched ATT (\$5.46/month) is slightly \emph{larger} than the two-feature baseline (\$4.60/month) because lagged-level matching selects a different matched control set.
+
+Under five-feature matching, the pre-period V-shape in the event study is often more visible, indicating that some slope-only matches were masking short-run curvature differences. We interpret the two-feature estimate as the clinic-comparable headline and the five-feature estimate as a robustness check on match definition (Appendix~\ref{app:matching}).
+
+\subsection{Cohort-Specific Dynamics}\label{sec:results-cohorts}
+
+Figures~\ref{fig:cohort-dynamics-p1}--\ref{fig:cohort-dynamics-p2} decompose dynamic treatment effects by adoption cohort under two-feature matching and the intensity-threshold rule. Early 2016 cohorts exhibit wide confidence bands and volatile paths; later cohorts --- particularly October 2019 (2019-10) --- show comparatively flatter pre-treatment dynamics and more stable positive post-treatment estimates.
+
+\begin{figure}[p]
+    \centering
+    \includegraphics[width=0.92\linewidth]{../../output/did-cs-whitepaper-2feat-threshold/did_cohort_dynamics_p1.png}
+    \caption{Cohort-specific Callaway--Sant'Anna dynamic effects (two-feature matched sample, intensity threshold $p=0.25$), adoption cohorts 1--6.}
+    \figurenotes{Each panel traces the ATT for one first-treatment cohort (month of threshold crossing). Shaded bands are 95\% confidence intervals; month 0 is the first treated period. Early 2016 cohorts have few matched tracts and wide bands; the 2019-10 panel is outlined for reference (see text).}
+    \label{fig:cohort-dynamics-p1}
+\end{figure}
+
+\begin{figure}[p]
+    \centering
+    \includegraphics[width=0.92\linewidth]{../../output/did-cs-whitepaper-2feat-threshold/did_cohort_dynamics_p2.png}
+    \caption{Cohort-specific dynamics (continued), adoption cohorts 7--11.}
+    \figurenotes{Same estimand as Figure~\ref{fig:cohort-dynamics-p1}. Later cohorts generally enter with more stable post-period paths but remain sensitive to parallel-trends violations in the pre-period; do not interpret a single cohort panel as a standalone causal effect.}
+    \label{fig:cohort-dynamics-p2}
+\end{figure}
+
+The 2019-10 cohort is the most credible sub-result: under the intensity-threshold specification, only a small number of pre-period relative times depart significantly from zero. We treat cohort-specific magnitudes as illustrative rather than standalone causal headlines. Appendix~\ref{app:cohort-att} reports cohort-level pooled post-period ATTs for both intensity-threshold and binary treatment definitions.
+
+\subsection{Treatment Intensity vs.\ Binary Definition}\label{sec:results-binary}
+
+Our preferred treatment indicator (intensity threshold, $p = 0.25$) classifies a tract as treated only when prohibition intensity exceeds a year-specific share cutoff. The binary alternative treats a tract in the first month any prohibition is recorded. Table~\ref{tab:treatment-comparison} and Figure~\ref{fig:treatment-comparison} compare pooled matched ATTs and event-study shapes across definitions under two-feature matching.
+
+\begin{table}[t]
+    \centering
+    \caption{Threshold vs.\ binary treatment definitions (two-feature matched CS, $k=3$).}
+    \label{tab:treatment-comparison}
+    \input{tables/tab_treatment_comparison.tex}
+\end{table}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.46\linewidth]{../../output/did-cs-whitepaper-2feat-threshold/did_callaway_santanna_event_study.png}
+    \includegraphics[width=0.46\linewidth]{../../output/did-cs-whitepaper-2feat-binary/did_callaway_santanna_event_study.png}
+    \caption{Matched Callaway--Sant'Anna event studies: intensity threshold ($p=0.25$, left) vs.\ binary first-prohibition definition (right), two-feature matching ($k=3$).}
+    \label{fig:treatment-comparison}
+\end{figure}
+
+The threshold specification is preferred because it measures a meaningful regulatory intensity gate rather than the first administrative filing. Binary classification treats more tracts earlier and tends to yield larger matched raw ATTs on the same pipeline; we retain it as sensitivity on treatment \emph{timing}.
+
+\subsection{Residualized Specifications}\label{sec:results-residualized}
+
+As a sensitivity check on functional-form assumptions, we residualize rents on ACS covariates and tract-specific linear time trends estimated on pre-treatment months only, then re-estimate Callaway--Sant'Anna on the preconditioned outcome:
+\begin{equation}\label{eq:residualization}
+    \widetilde{Y}_{it} = Y_{it} - \widehat{X}_i'\hat{\beta} - \hat{\alpha}_i - \hat{\delta}_i \cdot t,
+\end{equation}
+where $\widehat{X}_i'\hat{\beta}$ removes tract-level ACS covariates (standardized), and $\hat{\alpha}_i + \hat{\delta}_i \cdot t$ removes a tract-specific linear trend fit using pre-treatment observations only; the outcome is re-centered at the original sample mean so that levels remain interpretable on the preconditioned scale.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.93\linewidth]{../../output/did-cs-whitepaper-2feat-threshold/did_callaway_santanna_event_study_with_controls.png}
+    \caption{Dynamic CS on ACS- and linear-detrend-residualized outcomes under two-feature matching (sensitivity only; magnitudes not comparable to raw rent ATTs).}
+    \label{fig:cs-controls-main}
+\end{figure}
+
+The residualized pooled ATT can differ sharply in sign from raw rent ATTs when linear detrending extrapolates the late pre-period recovery slope forward (Appendix~\ref{app:residualized}). Appendix~\ref{app:matching-residualized} reports how the residualized ATT shifts under two-feature vs.\ five-feature matching.
+
+\subsection{Heterogeneity Analysis}\label{sec:results-heterogeneity}
+
+We split the two-feature matched sample on five pre-treatment characteristics and estimate CS ATTs separately for above- and below-median tracts: Airbnb density, renter share, prohibition dose, median income, and adoption cohort timing. This analysis is exploratory; subgroup samples are smaller than the full matched panel.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.92\linewidth]{../../output/did-cs-heterogeneity-2feat/did_cs_heterogeneity_airbnb_density.png}
+    \caption{Heterogeneity by pre-treatment Airbnb listing density (below vs.\ above tract median).}
+    \figurenotes{Blue/orange lines are matched Callaway--Sant'Anna event studies estimated separately within each median split; bands are 95\% CIs. Month 0 is intensity-threshold crossing. Exploratory: subgroup samples are smaller than the full matched panel.}
+    \label{fig:het-airbnb}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.92\linewidth]{../../output/did-cs-heterogeneity-2feat/did_cs_heterogeneity_renter_share.png}
+    \caption{Heterogeneity by renter share (\% of occupied units rented).}
+    \figurenotes{Same design as Figure~\ref{fig:het-airbnb}; split at the median pre-treatment renter share in the matched sample.}
+    \label{fig:het-renter}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.92\linewidth]{../../output/did-cs-heterogeneity-2feat/did_cs_heterogeneity_dose.png}
+    \caption{Heterogeneity by peak prohibited share (dose).}
+    \figurenotes{High-dose tracts reached a higher cumulative prohibited-units-to-occupancy ratio before treatment timing; see Table~\ref{tab:heterogeneity} for pooled subgroup ATTs.}
+    \label{fig:het-dose}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.92\linewidth]{../../output/did-cs-heterogeneity-2feat/did_cs_heterogeneity_income.png}
+    \caption{Heterogeneity by median household income.}
+    \figurenotes{Split at the median ACS household income among matched tracts; income is measured pre-treatment and does not vary within tract over time.}
+    \label{fig:het-income}
+\end{figure}
+
+\begin{table}[t]
+    \centering
+    \caption{Heterogeneity summary: pooled matched CS ATT by subgroup (two-feature matching).}
+    \label{tab:heterogeneity}
+    \small
+    \input{../../output/did-cs-heterogeneity-2feat/tables/tab_heterogeneity_summary.tex}
+    \tablenotes{Each row is a separate CS estimate on the matched sample restricted to tracts above/below the median of the listed characteristic (estimated once per subgroup). ATTs are in \$/month on the ZORI index scale; standard errors in parentheses. Splits are exploratory and not adjusted for multiple testing.}
+\end{table}
+
+High-dose and late-adopting tracts show larger positive ATTs; low-dose and early-adopting splits are noisier (Table~\ref{tab:heterogeneity}). Airbnb-density and renter-share splits show modest positive heterogeneity in this matched sample, though magnitudes are similar across medians.
+
+\subsection{Spillover Analysis and SUTVA}\label{sec:results-spillovers}
+
+A core DiD assumption is SUTVA: treatment in one tract does not affect outcomes elsewhere. We test spatial spillovers using a queen-contiguity design that re-labels never-treated tracts adjacent to any treated tract as treated from the earliest neighbor prohibition month, comparing them to never-treated tracts with no treated neighbor (pure controls). Original prohibited tracts are excluded from this second-stage panel.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.93\linewidth]{../../output/did-cs-spillover-2feat/did_cs_spillover_event_study.png}
+    \caption{Queen-contiguity spillover event study (two-feature matched baseline sample). Spillover-treated tracts are never-treated units adjacent to a treated tract; pure controls have no treated neighbor.}
+    \label{fig:spillover-es}
+\end{figure}
+
+\begin{table}[t]
+    \centering
+    \caption{Spillover design: pooled CS ATT on adjacent vs.\ isolated never-treated tracts.}
+    \label{tab:spillover-summary}
+    \small
+    \input{../../output/did-cs-spillover-2feat/tables/tab_spillover_summary.tex}
+\end{table}
+
+The spillover design yields a pooled ATT of \$25.8/month (Table~\ref{tab:spillover-summary}), indicating that adjacent never-treated tracts experience rent increases when neighbors adopt prohibitions. Pure controls are sparse ($n=34$), so this estimate should be read as supportive evidence of positive spatial spillovers rather than a precisely calibrated headline.
+
+We complement this with a donut diagnostic (Table~\ref{tab:sutva}) that compares matched CS ATTs under different control-group restrictions on the headline panel.
+
+\begin{table}[t]
+    \centering
+    \caption{SUTVA donut diagnostic: matched CS ATT under different control restrictions (five-feature matched panel).}
+    \label{tab:sutva}
+    \input{../../output/did-cs-whitepaper-threshold/tables/tab_sutva_donut.tex}
+\end{table}
+
+When controls are restricted to never-treated tracts adjacent to treated tracts, the estimated ATT falls toward zero; isolated never-treated controls yield larger ATTs. The headline estimate using the full mixed control pool is therefore attenuated by spatial contamination.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.93\linewidth]{../../output/did-cs-whitepaper-threshold/sutva_dose_response.png}
+    \caption{Dose-response: matched CS ATT by prohibition-intensity quartile among treated tracts.}
+    \label{fig:sutva-dose}
+\end{figure}
+
+\subsection{Design-Parameter Sensitivity}\label{sec:results-robustness}
+
+Appendices~\ref{app:robustness-k} and~\ref{app:robustness-percentile} report full robustness grids under five-feature matching. Key findings: the full-panel CS ATT is stable across parameter combinations; matched CS ATTs rise with $k$ and decline with stricter intensity thresholds. Appendix~\ref{app:matching-robustness} compares how these sensitivity patterns shift under two-feature vs.\ five-feature matching.

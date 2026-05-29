@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 from scipy.stats import linregress
 from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import StandardScaler
 
 from pipeline.base import DataProcessor
 
@@ -33,13 +34,24 @@ class TrendMatchingProcessor(DataProcessor):
         k_neighbors: int = 3,
         min_pre_periods: int = 6,
         caliper: float | None = None,
+        matching_features: tuple[str, ...] = (
+            "pre_trend_slope",
+            "avg_pre_rent",
+            "rent_lag_1",
+            "rent_lag_6",
+            "rent_lag_12",
+        ),
     ) -> None:
         """Initialize the trend matching processor.
 
         Args:
             k_neighbors: Number of control matches per treated tract
             min_pre_periods: Minimum pre-treatment months required
-            caliper: Maximum allowed difference in trend slopes (None = no limit)
+            caliper: Maximum allowed Euclidean distance in standardized feature space
+                (None = no limit)
+            matching_features: Standardized pre-treatment columns used for k-NN matching.
+                Default includes slope, mean, and three lagged rent levels to capture
+                trajectory shape (not just overall direction).
         """
         super().__init__(
             "trend_matching",
@@ -49,6 +61,7 @@ class TrendMatchingProcessor(DataProcessor):
         self.k_neighbors = k_neighbors
         self.min_pre_periods = min_pre_periods
         self.caliper = caliper
+        self.matching_features = matching_features
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Perform trend matching and create matched sample.
@@ -74,9 +87,10 @@ class TrendMatchingProcessor(DataProcessor):
         if trends_df.empty:
             first_treatment = did_panel.loc[did_panel["treated"] == 1, "month"].min()
             raise ValueError(
-                f"No tracts have at least {self.min_pre_periods} months of pre-treatment data. "
-                f"First treatment in panel is {first_treatment}; reduce min_pre_periods (e.g. to 6) "
+                "No tracts have at least %d months of pre-treatment data. "
+                "First treatment in panel is %s; reduce min_pre_periods (e.g. to 6) "
                 "or use a panel with longer pre-treatment history."
+                % (self.min_pre_periods, first_treatment)
             )
 
         # Step 2: Match treated to control tracts
@@ -85,20 +99,53 @@ class TrendMatchingProcessor(DataProcessor):
         # Step 3: Create matched sample
         matched_panel = self._create_matched_sample(did_panel, matching_info)
 
+        matching_diagnostics = self._compute_matching_diagnostics(
+            trends_df=trends_df,
+            matching_info=matching_info,
+        )
+
         # Log results
-        self._log_matching_results(trends_df, matching_info, matched_panel)
+        self._log_matching_results(
+            trends_df,
+            matching_info,
+            matched_panel,
+            matching_diagnostics,
+        )
 
         return {
             "did_panel": matched_panel,  # Update did_panel for subsequent components
             "did_panel_matched": matched_panel,  # Keep for reference
             "matching_info": matching_info,
             "trends_df": trends_df,
+            "matching_diagnostics": matching_diagnostics,
         }
 
+    @staticmethod
+    def _rent_at_month(
+        pre_data_indexed: pd.Series, target_dt: pd.Timestamp, fallback: float
+    ) -> float:
+        """Look up rent at a target calendar month (year+month match), or return fallback."""
+        mask = (pre_data_indexed.index.year == target_dt.year) & (
+            pre_data_indexed.index.month == target_dt.month
+        )
+        matches = pre_data_indexed[mask]
+        return float(matches.iloc[0]) if not matches.empty else fallback
+
     def _calculate_pre_trends(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Calculate pre-treatment rent trends for each tract."""
+        """Calculate pre-treatment rent trends and lagged levels for each tract.
+
+        Lag reference point is the panel-wide first treatment month so all tracts are
+        measured at the same calendar anchor — avoids data leakage for never-treated units.
+        """
         # Identify first treatment date in sample
         first_treatment = df.loc[df["treated"] == 1, "month"].min()
+
+        # Pre-compute lag reference months once
+        lag_months = {
+            "rent_lag_1": first_treatment - pd.DateOffset(months=1),
+            "rent_lag_6": first_treatment - pd.DateOffset(months=6),
+            "rent_lag_12": first_treatment - pd.DateOffset(months=12),
+        }
 
         # Get all unique tracts
         all_tracts = df["tract_geoid"].unique()
@@ -126,8 +173,14 @@ class TrendMatchingProcessor(DataProcessor):
                     months_numeric, pre_data["rental_price"]
                 )
 
-                # Also calculate average pre-treatment rent
                 avg_pre_rent = pre_data["rental_price"].mean()
+
+                # Lagged rent levels indexed by month for fast lookup
+                rent_series = pre_data.set_index("month")["rental_price"]
+                lag_values = {
+                    name: self._rent_at_month(rent_series, dt, avg_pre_rent)
+                    for name, dt in lag_months.items()
+                }
 
                 pre_trends.append(
                     {
@@ -137,6 +190,7 @@ class TrendMatchingProcessor(DataProcessor):
                         "pre_trend_r_squared": r_value**2,
                         "pre_trend_p_value": p_value,
                         "avg_pre_rent": avg_pre_rent,
+                        **lag_values,
                         "n_pre_periods": len(pre_data),
                         "ever_treated": tract_data["ever_treated"].iloc[0]
                         if "ever_treated" in tract_data.columns
@@ -176,25 +230,34 @@ class TrendMatchingProcessor(DataProcessor):
             len(control_trends),
         )
 
-        # Prepare matching variables (just trend slope for now)
-        # Could extend to multiple dimensions
-        matching_var = "pre_trend_slope"
+        missing_features = [
+            feature
+            for feature in self.matching_features
+            if feature not in trends_df.columns
+        ]
+        if missing_features:
+            msg = f"Missing matching feature(s): {missing_features}"
+            raise ValueError(msg)
+
+        scaler = StandardScaler()
+        control_features = control_trends[list(self.matching_features)].to_numpy()
+        treated_features = treated_trends[list(self.matching_features)].to_numpy()
+        control_features_scaled = scaler.fit_transform(control_features)
+        treated_features_scaled = scaler.transform(treated_features)
 
         # Fit k-nearest neighbors on control tracts
         nn = NearestNeighbors(
             n_neighbors=min(self.k_neighbors, len(control_trends)),
             metric="euclidean",
         )
-        nn.fit(control_trends[[matching_var]].values)
+        nn.fit(control_features_scaled)
 
         # Find matches for each treated tract
         matching_records = []
 
-        for _idx, treated_row in treated_trends.iterrows():
-            treated_slope = treated_row[matching_var]
-
+        for i_treated, (_idx, treated_row) in enumerate(treated_trends.iterrows()):
             # Find k nearest neighbors
-            distances, indices = nn.kneighbors([[treated_slope]])
+            distances, indices = nn.kneighbors([treated_features_scaled[i_treated]])
 
             for i, (dist, control_idx) in enumerate(zip(distances[0], indices[0])):
                 # Apply caliper if specified
@@ -202,17 +265,16 @@ class TrendMatchingProcessor(DataProcessor):
                     continue
 
                 control_tract = control_trends.iloc[control_idx]
-
-                matching_records.append(
-                    {
-                        "treated_tract": treated_row["tract_geoid"],
-                        "control_tract": control_tract["tract_geoid"],
-                        "treated_slope": treated_slope,
-                        "control_slope": control_tract[matching_var],
-                        "distance": dist,
-                        "match_rank": i + 1,
-                    }
-                )
+                record = {
+                    "treated_tract": treated_row["tract_geoid"],
+                    "control_tract": control_tract["tract_geoid"],
+                    "distance": dist,
+                    "match_rank": i + 1,
+                }
+                for feature in self.matching_features:
+                    record[f"treated_{feature}"] = treated_row[feature]
+                    record[f"control_{feature}"] = control_tract[feature]
+                matching_records.append(record)
 
         matching_info = pd.DataFrame(matching_records)
 
@@ -243,11 +305,77 @@ class TrendMatchingProcessor(DataProcessor):
 
         return matched_panel
 
+    def _compute_matching_diagnostics(
+        self,
+        trends_df: pd.DataFrame,
+        matching_info: pd.DataFrame,
+    ) -> dict[str, Any]:
+        """Compute summary diagnostics for balance and control reuse."""
+        treated_trends = trends_df[trends_df["ever_treated"] == 1].copy()
+        control_trends = trends_df[trends_df["ever_treated"] == 0].copy()
+        matched_control_ids = matching_info["control_tract"].unique()
+        matched_controls = control_trends[
+            control_trends["tract_geoid"].isin(matched_control_ids)
+        ].copy()
+        control_reuse = (
+            matching_info.groupby("control_tract")["treated_tract"]
+            .nunique()
+            .rename("n_treated_matches")
+            .reset_index()
+        )
+
+        diagnostics: dict[str, Any] = {
+            "matching_features": ",".join(self.matching_features),
+            "matched_treated_tracts": int(matching_info["treated_tract"].nunique()),
+            "matched_control_tracts": int(matching_info["control_tract"].nunique()),
+            "matched_pairs": int(len(matching_info)),
+            "distance_mean": float(matching_info["distance"].mean()),
+            "distance_median": float(matching_info["distance"].median()),
+            "distance_p90": float(matching_info["distance"].quantile(0.90)),
+            "distance_p95": float(matching_info["distance"].quantile(0.95)),
+            "distance_max": float(matching_info["distance"].max()),
+            "control_reuse_mean": float(control_reuse["n_treated_matches"].mean()),
+            "control_reuse_median": float(control_reuse["n_treated_matches"].median()),
+            "control_reuse_p90": float(
+                control_reuse["n_treated_matches"].quantile(0.90)
+            ),
+            "control_reuse_p95": float(
+                control_reuse["n_treated_matches"].quantile(0.95)
+            ),
+            "control_reuse_max": int(control_reuse["n_treated_matches"].max()),
+            "control_reuse_table": control_reuse,
+        }
+
+        for feature in self.matching_features:
+            diagnostics[f"smd_{feature}_before"] = self._standardized_mean_difference(
+                treated_trends[feature],
+                control_trends[feature],
+            )
+            diagnostics[f"smd_{feature}_after"] = self._standardized_mean_difference(
+                treated_trends[feature],
+                matched_controls[feature],
+            )
+
+        return diagnostics
+
+    @staticmethod
+    def _standardized_mean_difference(
+        treated: pd.Series,
+        control: pd.Series,
+    ) -> float:
+        treated_var = treated.var(ddof=1)
+        control_var = control.var(ddof=1)
+        pooled_sd = ((treated_var + control_var) / 2) ** 0.5
+        if pooled_sd == 0 or pd.isna(pooled_sd):
+            return float("nan")
+        return float((treated.mean() - control.mean()) / pooled_sd)
+
     def _log_matching_results(
         self,
         trends_df: pd.DataFrame,
         matching_info: pd.DataFrame,
         matched_panel: pd.DataFrame,
+        matching_diagnostics: dict[str, Any],
     ) -> None:
         """Log summary of matching results."""
         logger.info("\n" + "=" * 60)
@@ -281,7 +409,22 @@ class TrendMatchingProcessor(DataProcessor):
             "  Matched control tracts: %d", matching_info["control_tract"].nunique()
         )
         logger.info("  Average distance: %.4f", matching_info["distance"].mean())
+        logger.info(
+            "  Distance p95: %.4f",
+            matching_diagnostics["distance_p95"],
+        )
         logger.info("  Max distance: %.4f", matching_info["distance"].max())
+        logger.info(
+            "  Control reuse max: %d",
+            matching_diagnostics["control_reuse_max"],
+        )
+        for feature in self.matching_features:
+            logger.info(
+                "  SMD %s: before %.3f, after %.3f",
+                feature,
+                matching_diagnostics.get(f"smd_{feature}_before"),
+                matching_diagnostics.get(f"smd_{feature}_after"),
+            )
 
         logger.info("\nMatched Sample:")
         logger.info("  Total tracts: %d", matched_panel["tract_geoid"].nunique())
